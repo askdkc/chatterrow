@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
+// Health check for load balancers / provisioning scripts.
+Route::get('up', fn () => response('ok'))->name('health.up');
+
 // Legacy dashboard route: the app's home is the server list.
 Route::get('dashboard', fn () => redirect()->route('servers.index'))
     ->middleware(['auth', 'verified'])
