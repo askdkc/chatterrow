@@ -18,7 +18,7 @@
 
 <nav
     class="flex h-full w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto bg-[#1e1f22] py-3 dark:bg-[#1e1f22] light:bg-[#e3e5e8]"
-    aria-label="サーバー一覧"
+    aria-label="プロジェクト一覧"
 >
     <!-- Home / browse -->
     <button
@@ -27,7 +27,7 @@
         class:bg-[#5865f2]={!activeServerId}
         class:rounded-xl={!activeServerId}
         onclick={onBrowse}
-        title="サーバー一覧"
+        title="プロジェクト一覧"
     >
         <Compass class="h-6 w-6" />
     </button>
@@ -61,7 +61,7 @@
         type="button"
         class="group relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#313338] text-[#23a559] transition-all hover:rounded-xl hover:bg-[#23a559] hover:text-white"
         onclick={onAddServer}
-        title="サーバーを作成"
+        title="プロジェクトを作成"
     >
         <Plus class="h-6 w-6" />
     </button>

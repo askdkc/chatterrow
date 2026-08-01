@@ -23,6 +23,7 @@ class ChatPageController extends Controller
 
         $messages = Message::query()
             ->with(['user:id,name,email', 'attachments'])
+            ->withCount(['replies as reply_count'])
             ->where('channel_id', $channel->id)
             ->whereNull('parent_id')
             ->latest('id')

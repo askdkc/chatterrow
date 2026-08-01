@@ -281,7 +281,7 @@
                                 onclick={() => openPreview(file)}
                                 title="プレビュー"
                             >
-                                {#if isImage(file) && file.thumbnail_url}
+                                {#if file.thumbnail_url}
                                     <img
                                         src={file.thumbnail_url}
                                         alt={file.original_name}
@@ -398,6 +398,7 @@
     <MemberDialog
         {server}
         {members}
+        onUpdated={(updated) => (server = { ...server, ...updated })}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

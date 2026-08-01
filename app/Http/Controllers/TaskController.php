@@ -30,6 +30,7 @@ class TaskController extends Controller
             ->with(['assignee:id,name,email', 'channel:id,name'])
             ->whereIn('channel_id', $channels->pluck('id'))
             ->orderBy('completed_at')
+            ->orderBy('due_at')
             ->orderBy('due_on')
             ->get();
 
@@ -53,6 +54,7 @@ class TaskController extends Controller
             ->with(['assignee:id,name,email', 'creator:id,name,email'])
             ->where('channel_id', $channel->id)
             ->orderBy('completed_at')
+            ->orderBy('due_at')
             ->orderBy('due_on')
             ->get();
 
@@ -78,7 +80,8 @@ class TaskController extends Controller
         $todos = Todo::query()
             ->with(['channel:id,name'])
             ->whereIn('channel_id', $channels->pluck('id'))
-            ->whereNotNull('due_on')
+            ->where(fn ($query) => $query->whereNotNull('due_at')->orWhereNotNull('due_on'))
+            ->orderBy('due_at')
             ->orderBy('due_on')
             ->get();
 
@@ -94,10 +97,10 @@ class TaskController extends Controller
             'id' => "todo-{$todo->id}",
             'type' => 'todo',
             'title' => $todo->title,
-            'start' => $todo->due_on?->toDateString(),
-            'end' => $todo->due_on?->toDateString(),
+            'start' => ($todo->starts_at ?? $todo->due_at ?? $todo->due_on)?->toDateString(),
+            'end' => ($todo->due_at ?? $todo->due_on)?->toDateString(),
             'channel_id' => $todo->channel_id,
-            'channel_name' => $todo->channel?->name,
+            'channel_name' => $todo->channel->name,
             'completed' => $todo->completed_at !== null,
         ]))->values();
 
@@ -110,16 +113,17 @@ class TaskController extends Controller
     }
 
     /**
-     * Gantt data for one channel: the channel bar + its todos.
+     * Gantt page for one channel: the channel bar + its todos.
      */
-    public function channelGantt(Server $server, Channel $channel): JsonResponse
+    public function channelGantt(Server $server, Channel $channel): Response
     {
         abort_unless($channel->server_id === $server->id, 404);
         Gate::authorize('view', $channel);
 
         $todos = Todo::query()
             ->where('channel_id', $channel->id)
-            ->whereNotNull('due_on')
+            ->where(fn ($query) => $query->whereNotNull('due_at')->orWhereNotNull('due_on'))
+            ->orderBy('due_at')
             ->orderBy('due_on')
             ->get();
 
@@ -137,15 +141,17 @@ class TaskController extends Controller
             'id' => "todo-{$todo->id}",
             'type' => 'todo',
             'title' => $todo->title,
-            'start' => $todo->due_on?->toDateString(),
-            'end' => $todo->due_on?->toDateString(),
+            'start' => ($todo->starts_at ?? $todo->due_at ?? $todo->due_on)?->toDateString(),
+            'end' => ($todo->due_at ?? $todo->due_on)?->toDateString(),
             'channel_id' => $channel->id,
             'channel_name' => $channel->name,
             'completed' => $todo->completed_at !== null,
         ]))->values();
 
-        return response()->json([
-            'channel' => $channel,
+        return Inertia::render('servers/Gantt', [
+            'server' => $server,
+            'channels' => $server->channels()->orderBy('name')->get(),
+            'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'tasks' => $tasks,
         ]);
     }

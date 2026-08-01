@@ -1,177 +1,257 @@
 # chatter
 
-Discord風UIのチャット型グループウェア（Laravel 13 + Inertia 3 + Svelte 5）。
+Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェクト型グループウェアです。
 
-サーバー（プロジェクト）ごとにチャンネルを作り、チャンネル単位でチャット・タスク（todo）・ファイル・ガントチャートを管理します。Office ファイルは ONLYOFFICE Document Server（読取専用）でプレビュー、画像・動画・PDF はブラウザ内 JS プレビュー、リアルタイム通知は Laravel Reverb で配信します。
+プロジェクトごとにチャンネルを作り、チャット、タスク、ファイル、ガントチャートを一元管理します。リアルタイム配信にはLaravel Reverb、Officeファイルの読取専用プレビューにはONLYOFFICE Document Serverを使用します。
 
-## 機能
+## 主な機能
 
-- **Discord 風 3 カラム UI** — サーバーサイドバー / チャンネル一覧 / メッセージ欄
-- **サーバー** — 開始日・終了期限の設定（カレンダー情報。利用期限ではない）、メンバー管理
-- **チャンネル = タスク** — チャンネル自体に期間を持たせ、ガントチャート上でタスクとして表示
-- **チャット** — メッセージ送信・スレッド・チャンネル切替・D&D ファイルアップロード・添付表示（Reverb でリアルタイム同期）
-- **タスク一覧** — サーバー内の全チャンネル + チャンネル内 todo を一覧表示
-- **ガントチャート** — サーバー = 全チャンネルのタスク、チャンネル = 配下タスク
-- **ファイルビューワー** — 画像/動画/PDF は JS プレビュー、Office は ONLYOFFICE 読取専用ポップアップ
-- **期限リマインダー** — タスク期限当日にチャンネルへ自動通知（scheduler + supervisor）
+- **プロジェクト管理**: プロジェクト名、内容、開始日、終了日、メンバーを設定
+- **チャンネル**: プロジェクト内の会話・タスク・ファイルをチャンネル単位で整理
+- **リアルタイムチャット**: Laravel Reverbによるメッセージ、スレッド、返信数の同期
+- **安全なMarkdown**: HTMLエスケープ、HTTP(S) URL制限、Shikiコードハイライト
+- **添付ファイル**: ファイル／フォルダのD&D、10件単位アップロード、画像・PDF・Officeサムネイル
+- **ファイルプレビュー**: 画像・PDFの中央ビューア、ONLYOFFICEによるOfficeプレビュー、Escで終了
+- **タスク管理**: 開始日・開始時刻・終了日・終了時刻、優先度、メモ、完了状態
+- **ガントチャート**: プロジェクトまたはチャンネル単位の期間表示
+- **期限リマインダー**: スケジューラとキューワーカーによる自動通知
+- **テーマ**: ダーク／ライトモード対応
+- **キーボード操作**: メッセージ送信とタスク作成は`Cmd+Enter`または`Ctrl+Enter`。IME確定Enterは送信しません
 
-## 技術スタック
+## 技術構成
 
 | レイヤー | 技術 |
 |---|---|
-| Backend | Laravel 13.23 / PHP 8.3+ |
+| Backend | Laravel 13 / PHP 8.4.1+ |
 | Frontend | Inertia 3 / Svelte 5 / Tailwind CSS 4 / Vite 8 |
-| DB | SQLite（アプリ本体）/ PostgreSQL（ONLYOFFICE 内部） |
-| Realtime | Laravel Reverb (WebSocket) |
-| プレビュー | @file-viewer/web + preset-office、libreoffice / poppler / imagemagick |
-| Office | ONLYOFFICE Document Server（読取専用、JWT 署名） |
-| サーバー | nginx + PHP-FPM + supervisor |
+| Database | SQLiteまたはPostgreSQL |
+| Realtime | Laravel Reverb（WebSocket） |
+| Preview | Shiki / libreoffice / poppler / ImageMagick |
+| Office | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
+| Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot |
 
-## クイックスタート（Ubuntu 24.04 / 26.04）
+## 本番要件
 
-sudo が使える `ubuntu` ユーザーで、ドメインの A レコード（`chat.example.com` と `office.chat.example.com`）がこのサーバーを指すよう事前に設定しておきます。その上で:
+- Ubuntu 24.04 LTSまたはUbuntu 26.04 LTS（amd64）
+- sudoを使用できる一般ユーザー。rootユーザーとして直接実行しないでください
+- 2 CPU、2 GB RAM、40 GB空きディスク以上
+- 4 GB以上のswapを推奨
+- TCP 80/443をインターネットから到達可能にする
+- アプリ用とONLYOFFICE用の異なる2つのDNS名
+
+例:
+
+```text
+chat.example.com         A/AAAA -> サーバー
+office.chat.example.com  A/AAAA -> サーバー
+```
+
+ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポートは外部公開しないでください。クラウドファイアウォールやホスト側ファイアウォールでは、SSH用ポートと80/443だけを許可します。
+
+## 自動セットアップ
+
+リポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。
 
 ```bash
 git clone git@github.com:askdkc/chatter.git
 cd chatter
-./setup.sh --domain chat.example.com --email you@example.com
+./setup.sh
 ```
 
-これだけで以下が自動で完了します。
+入力例:
 
-1. **apt インストール**: nginx / PHP 8.3+（FPM + 拡張）/ composer / Node.js 22 / supervisor / certbot / libreoffice・poppler・imagemagick / ONLYOFFICE Document Server
-2. **アプリ配備**: `/var/www/chatter` へ clone → `composer install` → `.env` 生成（APP_KEY・Reverb 鍵・ONLYOFFICE JWT を自動生成）→ `npm ci && npm run build` → `migrate`
-3. **nginx**: `sites-available/chatter`（アプリ）+ `sites-available/onlyoffice`（Document Server リバースプロキシ、ポート 8080）を生成し有効化
-4. **Let's Encrypt**: `certbot --nginx` で `chat.example.com` + `office.chat.example.com` に SSL 発行、`certbot.timer` で自動更新を有効化
-5. **supervisor**: `chatter-queue`（キュー）/ `chatter-reverb`（WebSocket）/ `chatter-schedule`（スケジューラ）の3設定を自動生成
-6. **自動起動**: nginx / php*-fpm / supervisor / postgresql / onlyoffice-documentserver を `systemctl enable`
+```text
+Application domain (e.g. chat.example.com): chat.example.com
+Application database [sqlite/postgresql] (default: sqlite): postgresql
+Let's Encrypt email (optional): admin@example.com
+PostgreSQL password (leave blank to generate):
+```
 
-完了後、`https://chat.example.com` にアクセスし、`/register` から最初のユーザーを作成します。
+ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になります。上の例では`office.chat.example.com`です。
 
-## setup.sh オプション
+セットアップは以下を自動実行します。
+
+1. nginx公式署名済みリポジトリ、PHP 8.4+、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
+2. PHP拡張、LibreOffice、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
+3. PostgreSQLをCPU数と搭載RAMに合わせて調整
+4. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
+5. アプリを`/var/www/chatter`へ配備し、依存関係、フロントエンド、マイグレーションを実行
+6. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
+7. Supervisorでキュー、Reverb、スケジューラを`www-data`として常駐
+8. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
+9. PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
+
+## 非対話セットアップ
+
+自動化環境では`--domain`と`--database`が必須です。
+
+```bash
+./setup.sh \
+    --domain chat.example.com \
+    --office-domain office.chat.example.com \
+    --email admin@example.com \
+    --database postgresql
+```
+
+### オプション
 
 | オプション | デフォルト | 説明 |
 |---|---|---|
-| `--domain <d>` | — | アプリのドメイン（certbot 対象。`--no-ssl` 以外は必須） |
-| `--email <m>` | — | Let's Encrypt の登録・更新通知メール |
-| `--office-domain <d>` | `office.<domain>` | ONLYOFFICE Document Server のドメイン |
-| `--app-dir <p>` | `/var/www/chatter` | アプリのインストール先 |
-| `--repo <url>` | `git@github.com:askdkc/chatter.git` | 配備する Git リポジトリ |
-| `--no-ssl` | off | certbot をスキップ（HTTP のみ・テスト用） |
+| `--domain <domain>` | 対話入力 | アプリの公開ドメイン |
+| `--office-domain <domain>` | `office.<domain>` | ONLYOFFICEの公開ドメイン |
+| `--email <email>` | 空 | Let's Encrypt登録・期限通知メール |
+| `--database <driver>` | 対話時は`sqlite` | `sqlite`または`postgresql` |
+| `--db-name <name>` | `chatter` | アプリ用PostgreSQL DB名 |
+| `--db-user <name>` | `chatter` | アプリ用PostgreSQLロール |
+| `--db-password <password>` | 自動生成 | アプリ用PostgreSQLパスワード |
+| `--app-dir <path>` | `/var/www/chatter` | `/var/www`配下の配備先 |
+| `--repo <url>` | GitHub SSH URL | 配備するGitリポジトリ |
+| `--no-ssl` | off | Certbotを省略しHTTPで構成 |
 
-> **SSH 鍵**: `--repo` 既定値は SSH 形式（`git@github.com:...`）です。サーバーに GitHub の SSH 鍵が登録されていない場合は HTTPS に自動フォールバックします。
+同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`。
 
-## 手動インストール（setup.sh を使わない場合）
-
-```bash
-# 1. パッケージ
-sudo apt update
-sudo apt install -y nginx php-cli php-fpm php-sqlite3 php-mbstring php-xml \
-    php-zip php-bcmath php-intl php-curl php-gd composer supervisor \
-    certbot python3-certbot-nginx libreoffice poppler-utils imagemagick
-
-# 2. Node.js 22（Vite 8 は ^20.19 || >=22.12 が必要）
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# 3. ONLYOFFICE Document Server（ポート 8080 + JWT）
-curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | sudo gpg --dearmor -o /usr/share/keyrings/onlyoffice.gpg
-echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
-sudo apt update && sudo apt install -y onlyoffice-documentserver
-
-# 4. アプリ
-sudo git clone git@github.com:askdkc/chatter.git /var/www/chatter
-cd /var/www/chatter
-composer install --no-dev
-cp .env.example .env        # → APP_KEY / REVERB_* / ONLYOFFICE_* を設定
-php artisan key:generate
-npm ci && npm run build
-touch database/database.sqlite && php artisan migrate --force
-sudo chown -R www-data:www-data storage bootstrap/cache
-
-# 5. nginx / supervisor / certbot
-#    setup.sh の「nginx conf 生成」「supervisor conf 生成」「Let's Encrypt」セクションと同内容
-```
-
-## 環境変数（.env）
-
-| 変数 | 説明 |
-|---|---|
-| `APP_URL` | アプリの公開 URL（`https://chat.example.com`） |
-| `BROADCAST_CONNECTION=reverb` | WebSocket ブロードキャスト |
-| `REVERB_APP_ID/KEY/SECRET` | Reverb アプリ鍵（`openssl rand -hex 16/24` で生成） |
-| `REVERB_HOST/PORT/SCHEME` | クライアント側 WebSocket 接続先（`chat.example.com` / 443 / https） |
-| `REVERB_SERVER_HOST/PORT` | Reverb サーバー側 listen 先（127.0.0.1:8080、nginx が `/apps` をプロキシ） |
-| `ONLYOFFICE_ENABLED=true` | ONLYOFFICE プレビュー有効化 |
-| `ONLYOFFICE_DOCUMENT_SERVER_URL` | Document Server の公開 URL（`https://office.chat.example.com`） |
-| `ONLYOFFICE_JWT_SECRET` | Document Server の `local.json` と同じ JWT シークレット |
-| `ONLYOFFICE_ALLOW_DOWNLOAD/PRINT` | プレビュー時のダウンロード・印刷許可 |
-
-## 運用
-
-### サービス構成（supervisor が管理）
+PostgreSQLパスワードを省略すると64桁のランダム値を生成し、次の場所へ保存します。
 
 ```text
-chatter-queue     php artisan queue:work database          # プレビュー生成等のジョブ
-chatter-reverb    php artisan reverb:start                 # WebSocket (127.0.0.1:8080)
-chatter-schedule  php artisan schedule:work                # 期限リマインダー（毎時）
+/etc/chatter/database-password  root:root 0600
+/var/www/chatter/.env           <deploy-user>:www-data 0640
 ```
 
-```bash
-sudo supervisorctl status                      # 状態確認
-sudo supervisorctl restart chatter-reverb      # 再起動
-sudo tail -f /var/log/chatter-*.log            # ログ
+## PostgreSQL自動調整
+
+PostgreSQLはONLYOFFICEでも必要なため、アプリでSQLiteを選んだ場合もインストール・調整します。Ubuntu上に複数のPostgreSQLクラスタがある場合は、誤ったクラスタを変更しないようセットアップを停止します。
+
+設定ファイル:
+
+```text
+/etc/postgresql/<version>/<cluster>/conf.d/99-chatter-tuning.conf
 ```
 
-### SSL 自動更新
+主な計算基準:
 
-`certbot.timer`（systemd）が毎日証明書の有効期限を確認し、30日以内なら自動更新します。
+| 設定 | 基準 |
+|---|---|
+| `shared_buffers` | RAMの20%、128 MBから8 GBの範囲 |
+| `effective_cache_size` | RAMの60%、256 MBから64 GBの範囲 |
+| `maintenance_work_mem` | RAMの5%、64 MBから1 GBの範囲 |
+| `work_mem` | RAM、`shared_buffers`、最大接続数から安全側に算出 |
+| `max_connections` | CPUとRAMから50から300の範囲で算出 |
+| parallel workers | CPU数から算出し上限を設定 |
+
+このサーバーではPHP、ONLYOFFICE、Redis、RabbitMQも同居するため、PostgreSQL専用サーバーより保守的な割り当てです。再実行すると現在のCPU数とRAMから再計算されます。
+
+## ポート構成
+
+| ポート | 用途 | 公開範囲 |
+|---|---|---|
+| 80 / 443 | nginx、Certbot、公開Web | インターネット |
+| 8080 | ONLYOFFICE Document Server | localhost向け |
+| 8081 | Laravel Reverb | localhost向け |
+| 8090 | ONLYOFFICEから署名済みファイルを取得 | 127.0.0.1のみ |
+| 5432 | PostgreSQL | ローカル接続を推奨 |
+
+## SSLと自動更新
+
+Certbotはアプリ用とONLYOFFICE用の両ドメインを含む証明書をnginxへ設定します。`certbot.timer`が更新時期を定期確認し、更新成功後にnginxをreloadします。セットアップ時にはdry-runも実行します。
 
 ```bash
 sudo systemctl status certbot.timer
-sudo certbot renew --dry-run                   # 動作確認
+sudo certbot certificates
+sudo certbot renew --dry-run
+```
+
+## 運用
+
+### プロセス確認
+
+```bash
+sudo supervisorctl status
+sudo supervisorctl restart chatter-queue chatter-reverb chatter-schedule
+sudo tail -f /var/log/chatter-*.log
 ```
 
 ### アプリ更新
 
+同じ設定で`setup.sh`を再実行できます。既存のPostgreSQLパスワードとTLS有効nginx設定は保持され、Gitはfast-forward可能な場合だけ更新されます。
+
 ```bash
-cd /var/www/chatter
-git pull
-composer install --no-dev
-npm ci && npm run build
-php artisan migrate --force
-sudo supervisorctl restart chatter-queue chatter-reverb chatter-schedule
+cd /path/to/chatter-source
+./setup.sh --domain chat.example.com --database postgresql --email admin@example.com
 ```
 
 ### バックアップ
 
+SQLite:
+
 ```bash
-# SQLite DB + アップロードファイル
-sudo sqlite3 /var/www/chatter/database/database.sqlite ".backup /backup/chatter-$(date +%F).sqlite"
-sudo rsync -a /var/www/chatter/storage/app /backup/
+sudo install -d /backup
+sudo -u www-data sqlite3 /var/www/chatter/database/database.sqlite \
+    ".backup /backup/chatter-$(date +%F).sqlite"
+sudo rsync -a /var/www/chatter/storage/app/ /backup/storage-app/
 ```
+
+PostgreSQL:
+
+```bash
+sudo install -d /backup
+sudo -u postgres pg_dump --format=custom chatter > /backup/chatter-$(date +%F).dump
+sudo rsync -a /var/www/chatter/storage/app/ /backup/storage-app/
+```
+
+## 主な環境変数
+
+| 変数 | 説明 |
+|---|---|
+| `APP_URL` | アプリの公開URL |
+| `DB_CONNECTION` | `sqlite`または`pgsql` |
+| `REVERB_APP_ID/KEY/SECRET` | Reverb認証情報 |
+| `REVERB_HOST/PORT/SCHEME` | ブラウザとLaravelが接続する公開WebSocket |
+| `REVERB_SERVER_HOST/PORT` | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
+| `REVERB_ALLOWED_ORIGINS` | Reverbへの接続を許可する公開ドメイン |
+| `ONLYOFFICE_DOCUMENT_SERVER_URL` | ブラウザから見えるONLYOFFICE URL |
+| `APP_ONLYOFFICE_INTERNAL_URL` | ONLYOFFICEがファイルを取得する内部アプリURL |
+| `ONLYOFFICE_JWT_SECRET` | ONLYOFFICEと共有するJWT秘密鍵 |
 
 ## トラブルシューティング
 
-| 症状 | 対処 |
+| 症状 | 確認 |
 |---|---|
-| アプリが 502 | `sudo systemctl status php*-fpm`（FPM が落ちていないか）、`sudo nginx -t` |
-| プレビューが生成されない | `sudo tail -f /var/log/chatter-queue-error.log`（libreoffice/poppler 未導入なら `sudo apt install libreoffice poppler-utils imagemagick`） |
-| Office プレビューが開かない | `ONLYOFFICE_JWT_SECRET` と `/etc/onlyoffice/documentserver/local.json` の `services.CoAuthoring.secret` が一致しているか確認 |
-| チャットがリアルタイム更新されない | `sudo supervisorctl status chatter-reverb`、ブラウザ開発者ツールの Network で `/apps/` WebSocket 接続を確認 |
-| リマインダーが来ない | `sudo supervisorctl status chatter-schedule`（`schedule:work` が動いているか） |
+| 502 Bad Gateway | `sudo systemctl status php*-fpm`、`sudo nginx -t` |
+| リアルタイム更新されない | `sudo supervisorctl status chatter-reverb`、ブラウザNetworkの`/app/`接続 |
+| 添付プレビューが生成されない | `/var/log/chatter-queue-error.log`、LibreOffice/Poppler/ImageMagick |
+| Officeプレビューが開かない | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL |
+| PostgreSQLへ接続できない | `.env`、`sudo -u postgres pg_isready`、`/etc/chatter/database-password` |
+| 証明書を発行できない | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/` |
 
-## 開発（ローカル）
+## ローカル開発
 
 ```bash
 composer install
-cp .env.example .env && php artisan key:generate
-touch database/database.sqlite && php artisan migrate
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate
 npm ci
-npm run dev          # 別ターミナルで: php artisan serve
-php artisan test     # 43 tests (149 assertions)
+npm run dev
+```
+
+別ターミナルでLaravelとReverbを起動します。
+
+```bash
+php artisan serve
+php artisan reverb:start --port=8081
+```
+
+検証:
+
+```bash
+php artisan test
+npm run test:unit
+npm run lint:check
+npm run types:check
+npm run build
 ```
 
 ## ライセンス
 
-MIT（Laravel 本体は MIT、ONLYOFFICE は AGPLv3 Community Edition を同梱する場合に注意）。
+MIT。ONLYOFFICE Docs Community Editionを導入する場合はAGPLv3の条件も確認してください。

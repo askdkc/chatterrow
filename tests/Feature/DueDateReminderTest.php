@@ -55,7 +55,7 @@ class DueDateReminderTest extends TestCase
         $todo = Todo::factory()->create([
             'channel_id' => $channel->id,
             'assignee_id' => $this->owner->id,
-            'due_on' => now()->today(),
+            'due_at' => now()->today()->setHour(17),
         ]);
 
         $this->artisan('reminders:send-due')->assertSuccessful();
@@ -80,7 +80,7 @@ class DueDateReminderTest extends TestCase
     {
         Todo::factory()->create([
             'channel_id' => $this->channel->id,
-            'due_on' => now()->today(),
+            'due_at' => now()->today()->setHour(17),
             'completed_at' => now(),
         ]);
 

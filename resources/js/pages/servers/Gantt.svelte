@@ -7,6 +7,7 @@
         CheckCircle2,
     } from 'lucide-svelte';
     import ChannelList from '@/components/discord/ChannelList.svelte';
+    import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import type {
         ServerResource,
@@ -42,11 +43,14 @@
     const authServers: ServerResource[] = $derived(
         page.props.auth?.servers ?? [],
     );
+    let showMemberDialog = $state(false);
 
     const epochDay = (value: string | Date): number =>
         Math.floor(new Date(`${value}T00:00:00`).getTime() / 86_400_000);
 
-    const dated = tasks.filter((t) => t.start !== null && t.end !== null);
+    const dated = $derived(
+        tasks.filter((t) => t.start !== null && t.end !== null),
+    );
     const minDay = $derived(
         dated.length > 0
             ? Math.min(...dated.map((t) => epochDay(t.start as string)))
@@ -153,7 +157,9 @@
 
     function onAddChannel() {}
 
-    function onManageMembers() {}
+    function onManageMembers() {
+        showMemberDialog = true;
+    }
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
@@ -275,3 +281,12 @@
         </div>
     </main>
 </div>
+
+{#if showMemberDialog}
+    <MemberDialog
+        {server}
+        {members}
+        onUpdated={(updated) => (server = { ...server, ...updated })}
+        onClose={() => (showMemberDialog = false)}
+    />
+{/if}

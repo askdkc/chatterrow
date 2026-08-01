@@ -8,10 +8,12 @@
         CalendarRange,
         FileText,
         ChevronDown,
+        CornerDownRight,
         Settings,
     } from 'lucide-svelte';
     import type {
         ChannelResource,
+        MessageResource,
         ServerResource,
         UserResource,
     } from '@/types';
@@ -21,16 +23,30 @@
         channels,
         members,
         activeChannelId,
+        threads = [],
+        activeThreadId = null,
         onAddChannel,
         onManageMembers,
+        onOpenThread,
     }: {
         server: ServerResource;
         channels: ChannelResource[];
         members: UserResource[];
         activeChannelId: number | null;
+        threads?: MessageResource[];
+        activeThreadId?: number | null;
         onAddChannel: () => void;
         onManageMembers: () => void;
+        onOpenThread?: (message: MessageResource) => void;
     } = $props();
+
+    function threadTitle(message: MessageResource): string {
+        return (
+            message.body.trim().split('\n')[0] ||
+            message.attachments?.[0]?.original_name ||
+            '無題のスレッド'
+        );
+    }
 </script>
 
 <aside
@@ -52,7 +68,7 @@
                 class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide"
             >
                 <ChevronDown class="h-3 w-3" />
-                テキストチャンネル
+                チャンネル
             </span>
             <button
                 type="button"
@@ -82,6 +98,39 @@
                     ></span>
                 {/if}
             </Link>
+
+            {#if channel.id === activeChannelId && threads.length > 0}
+                <div
+                    class="relative mx-4 mb-2 ml-6 border-l-2 border-[#4e5058] pl-2"
+                    aria-label="スレッド一覧"
+                >
+                    {#each threads as thread (thread.id)}
+                        <button
+                            type="button"
+                            class={`group/thread flex w-full min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-left text-sm transition hover:bg-white/10 hover:text-[#dbdee1] ${
+                                thread.id === activeThreadId
+                                    ? 'bg-white/10 text-[#dbdee1]'
+                                    : ''
+                            }`}
+                            onclick={() => onOpenThread?.(thread)}
+                            aria-label={`スレッド「${threadTitle(thread)}」を開く`}
+                            title={threadTitle(thread)}
+                        >
+                            <CornerDownRight
+                                class="h-3.5 w-3.5 shrink-0 opacity-60"
+                            />
+                            <span class="min-w-0 flex-1 truncate">
+                                {threadTitle(thread)}
+                            </span>
+                            <span
+                                class="shrink-0 text-[10px] text-[#80848e] group-hover/thread:text-[#b5bac1]"
+                            >
+                                {thread.reply_count}
+                            </span>
+                        </button>
+                    {/each}
+                </div>
+            {/if}
         {/each}
 
         {#if channels.length === 0}

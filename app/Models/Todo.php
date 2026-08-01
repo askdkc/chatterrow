@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\TodoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,9 @@ use Illuminate\Support\Carbon;
  * @property int|null $created_by
  * @property string $title
  * @property string|null $details
+ * @property Carbon|null $starts_at
+ * @property Carbon|null $due_at
+ * @property string $priority
  * @property Carbon|null $due_on
  * @property Carbon|null $completed_at
  * @property int|null $completed_by
@@ -28,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $creator
  * @property-read Collection<int, StoredFile> $attachments
  */
-#[Fillable(['channel_id', 'assignee_id', 'created_by', 'title', 'details', 'due_on', 'completed_at', 'completed_by', 'position', 'reminded_at'])]
+#[Fillable(['channel_id', 'assignee_id', 'created_by', 'title', 'details', 'starts_at', 'due_at', 'priority', 'due_on', 'completed_at', 'completed_by', 'position', 'reminded_at'])]
 class Todo extends Model
 {
     /** @use HasFactory<TodoFactory> */
@@ -68,6 +72,8 @@ class Todo extends Model
     protected function casts(): array
     {
         return [
+            'starts_at' => 'datetime',
+            'due_at' => 'datetime',
             'due_on' => 'date',
             'completed_at' => 'datetime',
         ];

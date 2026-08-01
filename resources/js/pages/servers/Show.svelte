@@ -37,7 +37,7 @@
     let showMemberDialog = $state(false);
     let showServerDialog = $state(false);
 
-    const channels: ChannelResource[] = server.channels ?? [];
+    const channels: ChannelResource[] = $derived(server.channels ?? []);
 
     onMount(() => {
         // Auto-enter the first channel, like Discord opens the default channel.
@@ -157,6 +157,7 @@
     <MemberDialog
         {server}
         {members}
+        onUpdated={(updated) => (server = { ...server, ...updated })}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

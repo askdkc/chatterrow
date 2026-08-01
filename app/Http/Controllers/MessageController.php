@@ -9,7 +9,6 @@ use App\Models\Server;
 use App\Models\StoredFile;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -25,6 +24,7 @@ class MessageController extends Controller
 
         $query = Message::query()
             ->with(['user:id,name,email', 'attachments'])
+            ->withCount(['replies as reply_count'])
             ->where('channel_id', $channel->id)
             ->where('parent_id', $parentId)
             ->latest('id')
@@ -43,7 +43,13 @@ class MessageController extends Controller
 
         $validated = $request->validate([
             'body' => ['required_without:attachments', 'string', 'max:10000'],
-            'parent_id' => ['nullable', 'integer', Rule::exists('messages', 'id')->where('channel_id', $channel->id)],
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('messages', 'id')
+                    ->where('channel_id', $channel->id)
+                    ->whereNull('parent_id'),
+            ],
             'attachments' => ['nullable', 'array', 'max:10'],
             'attachments.*.path' => ['required', 'string'],
             'attachments.*.original_name' => ['required', 'string', 'max:255'],
@@ -86,13 +92,38 @@ class MessageController extends Controller
         return response()->json(['message' => $message], 201);
     }
 
-    public function destroy(Server $server, Channel $channel, Message $message): RedirectResponse
+    public function update(Request $request, Server $server, Channel $channel, Message $message): JsonResponse
     {
-        abort_unless($message->server_id === $server->id && $message->channel_id === $channel->id, 404);
+        $this->ensureMessageBelongsToChannel($server, $channel, $message);
+        Gate::authorize('update', $message);
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:10000'],
+        ]);
+
+        $message->update(['body' => $validated['body']]);
+        $message->load(['user:id,name,email', 'attachments']);
+
+        return response()->json(['message' => $message]);
+    }
+
+    public function destroy(Server $server, Channel $channel, Message $message): JsonResponse
+    {
+        $this->ensureMessageBelongsToChannel($server, $channel, $message);
         Gate::authorize('delete', $message);
 
         $message->delete();
 
-        return back();
+        return response()->json(status: 204);
+    }
+
+    private function ensureMessageBelongsToChannel(Server $server, Channel $channel, Message $message): void
+    {
+        abort_unless(
+            $channel->server_id === $server->id
+                && $message->server_id === $server->id
+                && $message->channel_id === $channel->id,
+            404,
+        );
     }
 }

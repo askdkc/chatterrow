@@ -40,14 +40,14 @@
         <header
             class="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-black/10 bg-[#313338] px-6 dark:border-black/20"
         >
-            <h1 class="text-[15px] font-bold">サーバー一覧</h1>
+            <h1 class="text-[15px] font-bold">プロジェクト一覧</h1>
             <button
                 type="button"
                 class="flex items-center gap-1.5 rounded-md bg-[#5865f2] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#4752c4]"
                 onclick={onAddServer}
             >
                 <Plus class="h-4 w-4" />
-                サーバーを作成
+                プロジェクトを作成
             </button>
         </header>
 
@@ -61,16 +61,18 @@
                     >
                         <Hash class="h-8 w-8 text-[#5865f2]" />
                     </div>
-                    <h2 class="text-lg font-bold">まだサーバーがありません</h2>
+                    <h2 class="text-lg font-bold">
+                        まだプロジェクトがありません
+                    </h2>
                     <p class="mt-1 text-sm text-[#80848e]">
-                        サーバーを作成して、チームのチャットとタスクを始めましょう
+                        プロジェクトを作成して、チームのチャットとタスクを始めましょう
                     </p>
                     <button
                         type="button"
                         class="mt-4 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
                         onclick={onAddServer}
                     >
-                        サーバーを作成
+                        プロジェクトを作成
                     </button>
                 </div>
             {:else}

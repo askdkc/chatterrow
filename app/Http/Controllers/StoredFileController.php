@@ -19,13 +19,15 @@ class StoredFileController extends Controller
     {
         Gate::authorize('view', $server);
 
-        $validated = $request->validate([
+        $request->validate([
             'files' => ['required', 'array', 'max:10'],
             'files.*' => ['required', 'file', 'max:51200'],
         ]);
 
-        /** @var UploadedFile $file */
-        $stored = collect($validated['files'])->map(function ($file) use ($server, $request) {
+        $uploadedFiles = $request->file('files');
+        abort_unless(is_array($uploadedFiles), 422);
+
+        $stored = collect($uploadedFiles)->map(function (UploadedFile $file) use ($server, $request) {
             $originalName = $file->getClientOriginalName();
             $path = $file->store("uploads/{$server->id}/".date('Y/m/d'), ['disk' => 'local']);
 

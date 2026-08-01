@@ -30,7 +30,7 @@
 
     const mainNavItems: NavItem[] = [
         {
-            title: t('サーバー一覧'),
+            title: t('プロジェクト一覧'),
             href: serversIndex(),
             icon: LayoutGrid,
         },

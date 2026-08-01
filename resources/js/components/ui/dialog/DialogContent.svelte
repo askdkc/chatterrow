@@ -10,7 +10,16 @@
     const { open, setOpen } = getContext<DialogContext>(DIALOG_CONTEXT);
 
     const close = () => setOpen(false);
+
+    const handleKeydown = (event: KeyboardEvent): void => {
+        if (open() && event.key === 'Escape') {
+            event.preventDefault();
+            close();
+        }
+    };
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 {#if open()}
     <div class="fixed inset-0 z-50 flex items-center justify-center">

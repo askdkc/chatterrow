@@ -58,6 +58,7 @@ export interface MessageResource {
     parent_id: number | null;
     body: string;
     created_at: string;
+    updated_at?: string;
     reply_count?: number;
     user?: UserResource | null;
     attachments?: StoredFileResource[];
@@ -70,6 +71,9 @@ export interface TodoResource {
     created_by: number | null;
     title: string;
     details: string | null;
+    starts_at: string | null;
+    due_at: string | null;
+    priority: 'low' | 'normal' | 'high' | 'urgent';
     due_on: string | null;
     completed_at: string | null;
     completed_by: number | null;

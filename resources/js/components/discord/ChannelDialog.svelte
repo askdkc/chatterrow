@@ -48,22 +48,41 @@
             saving = false;
         }
     }
+
+    function handleDialogKeydown(event: KeyboardEvent) {
+        if (event.key === 'Escape') {
+            onClose();
+        }
+    }
 </script>
 
-<div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-    onclick={onClose}
->
+<svelte:window onkeydown={handleDialogKeydown} />
+
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+    <button
+        type="button"
+        class="absolute inset-0 bg-black/60"
+        aria-label="背景をクリックして閉じる"
+        onclick={onClose}
+    ></button>
     <div
-        class="w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
-        onclick={(e) => e.stopPropagation()}
+        class="relative z-10 w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="channel-dialog-title"
     >
         <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-[#dbdee1]">チャンネルを作成</h2>
+            <h2
+                id="channel-dialog-title"
+                class="text-lg font-bold text-[#dbdee1]"
+            >
+                チャンネルを作成
+            </h2>
             <button
                 type="button"
                 class="rounded p-1 hover:bg-white/10"
                 onclick={onClose}
+                aria-label="閉じる"
             >
                 <X class="h-5 w-5 text-[#80848e]" />
             </button>
@@ -71,10 +90,13 @@
 
         <div class="space-y-3">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                <label
+                    for="channel-name"
+                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                     >チャンネル名</label
                 >
                 <input
+                    id="channel-name"
                     bind:value={name}
                     type="text"
                     placeholder="例: プロジェクト進行"
@@ -87,10 +109,13 @@
                 />
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                <label
+                    for="channel-description"
+                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                     >説明（任意）</label
                 >
                 <textarea
+                    id="channel-description"
                     bind:value={description}
                     rows="2"
                     class="w-full resize-none rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
@@ -99,10 +124,12 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label
+                        for="channel-starts-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                         >開始日</label
                     >
                     <input
+                        id="channel-starts-on"
                         bind:value={startsOn}
                         type="date"
                         class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
@@ -110,10 +137,12 @@
                 </div>
                 <div>
                     <label
+                        for="channel-ends-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                         >終了期限</label
                     >
                     <input
+                        id="channel-ends-on"
                         bind:value={endsOn}
                         type="date"
                         class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"

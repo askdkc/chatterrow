@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('servers/{server}/channels/{channel}/messages', [MessageController::class, 'index'])->name('servers.channels.messages.index');
     Route::post('servers/{server}/channels/{channel}/messages', [MessageController::class, 'store'])->name('servers.channels.messages.store');
+    Route::patch('servers/{server}/channels/{channel}/messages/{message}', [MessageController::class, 'update'])->name('servers.channels.messages.update');
     Route::delete('servers/{server}/channels/{channel}/messages/{message}', [MessageController::class, 'destroy'])->name('servers.channels.messages.destroy');
 
     Route::get('servers/{server}/channels/{channel}/todos', [TodoController::class, 'index'])->name('servers.channels.todos.index');

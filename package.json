@@ -12,7 +12,7 @@
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
         "test:unit": "vitest run",
-        "types:check": "svelte-check --tsconfig ./tsconfig.json"
+        "types:check": "svelte-check --config ./svelte.config.js --tsconfig ./tsconfig.json --fail-on-warnings"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
@@ -51,6 +51,7 @@
         "laravel-vite-plugin": "^3.0.0",
         "lucide-svelte": "^0.468.0",
         "pusher-js": "^8.6.0",
+        "shiki": "^4.4.1",
         "svelte": "^5.16.0",
         "svelte-sonner": "^0.3.28",
         "tailwind-merge": "^3.2.0",

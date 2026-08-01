@@ -9,7 +9,9 @@ use App\Models\Todo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class TodoController extends Controller
 {
@@ -37,6 +39,9 @@ class TodoController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:5000'],
+            'starts_at' => ['nullable', 'date'],
+            'due_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'priority' => ['sometimes', 'string', Rule::in(['low', 'normal', 'high', 'urgent'])],
             'due_on' => ['nullable', 'date'],
             'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
@@ -62,6 +67,9 @@ class TodoController extends Controller
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
             'details' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'starts_at' => ['sometimes', 'nullable', 'date'],
+            'due_at' => ['sometimes', 'nullable', 'date', 'after_or_equal:starts_at'],
+            'priority' => ['sometimes', 'string', Rule::in(['low', 'normal', 'high', 'urgent'])],
             'due_on' => ['sometimes', 'nullable', 'date'],
             'assignee_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'completed_at' => ['sometimes', 'nullable', 'date'],
@@ -81,7 +89,7 @@ class TodoController extends Controller
         abort_unless($todo->channel_id === $channel->id && $channel->server_id === $server->id, 404);
         Gate::authorize('update', $todo);
 
-        $todo->completed_at = $todo->completed_at === null ? now() : null;
+        $todo->completed_at = $todo->completed_at === null ? Carbon::now() : null;
         $todo->completed_by = $todo->completed_at !== null ? $request->user()?->id : null;
         $todo->save();
 

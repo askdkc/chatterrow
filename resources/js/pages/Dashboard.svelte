@@ -4,7 +4,7 @@
     export const layout = {
         breadcrumbs: [
             {
-                title: 'サーバー一覧',
+                title: 'プロジェクト一覧',
                 href: serversIndex(),
             },
         ],
@@ -17,7 +17,7 @@
     import { t } from '@/lib/i18n';
 </script>
 
-<AppHead title={t('サーバー一覧')} />
+<AppHead title={t('プロジェクト一覧')} />
 
 <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
     <div class="grid auto-rows-min gap-4 md:grid-cols-3">

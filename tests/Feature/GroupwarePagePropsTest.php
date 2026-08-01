@@ -70,15 +70,41 @@ class GroupwarePagePropsTest extends TestCase
 
     public function test_chat_page_has_server_channel_members_messages_and_shared_rail(): void
     {
+        $rootMessage = Message::query()
+            ->where('channel_id', $this->channel->id)
+            ->whereNull('parent_id')
+            ->firstOrFail();
+        Message::factory()->create([
+            'server_id' => $this->server->id,
+            'channel_id' => $this->channel->id,
+            'user_id' => $this->member->id,
+            'parent_id' => $rootMessage->id,
+        ]);
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-31',
+        ]);
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-07',
+        ]);
+
         $this->actingAs($this->member)
             ->get(route('servers.channels.show', [$this->server, $this->channel]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('chat/Chat')
                 ->where('server.id', $this->server->id)
+                ->where('server.starts_on', '2026-08-01')
+                ->where('server.ends_on', '2026-08-31')
+                ->where('server.channels.0.starts_on', '2026-08-01')
+                ->where('server.channels.0.ends_on', '2026-08-07')
                 ->where('channel.id', $this->channel->id)
+                ->where('channel.starts_on', '2026-08-01')
+                ->where('channel.ends_on', '2026-08-07')
                 ->has('members', 2)
                 ->has('initialMessages', 1)
+                ->where('initialMessages.0.reply_count', 1)
                 ->has('auth.servers', 1));
     }
 
@@ -133,6 +159,21 @@ class GroupwarePagePropsTest extends TestCase
                 ->component('servers/Files')
                 ->where('server.id', $this->server->id)
                 ->where('channel.id', $this->channel->id)
+                ->has('auth.servers', 1));
+    }
+
+    public function test_channel_gantt_route_renders_the_gantt_page(): void
+    {
+        $this->actingAs($this->member)
+            ->get(route('servers.channels.gantt', [$this->server, $this->channel]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('servers/Gantt')
+                ->where('server.id', $this->server->id)
+                ->has('channels', 1)
+                ->has('members', 2)
+                ->has('tasks')
+                ->where('tasks.0.channel_id', $this->channel->id)
                 ->has('auth.servers', 1));
     }
 

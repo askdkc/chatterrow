@@ -1,8 +1,8 @@
 /**
  * Shared HTTP helper for authenticated groupware mutations.
  *
- * - Reads the CSRF token from the app shell meta tag on every request.
- * - Sets X-CSRF-TOKEN, X-Requested-With and Accept: application/json.
+ * - Reads Laravel's current XSRF token cookie on every request.
+ * - Sets X-XSRF-TOKEN, X-Requested-With and Accept: application/json.
  * - Preserves caller headers; never sets Content-Type for FormData.
  * - Converts non-2xx JSON responses into a typed HttpError.
  */
@@ -35,26 +35,26 @@ export class HttpError extends Error {
     }
 }
 
-export function csrfToken(): string {
-    const meta = document.querySelector<HTMLMetaElement>(
-        'meta[name="csrf-token"]',
-    );
+export function xsrfToken(): string {
+    const cookie = document.cookie
+        .split('; ')
+        .find((value) => value.startsWith('XSRF-TOKEN='));
 
-    if (!meta?.content) {
-        throw new Error('CSRF token is missing from the application shell.');
+    if (!cookie) {
+        throw new Error('XSRF token cookie is missing.');
     }
 
-    return meta.content;
+    return decodeURIComponent(cookie.slice('XSRF-TOKEN='.length));
 }
 
 export async function apiFetch(
     input: RequestInfo | URL,
     init: RequestInit = {},
 ): Promise<Response> {
-    const token = csrfToken();
+    const token = xsrfToken();
 
     const headers = new Headers(init.headers);
-    headers.set('X-CSRF-TOKEN', token);
+    headers.set('X-XSRF-TOKEN', token);
     headers.set('X-Requested-With', 'XMLHttpRequest');
     headers.set('Accept', 'application/json');
 

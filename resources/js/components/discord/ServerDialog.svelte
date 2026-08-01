@@ -16,7 +16,7 @@
     let error = $state('');
 
     async function create() {
-        if (!name.trim()) {
+        if (saving || !name.trim()) {
             return;
         }
 
@@ -42,22 +42,44 @@
             saving = false;
         }
     }
+
+    function handleDialogKeydown(event: KeyboardEvent) {
+        if (event.key === 'Escape') {
+            onClose();
+        } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            create();
+        }
+    }
 </script>
 
-<div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-    onclick={onClose}
->
+<svelte:window onkeydown={handleDialogKeydown} />
+
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+    <button
+        type="button"
+        class="absolute inset-0 bg-black/60"
+        aria-label="背景をクリックして閉じる"
+        onclick={onClose}
+    ></button>
     <div
-        class="w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
-        onclick={(e) => e.stopPropagation()}
+        class="relative z-10 w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="server-dialog-title"
     >
         <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-[#dbdee1]">サーバーを作成</h2>
+            <h2
+                id="server-dialog-title"
+                class="text-lg font-bold text-[#dbdee1]"
+            >
+                プロジェクトを作成
+            </h2>
             <button
                 type="button"
                 class="rounded p-1 hover:bg-white/10"
                 onclick={onClose}
+                aria-label="閉じる"
             >
                 <X class="h-5 w-5 text-[#80848e]" />
             </button>
@@ -65,26 +87,27 @@
 
         <div class="space-y-3">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >サーバー名</label
+                <label
+                    for="server-name"
+                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                    >プロジェクト名</label
                 >
                 <input
+                    id="server-name"
                     bind:value={name}
                     type="text"
                     placeholder="例: プロジェクトA"
                     class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
-                    onkeydown={(e) => {
-                        if (e.key === 'Enter') {
-                            create();
-                        }
-                    }}
                 />
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >説明（任意）</label
+                <label
+                    for="server-description"
+                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                    >内容（任意）</label
                 >
                 <textarea
+                    id="server-description"
                     bind:value={description}
                     rows="2"
                     class="w-full resize-none rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
@@ -93,10 +116,12 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label
+                        for="server-starts-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                         >開始日</label
                     >
                     <input
+                        id="server-starts-on"
                         bind:value={startsOn}
                         type="date"
                         class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
@@ -104,10 +129,12 @@
                 </div>
                 <div>
                     <label
+                        for="server-ends-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                        >終了期限</label
+                        >終了日</label
                     >
                     <input
+                        id="server-ends-on"
                         bind:value={endsOn}
                         type="date"
                         class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
@@ -115,7 +142,7 @@
                 </div>
             </div>
             <p class="text-xs text-[#80848e]">
-                終了期限はカレンダー・ガントチャート上の情報として機能します（利用期限ではありません）。
+                開始日・終了日はカレンダーとガントチャートに反映されます。
             </p>
 
             {#if error}

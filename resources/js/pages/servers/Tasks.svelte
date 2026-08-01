@@ -4,6 +4,8 @@
         Hash,
         ListTodo,
         CalendarDays,
+        Clock3,
+        Flag,
         CheckCircle2,
         Circle,
         User,
@@ -59,6 +61,25 @@
             month: 'short',
             day: 'numeric',
         });
+    }
+
+    function formatDateTime(iso: string): string {
+        return new Date(iso).toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
+    function priorityLabel(priority: TodoResource['priority']): string {
+        return {
+            low: '低',
+            normal: '通常',
+            high: '高',
+            urgent: '緊急',
+        }[priority];
     }
 </script>
 
@@ -166,7 +187,7 @@
                         {#each todos as todo (todo.id)}
                             <div
                                 class="flex items-center gap-3 rounded-lg bg-[#2b2d31] p-3 transition hover:bg-[#383a40]"
-                                class:opacity-60={todo.completed_at !== null}
+                                class:opacity-60={Boolean(todo.completed_at)}
                             >
                                 {#if todo.completed_at}
                                     <CheckCircle2
@@ -180,11 +201,19 @@
                                 <div class="min-w-0 flex-1">
                                     <p
                                         class="truncate text-sm font-medium"
-                                        class:line-through={todo.completed_at !==
-                                            null}
+                                        class:line-through={Boolean(
+                                            todo.completed_at,
+                                        )}
                                     >
                                         {todo.title}
                                     </p>
+                                    {#if todo.details}
+                                        <p
+                                            class="mt-0.5 line-clamp-2 text-xs text-[#80848e]"
+                                        >
+                                            {todo.details}
+                                        </p>
+                                    {/if}
                                     <Link
                                         href={`/servers/${server.id}/channels/${todo.channel.id}`}
                                         class="text-xs text-[#5865f2] hover:underline"
@@ -195,12 +224,24 @@
                                 <div
                                     class="flex shrink-0 items-center gap-4 text-xs text-[#80848e]"
                                 >
-                                    {#if todo.due_on}
+                                    {#if todo.starts_at}
                                         <span class="flex items-center gap-1">
-                                            <CalendarDays class="h-3.5 w-3.5" />
-                                            {formatDue(todo.due_on)}
+                                            <Clock3 class="h-3.5 w-3.5" />
+                                            {formatDateTime(todo.starts_at)}
                                         </span>
                                     {/if}
+                                    {#if todo.due_at || todo.due_on}
+                                        <span class="flex items-center gap-1">
+                                            <CalendarDays class="h-3.5 w-3.5" />
+                                            {todo.due_at
+                                                ? formatDateTime(todo.due_at)
+                                                : formatDue(todo.due_on)}
+                                        </span>
+                                    {/if}
+                                    <span class="flex items-center gap-1">
+                                        <Flag class="h-3.5 w-3.5" />
+                                        {priorityLabel(todo.priority)}
+                                    </span>
                                     <span class="flex items-center gap-1">
                                         <User class="h-3.5 w-3.5" />
                                         {todo.assignee?.name ?? '未割当'}
@@ -219,6 +260,7 @@
     <MemberDialog
         {server}
         {members}
+        onUpdated={(updated) => (server = { ...server, ...updated })}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

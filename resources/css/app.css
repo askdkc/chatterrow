@@ -90,6 +90,7 @@
 }
 
 :root {
+    color-scheme: light;
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 3.9%);
     --card: hsl(0 0% 100%);
@@ -127,6 +128,7 @@
 }
 
 .dark {
+    color-scheme: dark;
     --background: hsl(0 0% 3.9%);
     --foreground: hsl(0 0% 98%);
     --card: hsl(0 0% 3.9%);
@@ -168,5 +170,100 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/* Light palette for the Discord-inspired collaboration screens. */
+@layer utilities {
+    html:not(.dark) [class~='bg-[#313338]'] {
+        background-color: #ffffff;
+    }
+
+    html:not(.dark) [class~='bg-[#2b2d31]'] {
+        background-color: #f2f3f5;
+    }
+
+    html:not(.dark) [class~='bg-[#383a40]'] {
+        background-color: #ebedef;
+    }
+
+    html:not(.dark) [class~='bg-[#404249]'],
+    html:not(.dark) [class~='hover:bg-[#404249]']:hover,
+    html:not(.dark) [class~='hover:bg-[#383a40]']:hover {
+        background-color: #dfe1e5;
+    }
+
+    html:not(.dark) [class~='bg-[#1e1f22]'],
+    html:not(.dark) [class~='bg-[#232428]'] {
+        background-color: #e3e5e8;
+    }
+
+    html:not(.dark) [class~='text-[#dbdee1]'] {
+        color: #2e3338;
+    }
+
+    html:not(.dark) [class~='text-[#949ba4]'],
+    html:not(.dark) [class~='text-[#b5bac1]'] {
+        color: #4e5058;
+    }
+
+    html:not(.dark) [class~='text-[#80848e]'] {
+        color: #6a6f78;
+    }
+
+    html:not(.dark) [class~='border-[#686a70]'] {
+        border-color: #b5bac1;
+    }
+
+    html:not(.dark) [class~='focus-within:border-[#8b8d93]']:focus-within {
+        border-color: #6a6f78;
+    }
+
+    html:not(.dark) [class~='bg-white/5'] {
+        background-color: rgb(0 0 0 / 0.04);
+    }
+
+    html:not(.dark) [class~='bg-white/10'] {
+        background-color: rgb(0 0 0 / 0.08);
+    }
+
+    html:not(.dark) [class~='bg-white/15'] {
+        background-color: rgb(0 0 0 / 0.12);
+    }
+
+    html:not(.dark) [class~='hover:bg-white/5']:hover {
+        background-color: rgb(0 0 0 / 0.04);
+    }
+
+    html:not(.dark) [class~='hover:bg-white/10']:hover {
+        background-color: rgb(0 0 0 / 0.08);
+    }
+
+    html:not(.dark) [class~='hover:bg-white/15']:hover,
+    html:not(.dark) [class~='hover:bg-white/25']:hover {
+        background-color: rgb(0 0 0 / 0.12);
+    }
+
+    html:not(.dark) [class~='hover:text-[#dbdee1]']:hover,
+    html:not(.dark) [class~='hover:text-white']:hover {
+        color: #2e3338;
+    }
+
+    html:not(.dark) nav [class~='hover:text-white']:hover {
+        color: #ffffff;
+    }
+
+    html:not(.dark) [class~='border-white/5'] {
+        border-color: rgb(0 0 0 / 0.08);
+    }
+
+    html:not(.dark) [class~='focus-within:ring-white/10']:focus-within {
+        --tw-ring-color: rgb(0 0 0 / 0.08);
+    }
+
+    html:not(.dark) [class~='placeholder:text-[#6d6f78]']::placeholder,
+    html:not(.dark) [class~='placeholder:text-[#80848e]']::placeholder,
+    html:not(.dark) [class~='placeholder:text-[#a5a7ad]']::placeholder {
+        color: #747982;
     }
 }

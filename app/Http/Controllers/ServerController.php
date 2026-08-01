@@ -66,7 +66,7 @@ class ServerController extends Controller
         ]);
     }
 
-    public function update(Request $request, Server $server): RedirectResponse
+    public function update(Request $request, Server $server): JsonResponse|RedirectResponse
     {
         Gate::authorize('update', $server);
 
@@ -78,6 +78,10 @@ class ServerController extends Controller
         ]);
 
         $server->update($validated);
+
+        if ($request->expectsJson()) {
+            return response()->json(['server' => $server->fresh()]);
+        }
 
         return back();
     }

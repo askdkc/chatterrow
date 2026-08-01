@@ -26,8 +26,7 @@ function stubFetch(status: number, body: unknown): ReturnType<typeof vi.fn> {
 
 describe('ChannelDialog', () => {
     beforeEach(() => {
-        document.head.innerHTML =
-            '<meta name="csrf-token" content="token-123">';
+        document.cookie = 'XSRF-TOKEN=token-123; Path=/; Max-Age=3600';
         vi.restoreAllMocks();
         vi.stubGlobal('location', { href: '' });
     });
@@ -54,7 +53,7 @@ describe('ChannelDialog', () => {
         const [url, init] = fetchMock.mock.calls[0];
         expect(url).toBe('/servers/1/channels');
         const headers = new Headers(init.headers);
-        expect(headers.get('X-CSRF-TOKEN')).toBe('token-123');
+        expect(headers.get('X-XSRF-TOKEN')).toBe('token-123');
         expect(headers.get('Accept')).toBe('application/json');
         expect(init.method).toBe('POST');
         expect(JSON.parse(init.body)).toMatchObject({ name: 'new-channel' });

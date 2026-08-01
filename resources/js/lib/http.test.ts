@@ -1,47 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiFetch, apiJson, csrfToken, HttpError } from './http';
+import { apiFetch, apiJson, HttpError, xsrfToken } from './http';
 
-function setCsrfMeta(content: string | null): void {
-    let meta = document.querySelector<HTMLMetaElement>(
-        'meta[name="csrf-token"]',
-    );
-
-    if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = 'csrf-token';
-        document.head.appendChild(meta);
-    }
-
-    if (content === null) {
-        meta.remove();
-    } else {
-        meta.content = content;
-    }
+function setXsrfCookie(content: string | null): void {
+    document.cookie = `XSRF-TOKEN=${content === null ? '' : encodeURIComponent(content)}; Path=/; Max-Age=${content === null ? 0 : 3600}`;
 }
 
-describe('csrfToken', () => {
+describe('xsrfToken', () => {
     beforeEach(() => {
-        document.head.innerHTML = '';
+        setXsrfCookie(null);
     });
 
-    it('returns the meta content when present', () => {
-        setCsrfMeta('token-123');
-        expect(csrfToken()).toBe('token-123');
+    it('returns the decoded cookie value when present', () => {
+        setXsrfCookie('encrypted=token');
+        expect(xsrfToken()).toBe('encrypted=token');
     });
 
-    it('throws when the meta tag is absent', () => {
-        expect(() => csrfToken()).toThrow(/CSRF token is missing/);
-    });
-
-    it('throws when the meta content is empty', () => {
-        setCsrfMeta('');
-        expect(() => csrfToken()).toThrow(/CSRF token is missing/);
+    it('throws when the cookie is absent', () => {
+        expect(() => xsrfToken()).toThrow(/XSRF token cookie is missing/);
     });
 });
 
 describe('apiFetch', () => {
     beforeEach(() => {
-        setCsrfMeta('token-123');
+        setXsrfCookie('token-123');
         vi.restoreAllMocks();
     });
 
@@ -60,7 +41,7 @@ describe('apiFetch', () => {
         const [input, init] = fetchMock.mock.calls[0];
         expect(input).toBe('/servers');
         const headers = new Headers(init.headers);
-        expect(headers.get('X-CSRF-TOKEN')).toBe('token-123');
+        expect(headers.get('X-XSRF-TOKEN')).toBe('token-123');
         expect(headers.get('X-Requested-With')).toBe('XMLHttpRequest');
         expect(headers.get('Accept')).toBe('application/json');
         expect(init.credentials).toBe('same-origin');
@@ -77,7 +58,7 @@ describe('apiFetch', () => {
 
         const headers = new Headers(fetchMock.mock.calls[0][1].headers);
         expect(headers.get('X-Custom')).toBe('yes');
-        expect(headers.get('X-CSRF-TOKEN')).toBe('token-123');
+        expect(headers.get('X-XSRF-TOKEN')).toBe('token-123');
     });
 
     it('throws HttpError with status and payload on non-2xx JSON', async () => {
@@ -125,18 +106,20 @@ describe('apiFetch', () => {
         }
     });
 
-    it('throws a clear error when the CSRF meta is absent', async () => {
-        document.head.innerHTML = '';
+    it('throws a clear error when the XSRF cookie is absent', async () => {
+        setXsrfCookie(null);
         vi.stubGlobal('fetch', vi.fn());
 
-        await expect(apiFetch('/x')).rejects.toThrow(/CSRF token is missing/);
+        await expect(apiFetch('/x')).rejects.toThrow(
+            /XSRF token cookie is missing/,
+        );
         expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     });
 });
 
 describe('apiJson', () => {
     beforeEach(() => {
-        setCsrfMeta('token-123');
+        setXsrfCookie('token-123');
         vi.restoreAllMocks();
     });
 

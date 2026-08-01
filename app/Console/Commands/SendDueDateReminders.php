@@ -56,7 +56,15 @@ class SendDueDateReminders extends Command
     {
         $todos = Todo::query()
             ->with(['channel.server', 'assignee'])
-            ->whereDate('due_on', $targetDate->toDateString())
+            ->where(function ($query) use ($targetDate): void {
+                $query
+                    ->whereDate('due_at', $targetDate->toDateString())
+                    ->orWhere(function ($query) use ($targetDate): void {
+                        $query
+                            ->whereNull('due_at')
+                            ->whereDate('due_on', $targetDate->toDateString());
+                    });
+            })
             ->whereNull('completed_at')
             ->whereNull('reminded_at')
             ->get();

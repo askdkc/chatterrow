@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Support\StoredFilePreviewDispatcher;
 use App\Support\StoredFilePreviewGenerator;
 use Database\Factories\StoredFileFactory;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,7 +32,11 @@ use Illuminate\Support\Carbon;
  * @property-read Server $server
  * @property-read User|null $uploader
  * @property-read Model|null $attachable
+ * @property-read string $stream_url
+ * @property-read string $download_url
+ * @property-read string|null $thumbnail_url
  */
+#[Appends(['stream_url', 'download_url', 'thumbnail_url'])]
 #[Fillable(['server_id', 'uploaded_by', 'attachable_type', 'attachable_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'preview_path', 'preview_status'])]
 class StoredFile extends Model
 {
@@ -76,6 +82,27 @@ class StoredFile extends Model
     public function attachable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /** @return Attribute<string, never> */
+    protected function streamUrl(): Attribute
+    {
+        return Attribute::get(fn (): string => route('servers.files.stream', [$this->server_id, $this]));
+    }
+
+    /** @return Attribute<string, never> */
+    protected function downloadUrl(): Attribute
+    {
+        return Attribute::get(fn (): string => route('servers.files.download', [$this->server_id, $this]));
+    }
+
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if ($this->preview_status !== 'ready' || $this->preview_path === null) {
+            return null;
+        }
+
+        return route('servers.files.thumbnail', [$this->server_id, $this]);
     }
 
     /** @return array<string, string> */
