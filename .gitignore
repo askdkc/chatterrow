@@ -34,6 +34,6 @@ PLAN.md
 /.claude
 .mcp.json
 .npmrc
-AGENTS.md
-CLAUDE.md
-PLAN.md
+/AGENTS.md
+/CLAUDE.md
+/PLAN.md
