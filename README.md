@@ -1,4 +1,4 @@
-# chatter
+# 茶多楼 chatterrow
 
 Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェクト型グループウェアです。
 
