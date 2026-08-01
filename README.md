@@ -53,7 +53,7 @@ ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポート�
 リポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。
 
 ```bash
-git clone git@github.com:askdkc/chatter.git
+git clone git@github.com:askdkc/chatterrow.git
 cd chatter
 ./setup.sh
 ```

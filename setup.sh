@@ -61,7 +61,7 @@ prompt_required() {
 }
 
 APP_DIR="${APP_DIR:-/var/www/chatter}"
-REPO_URL="${REPO_URL:-git@github.com:askdkc/chatter.git}"
+REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 OFFICE_DOMAIN="${OFFICE_DOMAIN:-}"
@@ -87,7 +87,7 @@ Options:
   --db-user <name>           PostgreSQL role name (default: chatter)
   --db-password <password>   PostgreSQL password (default: securely generated)
   --app-dir <path>           App install path (default: /var/www/chatter)
-  --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatter.git)
+  --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrow.git)
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
 
