@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Console\Commands\SendDueDateReminders;
 use App\Models\Channel;
 use App\Models\Message;
 use App\Models\Server;

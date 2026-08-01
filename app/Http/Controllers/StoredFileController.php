@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\StoredFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -23,7 +24,7 @@ class StoredFileController extends Controller
             'files.*' => ['required', 'file', 'max:51200'],
         ]);
 
-        /** @var \Illuminate\Http\UploadedFile $file */
+        /** @var UploadedFile $file */
         $stored = collect($validated['files'])->map(function ($file) use ($server, $request) {
             $originalName = $file->getClientOriginalName();
             $path = $file->store("uploads/{$server->id}/".date('Y/m/d'), ['disk' => 'local']);

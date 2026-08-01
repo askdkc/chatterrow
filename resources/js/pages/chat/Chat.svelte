@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { router } from '@inertiajs/svelte';
+    import { router, usePage } from '@inertiajs/svelte';
     import {
         Hash,
         Send,
@@ -35,14 +35,18 @@
         channel,
         initialMessages,
         members,
-        authServers,
     }: {
         server: ServerResource;
         channel: ChannelResource;
         initialMessages: MessageResource[];
         members: UserResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     let messages: MessageResource[] = $state(initialMessages);
     let draft = $state('');

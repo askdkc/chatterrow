@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { router } from '@inertiajs/svelte';
+    import { router, usePage } from '@inertiajs/svelte';
     import {
         Plus,
         Users,
@@ -22,12 +22,16 @@
     let {
         server,
         members,
-        authServers,
     }: {
         server: ServerResource;
         members: UserResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     let showChannelDialog = $state(false);
     let showMemberDialog = $state(false);

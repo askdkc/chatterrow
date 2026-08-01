@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Link } from '@inertiajs/svelte';
+    import { Link, usePage } from '@inertiajs/svelte';
     import {
         ArrowLeft,
         FileText,
@@ -54,15 +54,19 @@
         files,
         channels,
         members,
-        authServers,
     }: {
         server: ServerResource;
         channel?: ChannelResource | null;
         files: StoredFileResource[];
         channels: ChannelResource[];
         members: UserResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     let showMemberDialog = $state(false);
     let uploadInput: HTMLInputElement | undefined = $state();

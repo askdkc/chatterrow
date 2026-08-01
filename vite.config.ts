@@ -4,6 +4,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 const isSvelteCheck = process.argv.some((argument) => argument.includes('svelte-check'));
@@ -30,4 +31,15 @@ export default defineConfig({
             formVariants: true,
         }),
     ],
+    resolve: {
+        alias: {
+            '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
+        },
+        conditions: ['browser'],
+    },
+    test: {
+        environment: 'jsdom',
+        include: ['resources/js/**/*.test.ts'],
+        exclude: ['node_modules', 'vendor'],
+    },
 });

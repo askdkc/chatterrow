@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Link } from '@inertiajs/svelte';
+    import { Link, usePage } from '@inertiajs/svelte';
     import {
         Hash,
         ListTodo,
@@ -24,14 +24,18 @@
         channels,
         todos,
         members,
-        authServers,
     }: {
         server: ServerResource;
         channels: ChannelResource[];
         todos: (TodoResource & { channel: { id: number; name: string } })[];
         members: UserResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     let showMemberDialog = $state(false);
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Link } from '@inertiajs/svelte';
+    import { Link, usePage } from '@inertiajs/svelte';
     import {
         ArrowLeft,
         CalendarRange,
@@ -30,14 +30,18 @@
         tasks,
         channels,
         members,
-        authServers,
     }: {
         server: ServerResource;
         tasks: GanttTask[];
         channels: ChannelResource[];
         members: UserResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     const epochDay = (value: string | Date): number =>
         Math.floor(new Date(`${value}T00:00:00`).getTime() / 86_400_000);

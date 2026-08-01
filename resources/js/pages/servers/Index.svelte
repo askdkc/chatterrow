@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { router } from '@inertiajs/svelte';
+    import { router, usePage } from '@inertiajs/svelte';
     import { Plus, Hash, Users, CalendarRange } from 'lucide-svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
@@ -7,11 +7,15 @@
 
     let {
         servers,
-        authServers,
     }: {
         servers: ServerResource[];
-        authServers: ServerResource[];
     } = $props();
+
+    const page = usePage();
+
+    const authServers: ServerResource[] = $derived(
+        page.props.auth?.servers ?? [],
+    );
 
     let showServerDialog = $state(false);
 

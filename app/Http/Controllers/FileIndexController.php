@@ -25,6 +25,8 @@ class FileIndexController extends Controller
 
         return Inertia::render('servers/Files', [
             'server' => $server,
+            'channels' => $server->channels()->orderBy('name')->get(['id', 'name']),
+            'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'files' => $files,
         ]);
     }
@@ -51,7 +53,9 @@ class FileIndexController extends Controller
 
         return Inertia::render('servers/Files', [
             'server' => $server,
-            'channel' => $channel,
+            'channel' => $channel->load('creator:id,name,email'),
+            'channels' => $server->channels()->orderBy('name')->get(['id', 'name']),
+            'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'files' => $files,
         ]);
     }

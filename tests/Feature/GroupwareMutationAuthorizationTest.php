@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Channel;
 use App\Models\Message;
 use App\Models\Server;
-use App\Models\Todo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;

@@ -36,6 +36,7 @@ class TaskController extends Controller
         return Inertia::render('servers/Tasks', [
             'server' => $server,
             'channels' => $channels,
+            'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'todos' => $todos,
         ]);
     }
@@ -102,6 +103,8 @@ class TaskController extends Controller
 
         return Inertia::render('servers/Gantt', [
             'server' => $server,
+            'channels' => $channels,
+            'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'tasks' => $tasks,
         ]);
     }

@@ -67,7 +67,7 @@ class SendDueDateReminders extends Command
             $assignee = $todo->assignee?->name !== null ? "（担当: {$todo->assignee->name}）" : '';
             $this->postReminder(
                 $todo->channel,
-                "⏰ タスク期限: 「{$todo->title}」".$assignee."（".$targetDate->format('Y-m-d').'）',
+                "⏰ タスク期限: 「{$todo->title}」".$assignee.'（'.$targetDate->format('Y-m-d').'）',
             );
 
             $todo->update(['reminded_at' => now()]);

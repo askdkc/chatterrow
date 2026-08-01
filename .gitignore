@@ -28,3 +28,12 @@ yarn-error.log
 /.vscode
 /.zed
 PLAN.md
+.codex
+.editorconfig
+.agents
+.claude
+.mcp.json
+.npmrc
+AGENTS.md
+CLAUDE.md
+PLAN.md

@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\Message;
 use App\Models\Server;
 use App\Models\StoredFile;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,7 @@ class MessageController extends Controller
             'attachments.*.size' => ['nullable', 'integer'],
         ]);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         $message = Message::create([
