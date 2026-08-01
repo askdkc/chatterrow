@@ -298,7 +298,9 @@
                 60_000,
             );
         } catch (error) {
-            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            if (!(
+                error instanceof DOMException && error.name === 'AbortError'
+            )) {
                 failPreview(requestGeneration);
             }
         } finally {
@@ -323,7 +325,10 @@
     onDestroy(cleanupPreview);
 </script>
 
-<Dialog open={file !== null} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+<Dialog
+    open={file !== null}
+    onOpenChange={(isOpen) => !isOpen && handleClose()}
+>
     <DialogContent
         class="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[96rem] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
     >
@@ -338,7 +343,12 @@
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 {#if file}
-                    <Button variant="ghost" size="icon" aria-label={t('Download')} asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t('Download')}
+                        asChild
+                    >
                         {#snippet children(buttonProps)}
                             <a
                                 {...buttonProps}
@@ -386,7 +396,9 @@
                     role="alert"
                 >
                     <div>
-                        <FileText class="mx-auto size-10 text-muted-foreground" />
+                        <FileText
+                            class="mx-auto size-10 text-muted-foreground"
+                        />
                         <p class="mt-3 font-semibold">{previewError}</p>
                         <p class="mt-1 text-sm text-muted-foreground">
                             {t(

@@ -51,7 +51,9 @@
             <LockKeyhole class="size-4" />{t('2FA recovery codes')}
         </CardTitle>
         <CardDescription>
-            {t('Recovery codes let you regain access if you lose your 2FA device. Store them in a secure password manager.')}
+            {t(
+                'Recovery codes let you regain access if you lose your 2FA device. Store them in a secure password manager.',
+            )}
         </CardDescription>
     </CardHeader>
     <CardContent>
@@ -64,7 +66,9 @@
                 {:else}
                     <Eye class="size-4" />
                 {/if}
-                {isRecoveryCodesVisible ? t('Hide recovery codes') : t('View recovery codes')}
+                {isRecoveryCodesVisible
+                    ? t('Hide recovery codes')
+                    : t('View recovery codes')}
             </Button>
 
             {#if isRecoveryCodesVisible && twoFactorAuth.state.recoveryCodesList.length}
@@ -79,7 +83,8 @@
                             type="submit"
                             disabled={processing}
                         >
-                            <RefreshCw class="size-4" /> {t('Regenerate codes')}
+                            <RefreshCw class="size-4" />
+                            {t('Regenerate codes')}
                         </Button>
                     {/snippet}
                 </Form>
@@ -115,7 +120,9 @@
                         {/if}
                     </div>
                     <p class="text-xs text-muted-foreground select-none">
-                        {t('Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.')}
+                        {t(
+                            'Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.',
+                        )}
                     </p>
                 </div>
             {/if}

@@ -48,10 +48,14 @@
                     {#snippet children({ errors, processing })}
                         <div class="space-y-3">
                             <DialogTitle
-                                >{t('Are you sure you want to delete your account?')}</DialogTitle
+                                >{t(
+                                    'Are you sure you want to delete your account?',
+                                )}</DialogTitle
                             >
                             <DialogDescription>
-                                {t('Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.')}
+                                {t(
+                                    'Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.',
+                                )}
                             </DialogDescription>
                         </div>
 
@@ -69,7 +73,9 @@
 
                         <DialogFooter class="gap-2">
                             <DialogClose>
-                                <Button variant="secondary">{t('Cancel')}</Button>
+                                <Button variant="secondary"
+                                    >{t('Cancel')}</Button
+                                >
                             </DialogClose>
 
                             <Button

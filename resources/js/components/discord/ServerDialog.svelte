@@ -1,5 +1,6 @@
 <script lang="ts">
     import { X, Loader2 } from 'lucide-svelte';
+    import { apiJson, HttpError } from '@/lib/http';
 
     let {
         onClose,
@@ -14,25 +15,17 @@
     let saving = $state(false);
     let error = $state('');
 
-    function csrfToken(): string {
-        return (
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ??
-            ''
-        );
-    }
-
     async function create() {
         if (!name.trim()) {
-return;
-}
+            return;
+        }
 
         saving = true;
         error = '';
 
         try {
-            const res = await fetch('/servers', {
+            const data = await apiJson<{ server: { id: number } }>('/servers', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
                 body: JSON.stringify({
                     name: name.trim(),
                     description: description.trim() || null,
@@ -40,34 +33,41 @@ return;
                     ends_on: endsOn || null,
                 }),
             });
-            const data = await res.json().catch(() => ({}));
 
-            if (res.ok) {
-                window.location.href = `/servers/${data.server.id}`;
-            } else {
-                error = data.message ?? '作成に失敗しました';
-            }
+            window.location.href = `/servers/${data.server.id}`;
+        } catch (e) {
+            error =
+                e instanceof HttpError ? e.messageText() : '作成に失敗しました';
         } finally {
             saving = false;
         }
     }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={onClose}>
+<div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    onclick={onClose}
+>
     <div
         class="w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
         onclick={(e) => e.stopPropagation()}
     >
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-[#dbdee1]">サーバーを作成</h2>
-            <button type="button" class="rounded p-1 hover:bg-white/10" onclick={onClose}>
+            <button
+                type="button"
+                class="rounded p-1 hover:bg-white/10"
+                onclick={onClose}
+            >
                 <X class="h-5 w-5 text-[#80848e]" />
             </button>
         </div>
 
         <div class="space-y-3">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]">サーバー名</label>
+                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                    >サーバー名</label
+                >
                 <input
                     bind:value={name}
                     type="text"
@@ -75,13 +75,15 @@ return;
                     class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                     onkeydown={(e) => {
                         if (e.key === 'Enter') {
-create();
-}
+                            create();
+                        }
                     }}
                 />
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]">説明（任意）</label>
+                <label class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                    >説明（任意）</label
+                >
                 <textarea
                     bind:value={description}
                     rows="2"
@@ -90,7 +92,10 @@ create();
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-[#b5bac1]">開始日</label>
+                    <label
+                        class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                        >開始日</label
+                    >
                     <input
                         bind:value={startsOn}
                         type="date"
@@ -98,7 +103,10 @@ create();
                     />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-[#b5bac1]">終了期限</label>
+                    <label
+                        class="mb-1 block text-xs font-semibold text-[#b5bac1]"
+                        >終了期限</label
+                    >
                     <input
                         bind:value={endsOn}
                         type="date"
@@ -111,7 +119,13 @@ create();
             </p>
 
             {#if error}
-                <p class="text-sm text-red-400">{error}</p>
+                <p
+                    class="text-sm text-red-400"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    {error}
+                </p>
             {/if}
         </div>
 

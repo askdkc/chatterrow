@@ -1,5 +1,6 @@
 <script lang="ts">
     import { X, UserPlus, Loader2 } from 'lucide-svelte';
+    import { apiFetch, apiJson, HttpError } from '@/lib/http';
     import type { ServerResource, UserResource } from '@/types';
 
     let {
@@ -17,64 +18,65 @@
     let error = $state('');
     let success = $state('');
 
-    function csrfToken(): string {
-        return (
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ??
-            ''
-        );
-    }
-
     async function invite() {
         if (!email.trim()) {
-return;
-}
+            return;
+        }
 
         searching = true;
         error = '';
         success = '';
 
         try {
-            const res = await fetch(`/servers/${server.id}/members`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
-                body: JSON.stringify({ email: email.trim() }),
-            });
-            const data = await res.json().catch(() => ({}));
+            const data = await apiJson<{ user: UserResource }>(
+                `/servers/${server.id}/members`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ email: email.trim() }),
+                },
+            );
 
-            if (res.ok) {
-                success = `${data.user?.name ?? email} を追加しました`;
-                email = '';
-                members = [...members, data.user].filter(
-                    (m, i, arr) => arr.findIndex((x) => x.id === m.id) === i,
-                );
-            } else {
-                error = data.message ?? '追加に失敗しました';
-            }
+            success = `${data.user?.name ?? email} を追加しました`;
+            email = '';
+            members = [...members, data.user].filter(
+                (m, i, arr) => arr.findIndex((x) => x.id === m.id) === i,
+            );
+        } catch (e) {
+            error =
+                e instanceof HttpError ? e.messageText() : '追加に失敗しました';
         } finally {
             searching = false;
         }
     }
 
     async function remove(member: UserResource) {
-        const res = await fetch(`/servers/${server.id}/members/${member.id}`, {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': csrfToken() },
-        });
-
-        if (res.ok) {
+        try {
+            await apiFetch(`/servers/${server.id}/members/${member.id}`, {
+                method: 'DELETE',
+            });
             members = members.filter((m) => m.id !== member.id);
+        } catch (e) {
+            error =
+                e instanceof HttpError ? e.messageText() : '削除に失敗しました';
         }
     }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={onClose}>
+<div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    onclick={onClose}
+>
     <div
         class="w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
         onclick={(e) => e.stopPropagation()}
     >
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-[#dbdee1]">サーバー設定</h2>
-            <button type="button" class="rounded p-1 hover:bg-white/10" onclick={onClose}>
+            <button
+                type="button"
+                class="rounded p-1 hover:bg-white/10"
+                onclick={onClose}
+            >
                 <X class="h-5 w-5 text-[#80848e]" />
             </button>
         </div>
@@ -86,7 +88,8 @@ return;
             {/if}
             {#if server.starts_on || server.ends_on}
                 <p class="mt-1 text-xs text-[#b5bac1]">
-                    期間: {server.starts_on ?? '未設定'} 〜 {server.ends_on ?? '未設定'}
+                    期間: {server.starts_on ?? '未設定'} 〜 {server.ends_on ??
+                        '未設定'}
                 </p>
             {/if}
         </div>
@@ -99,8 +102,8 @@ return;
                 class="min-w-0 flex-1 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 onkeydown={(e) => {
                     if (e.key === 'Enter') {
-invite();
-}
+                        invite();
+                    }
                 }}
             />
             <button
@@ -119,23 +122,35 @@ invite();
         </div>
 
         {#if error}
-            <p class="mb-2 text-sm text-red-400">{error}</p>
+            <p
+                class="mb-2 text-sm text-red-400"
+                role="alert"
+                aria-live="assertive"
+            >
+                {error}
+            </p>
         {/if}
         {#if success}
-            <p class="mb-2 text-sm text-green-400">{success}</p>
+            <p class="mb-2 text-sm text-green-400" role="status">{success}</p>
         {/if}
 
         <div class="max-h-64 space-y-1 overflow-y-auto">
             {#each members as member (member.id)}
-                <div class="flex items-center gap-3 rounded-md px-2 py-1.5 transition hover:bg-white/5">
+                <div
+                    class="flex items-center gap-3 rounded-md px-2 py-1.5 transition hover:bg-white/5"
+                >
                     <span
                         class="flex h-8 w-8 items-center justify-center rounded-full bg-[#5865f2] text-xs font-bold text-white"
                     >
                         {member.name.slice(0, 1).toUpperCase()}
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm text-[#dbdee1]">{member.name}</p>
-                        <p class="truncate text-xs text-[#80848e]">{member.email}</p>
+                        <p class="truncate text-sm text-[#dbdee1]">
+                            {member.name}
+                        </p>
+                        <p class="truncate text-xs text-[#80848e]">
+                            {member.email}
+                        </p>
                     </div>
                     <button
                         type="button"

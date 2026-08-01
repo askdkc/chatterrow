@@ -39,7 +39,9 @@
         {#if !twoFactorEnabled}
             <div class="flex flex-col items-start justify-start space-y-4">
                 <p class="text-muted-foreground text-sm">
-                    {t('When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.')}
+                    {t(
+                        'When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.',
+                    )}
                 </p>
 
                 <div>
@@ -64,7 +66,9 @@
         {:else}
             <div class="flex flex-col items-start justify-start space-y-4">
                 <p class="text-muted-foreground text-sm">
-                    {t('You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.')}
+                    {t(
+                        'You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.',
+                    )}
                 </p>
 
                 <div class="relative inline">

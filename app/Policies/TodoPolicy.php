@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Channel;
 use App\Models\Todo;
 use App\Models\User;
 
@@ -12,9 +13,9 @@ class TodoPolicy
         return $todo->channel->server->members()->whereKey($user->id)->exists();
     }
 
-    public function create(User $user, Todo $todo): bool
+    public function create(User $user, Channel $channel): bool
     {
-        return $todo->channel->server->members()->whereKey($user->id)->exists();
+        return $channel->server->members()->whereKey($user->id)->exists();
     }
 
     public function update(User $user, Todo $todo): bool

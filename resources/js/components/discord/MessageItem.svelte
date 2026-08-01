@@ -12,22 +12,29 @@
 
     function formatTime(iso: string | undefined): string {
         if (!iso) {
-return '';
-}
+            return '';
+        }
 
         const d = new Date(iso);
 
-        return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
     }
 
     function formatDate(iso: string | undefined): string {
         if (!iso) {
-return '';
-}
+            return '';
+        }
 
         const d = new Date(iso);
 
-        return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+        return d.toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        });
     }
 
     function isImage(file: StoredFileResource): boolean {
@@ -39,7 +46,9 @@ return '';
     }
 </script>
 
-<div class="group relative flex gap-4 rounded-md px-2 py-2 transition hover:bg-white/5">
+<div
+    class="group relative flex gap-4 rounded-md px-2 py-2 transition hover:bg-white/5"
+>
     <div
         class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5865f2] text-sm font-bold text-white"
     >
@@ -47,10 +56,17 @@ return '';
     </div>
     <div class="min-w-0 flex-1">
         <div class="flex items-baseline gap-2">
-            <span class="text-[15px] font-semibold text-[#dbdee1]">{message.user?.name ?? '不明'}</span>
-            <span class="text-xs text-[#80848e]">{formatDate(message.created_at)} {formatTime(message.created_at)}</span>
+            <span class="text-[15px] font-semibold text-[#dbdee1]"
+                >{message.user?.name ?? '不明'}</span
+            >
+            <span class="text-xs text-[#80848e]"
+                >{formatDate(message.created_at)}
+                {formatTime(message.created_at)}</span
+            >
         </div>
-        <p class="whitespace-pre-wrap break-words text-[15px] text-[#dbdee1]">{message.body}</p>
+        <p class="whitespace-pre-wrap break-words text-[15px] text-[#dbdee1]">
+            {message.body}
+        </p>
 
         {#if message.attachments && message.attachments.length > 0}
             <div class="mt-2 flex flex-wrap gap-2">
@@ -82,7 +98,9 @@ return '';
                             class="flex items-center gap-2 rounded-lg bg-[#383a40] px-3 py-2 text-sm transition hover:bg-[#404249]"
                         >
                             <Paperclip class="h-4 w-4 shrink-0" />
-                            <span class="max-w-48 truncate">{file.original_name}</span>
+                            <span class="max-w-48 truncate"
+                                >{file.original_name}</span
+                            >
                             <Download class="h-3.5 w-3.5 shrink-0 opacity-60" />
                         </a>
                     {/if}

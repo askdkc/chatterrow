@@ -15,7 +15,12 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog from '@/components/files/StoredFilePreviewDialog.svelte';
-    import type { ServerResource, ChannelResource, UserResource } from '@/types';
+    import { apiFetch, HttpError } from '@/lib/http';
+    import type {
+        ServerResource,
+        ChannelResource,
+        UserResource,
+    } from '@/types';
 
     interface StoredFileResource {
         id: number;
@@ -30,7 +35,18 @@
         thumbnail_url: string | null;
     }
 
-    const officeExtensions = new Set(['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'odt', 'ods', 'odp']);
+    const officeExtensions = new Set([
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'xlsm',
+        'ppt',
+        'pptx',
+        'odt',
+        'ods',
+        'odp',
+    ]);
 
     let {
         server,
@@ -53,32 +69,37 @@
     let uploading = $state(false);
     let previewFile = $state<StoredFileResource | null>(null);
     let onlyofficeFile = $state<StoredFileResource | null>(null);
+    let error = $state('');
 
-    const isImage = (f: StoredFileResource): boolean => (f.mime_type ?? '').startsWith('image/');
-    const isVideo = (f: StoredFileResource): boolean => (f.mime_type ?? '').startsWith('video/');
+    const isImage = (f: StoredFileResource): boolean =>
+        (f.mime_type ?? '').startsWith('image/');
+    const isVideo = (f: StoredFileResource): boolean =>
+        (f.mime_type ?? '').startsWith('video/');
     const isOffice = (f: StoredFileResource): boolean =>
-        officeExtensions.has(f.original_name.split('.').pop()?.toLowerCase() ?? '');
+        officeExtensions.has(
+            f.original_name.split('.').pop()?.toLowerCase() ?? '',
+        );
 
     function formatSize(bytes: number | null): string {
         if (bytes === null) {
-return '';
-}
+            return '';
+        }
 
         if (bytes < 1024) {
-return `${bytes} B`;
-}
+            return `${bytes} B`;
+        }
 
         if (bytes < 1024 * 1024) {
-return `${(bytes / 1024).toFixed(1)} KB`;
-}
+            return `${(bytes / 1024).toFixed(1)} KB`;
+        }
 
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 
     function formatDate(iso: string | null): string {
         if (!iso) {
-return '';
-}
+            return '';
+        }
 
         return new Date(iso).toLocaleDateString('ja-JP', {
             year: 'numeric',
@@ -87,19 +108,13 @@ return '';
         });
     }
 
-    function csrfToken(): string {
-        return (
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? ''
-        );
-    }
-
     async function onUpload(event: Event) {
         const input = event.target as HTMLInputElement;
         const selected = input.files;
 
         if (!selected || selected.length === 0) {
-return;
-}
+            return;
+        }
 
         uploading = true;
 
@@ -110,15 +125,17 @@ return;
                 form.append('files[]', file);
             }
 
-            const res = await fetch(`/servers/${server.id}/files`, {
+            await apiFetch(`/servers/${server.id}/files`, {
                 method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken() },
                 body: form,
             });
 
-            if (res.ok) {
-                window.location.reload();
-            }
+            window.location.reload();
+        } catch (e) {
+            error =
+                e instanceof HttpError
+                    ? e.messageText()
+                    : 'アップロードに失敗しました';
         } finally {
             uploading = false;
             input.value = '';
@@ -127,16 +144,17 @@ return;
 
     async function removeFile(file: StoredFileResource) {
         if (!window.confirm(`${file.original_name} を削除しますか？`)) {
-return;
-}
+            return;
+        }
 
-        const res = await fetch(`/servers/${server.id}/files/${file.id}`, {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': csrfToken() },
-        });
-
-        if (res.ok) {
+        try {
+            await apiFetch(`/servers/${server.id}/files/${file.id}`, {
+                method: 'DELETE',
+            });
             files = files.filter((f) => f.id !== file.id);
+        } catch (e) {
+            error =
+                e instanceof HttpError ? e.messageText() : '削除に失敗しました';
         }
     }
 
@@ -164,7 +182,12 @@ return;
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
-    <ServerRail servers={authServers} activeServerId={server.id} {onAddServer} {onBrowse} />
+    <ServerRail
+        servers={authServers}
+        activeServerId={server.id}
+        {onAddServer}
+        {onBrowse}
+    />
 
     <ChannelList
         {server}
@@ -176,15 +199,23 @@ return;
     />
 
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b border-black/10 bg-[#313338] px-4 dark:border-black/20">
-            <Link href={channel ? `/servers/${server.id}/channels/${channel.id}` : `/servers/${server.id}`} class="rounded p-1 transition hover:bg-white/10">
+        <header
+            class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b border-black/10 bg-[#313338] px-4 dark:border-black/20"
+        >
+            <Link
+                href={channel
+                    ? `/servers/${server.id}/channels/${channel.id}`
+                    : `/servers/${server.id}`}
+                class="rounded p-1 transition hover:bg-white/10"
+            >
                 <ArrowLeft class="h-4 w-4" />
             </Link>
             <FileText class="h-4 w-4 text-[#5865f2]" />
             <h1 class="text-[15px] font-bold">
                 {channel ? `ファイル - #${channel.name}` : 'ファイル一覧'}
             </h1>
-            <span class="ml-auto text-xs text-[#80848e]">{files.length} 件</span>
+            <span class="ml-auto text-xs text-[#80848e]">{files.length} 件</span
+            >
         </header>
 
         <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
@@ -210,10 +241,21 @@ return;
                     class="hidden"
                     onchange={onUpload}
                 />
+                {#if error}
+                    <p
+                        class="mt-2 text-xs text-red-400"
+                        role="alert"
+                        aria-live="assertive"
+                    >
+                        {error}
+                    </p>
+                {/if}
             </div>
 
             {#if files.length === 0}
-                <div class="flex flex-1 flex-col items-center justify-center text-center">
+                <div
+                    class="flex flex-1 flex-col items-center justify-center text-center"
+                >
                     <FileText class="mb-3 h-12 w-12 text-[#80848e]" />
                     <p class="font-medium">ファイルがありません</p>
                     <p class="mt-1 text-sm text-[#80848e]">
@@ -221,9 +263,13 @@ return;
                     </p>
                 </div>
             {:else}
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div
+                    class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                >
                     {#each files as file (file.id)}
-                        <div class="group relative overflow-hidden rounded-xl bg-[#2b2d31] transition hover:bg-[#383a40]">
+                        <div
+                            class="group relative overflow-hidden rounded-xl bg-[#2b2d31] transition hover:bg-[#383a40]"
+                        >
                             <!-- Thumbnail / icon -->
                             <button
                                 type="button"
@@ -246,30 +292,46 @@ return;
                                         loading="lazy"
                                     />
                                 {:else if isVideo(file)}
-                                    <div class="flex flex-col items-center gap-2 text-[#80848e]">
+                                    <div
+                                        class="flex flex-col items-center gap-2 text-[#80848e]"
+                                    >
                                         <Film class="h-10 w-10" />
                                         <span class="text-xs">動画</span>
                                     </div>
                                 {:else}
-                                    <div class="flex flex-col items-center gap-2 text-[#80848e]">
+                                    <div
+                                        class="flex flex-col items-center gap-2 text-[#80848e]"
+                                    >
                                         <FileText class="h-10 w-10" />
-                                        <span class="text-xs">{file.original_name.split('.').pop()?.toUpperCase()}</span>
+                                        <span class="text-xs"
+                                            >{file.original_name
+                                                .split('.')
+                                                .pop()
+                                                ?.toUpperCase()}</span
+                                        >
                                     </div>
                                 {/if}
                             </button>
 
                             <div class="p-3">
-                                <p class="truncate text-sm font-medium" title={file.original_name}>
+                                <p
+                                    class="truncate text-sm font-medium"
+                                    title={file.original_name}
+                                >
                                     {file.original_name}
                                 </p>
-                                <div class="mt-1 flex items-center justify-between text-xs text-[#80848e]">
+                                <div
+                                    class="mt-1 flex items-center justify-between text-xs text-[#80848e]"
+                                >
                                     <span>{formatSize(file.size)}</span>
                                     <span>{formatDate(file.created_at)}</span>
                                 </div>
                             </div>
 
                             <!-- Hover actions -->
-                            <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
+                            <div
+                                class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 transition group-hover:opacity-100"
+                            >
                                 <button
                                     type="button"
                                     class="rounded-md bg-[#5865f2] px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#4752c4]"
@@ -329,5 +391,9 @@ return;
 {/if}
 
 {#if showMemberDialog}
-    <MemberDialog {server} {members} onClose={() => (showMemberDialog = false)} />
+    <MemberDialog
+        {server}
+        {members}
+        onClose={() => (showMemberDialog = false)}
+    />
 {/if}

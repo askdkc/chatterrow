@@ -20,6 +20,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoPanel from '@/components/discord/TodoPanel.svelte';
     import { getEcho } from '@/lib/echo';
+    import { apiFetch, apiJson, HttpError } from '@/lib/http';
     import type {
         ServerResource,
         ChannelResource,
@@ -54,6 +55,8 @@
     let showServerDialog = $state(false);
     let todos = $state<TodoResource[]>([]);
     let showTodos = $state(true);
+    let sendError = $state('');
+    let uploadError = $state('');
     let messagesEnd: HTMLDivElement;
     let fileInput: HTMLInputElement;
 
@@ -61,34 +64,40 @@
     const serverId = server.id;
 
     async function loadTodos() {
-        const res = await fetch(`/servers/${serverId}/channels/${channelId}/todos`);
-
-        if (res.ok) {
-            const data = await res.json();
-            todos = data.todos;
-        }
+        const data = await apiJson<{ todos: TodoResource[] }>(
+            `/servers/${serverId}/channels/${channelId}/todos`,
+        );
+        todos = data.todos;
     }
 
     onMount(() => {
         loadTodos();
         scrollToBottom();
         const echo = getEcho();
-        const broadcastChannel = echo.private(`server.${serverId}.channel.${channelId}`);
+        const broadcastChannel = echo.private(
+            `server.${serverId}.channel.${channelId}`,
+        );
 
-        broadcastChannel.listen('.MessageCreated', (e: { message: MessageResource }) => {
-            appendMessage(e.message);
-        });
-        broadcastChannel.listen('.ReminderCreated', (e: { message: MessageResource }) => {
-            appendMessage(e.message);
-        });
+        broadcastChannel.listen(
+            '.MessageCreated',
+            (e: { message: MessageResource }) => {
+                appendMessage(e.message);
+            },
+        );
+        broadcastChannel.listen(
+            '.ReminderCreated',
+            (e: { message: MessageResource }) => {
+                appendMessage(e.message);
+            },
+        );
         broadcastChannel.listen('.TodoUpdated', (e: { todo: TodoResource }) => {
             upsertTodo(e.todo);
         });
 
         const onKeydown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-threadParent = null;
-}
+                threadParent = null;
+            }
         };
         window.addEventListener('keydown', onKeydown);
 
@@ -96,19 +105,23 @@ threadParent = null;
             broadcastChannel.stopListening('.MessageCreated');
             broadcastChannel.stopListening('.ReminderCreated');
             broadcastChannel.stopListening('.TodoUpdated');
-            echo.leaveChannel(`private-server-${serverId}-channel-${channelId}`);
+            echo.leaveChannel(
+                `private-server-${serverId}-channel-${channelId}`,
+            );
             window.removeEventListener('keydown', onKeydown);
         };
     });
 
     function appendMessage(message: MessageResource) {
         if (message.channel_id !== channelId) {
-return;
-}
+            return;
+        }
 
         if (message.parent_id) {
             messages = messages.map((m) =>
-                m.id === message.parent_id ? { ...m, reply_count: (m.reply_count ?? 0) + 1 } : m,
+                m.id === message.parent_id
+                    ? { ...m, reply_count: (m.reply_count ?? 0) + 1 }
+                    : m,
             );
 
             return;
@@ -137,50 +150,46 @@ return;
         const body = draft.trim();
 
         if (!body && pendingFiles.length === 0) {
-return;
-}
+            return;
+        }
 
         sending = true;
+        sendError = '';
 
         try {
-            const res = await fetch(`/servers/${serverId}/channels/${channelId}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
-                body: JSON.stringify({
-                    body,
-                    parent_id: threadParent?.id ?? null,
-                    attachments: pendingFiles.map((f) => ({
-                        path: f.path,
-                        original_name: f.original_name,
-                        mime_type: f.mime_type,
-                        size: f.size,
-                    })),
-                }),
-            });
+            const data = await apiJson<{ message: MessageResource }>(
+                `/servers/${serverId}/channels/${channelId}/messages`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        body,
+                        parent_id: threadParent?.id ?? null,
+                        attachments: pendingFiles.map((f) => ({
+                            path: f.path,
+                            original_name: f.original_name,
+                            mime_type: f.mime_type,
+                            size: f.size,
+                        })),
+                    }),
+                },
+            );
 
-            if (res.ok) {
-                const data = await res.json();
-                appendMessage(data.message);
-                draft = '';
-                pendingFiles = [];
-                threadParent = null;
-            }
+            appendMessage(data.message);
+            draft = '';
+            pendingFiles = [];
+            threadParent = null;
+        } catch (e) {
+            sendError =
+                e instanceof HttpError ? e.messageText() : '送信に失敗しました';
         } finally {
             sending = false;
         }
     }
 
-    function csrfToken(): string {
-        return (
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ??
-            ''
-        );
-    }
-
     async function onFilesPicked(fileList: FileList | null) {
         if (!fileList || fileList.length === 0) {
-return;
-}
+            return;
+        }
 
         const form = new FormData();
 
@@ -188,15 +197,20 @@ return;
             form.append('files[]', file);
         }
 
-        const res = await fetch(`/servers/${serverId}/files`, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken() },
-            body: form,
-        });
+        uploadError = '';
 
-        if (res.ok) {
-            const data = await res.json();
-            pendingFiles = [...pendingFiles, ...data.files];
+        try {
+            const data = await apiFetch(`/servers/${serverId}/files`, {
+                method: 'POST',
+                body: form,
+            });
+            const json = (await data.json()) as { files: StoredFileResource[] };
+            pendingFiles = [...pendingFiles, ...json.files];
+        } catch (e) {
+            uploadError =
+                e instanceof HttpError
+                    ? e.messageText()
+                    : 'アップロードに失敗しました';
         }
     }
 
@@ -244,7 +258,9 @@ return;
             <Hash class="h-5 w-5 text-[#80848e]" />
             <h1 class="text-[15px] font-bold text-[#dbdee1]">{channel.name}</h1>
             {#if channel.starts_on || channel.ends_on}
-                <span class="ml-2 rounded bg-[#f0b232]/20 px-2 py-0.5 text-xs text-[#f0b232]">
+                <span
+                    class="ml-2 rounded bg-[#f0b232]/20 px-2 py-0.5 text-xs text-[#f0b232]"
+                >
                     {channel.starts_on ?? '?'} 〜 {channel.ends_on ?? '未定'}
                 </span>
             {/if}
@@ -287,15 +303,22 @@ return;
                 ondragleave={() => (dragActive = false)}
                 ondrop={onDrop}
                 class={`flex min-w-0 flex-1 flex-col overflow-y-auto px-4 ${
-                    dragActive ? 'bg-[#5865f2]/5 ring-2 ring-inset ring-[#5865f2]' : ''
+                    dragActive
+                        ? 'bg-[#5865f2]/5 ring-2 ring-inset ring-[#5865f2]'
+                        : ''
                 }`}
             >
                 {#if threadParent}
-                    <div class="flex items-center gap-2 border-b border-black/10 py-2 dark:border-black/20">
+                    <div
+                        class="flex items-center gap-2 border-b border-black/10 py-2 dark:border-black/20"
+                    >
                         <MessageSquare class="h-4 w-4 text-[#80848e]" />
                         <span class="text-sm font-semibold">スレッド</span>
                         <span class="truncate text-sm text-[#80848e]">
-                            {threadParent.user?.name}: {threadParent.body.slice(0, 40)}
+                            {threadParent.user?.name}: {threadParent.body.slice(
+                                0,
+                                40,
+                            )}
                         </span>
                         <button
                             type="button"
@@ -316,7 +339,9 @@ return;
                         />
                     {/each}
                     {#if messages.length === 0}
-                        <div class="flex h-full items-center justify-center text-sm text-[#80848e]">
+                        <div
+                            class="flex h-full items-center justify-center text-sm text-[#80848e]"
+                        >
                             まだメッセージがありません
                         </div>
                     {/if}
@@ -326,17 +351,30 @@ return;
 
             <!-- Todo panel -->
             {#if showTodos}
-                <TodoPanel
-                    {todos}
-                    {members}
-                    serverId={serverId}
-                    channelId={channelId}
-                />
+                <TodoPanel {todos} {members} {serverId} {channelId} />
             {/if}
         </div>
 
         <!-- Composer -->
         <div class="shrink-0 px-4 pb-6">
+            {#if sendError}
+                <p
+                    class="mb-2 text-xs text-red-400"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    {sendError}
+                </p>
+            {/if}
+            {#if uploadError}
+                <p
+                    class="mb-2 text-xs text-red-400"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    {uploadError}
+                </p>
+            {/if}
             {#if pendingFiles.length > 0}
                 <div class="mb-2 flex flex-wrap gap-2">
                     {#each pendingFiles as file (file.path)}
@@ -344,15 +382,16 @@ return;
                             class="flex items-center gap-2 rounded-lg bg-[#383a40] px-3 py-1.5 text-sm"
                         >
                             <Paperclip class="h-3.5 w-3.5" />
-                            <span class="max-w-48 truncate">{file.original_name}</span>
+                            <span class="max-w-48 truncate"
+                                >{file.original_name}</span
+                            >
                             <button
                                 type="button"
                                 class="text-[#80848e] hover:text-white"
                                 onclick={() =>
                                     (pendingFiles = pendingFiles.filter(
                                         (f) => f.path !== file.path,
-                                    ))
-                                }
+                                    ))}
                             >
                                 <X class="h-3.5 w-3.5" />
                             </button>
@@ -388,7 +427,9 @@ return;
                     bind:value={draft}
                     rows={1}
                     class="max-h-40 min-h-5 flex-1 resize-none bg-transparent text-[15px] text-[#dbdee1] outline-none placeholder:text-[#6d6f78]"
-                    placeholder={threadParent ? `「${threadParent.user?.name}」への返信` : 'メッセージを入力'}
+                    placeholder={threadParent
+                        ? `「${threadParent.user?.name}」への返信`
+                        : 'メッセージを入力'}
                     onkeydown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -400,7 +441,8 @@ return;
                     type="button"
                     class="shrink-0 rounded p-1 text-[#b5bac1] transition hover:text-[#dbdee1] disabled:opacity-50"
                     onclick={sendMessage}
-                    disabled={sending || (!draft.trim() && pendingFiles.length === 0)}
+                    disabled={sending ||
+                        (!draft.trim() && pendingFiles.length === 0)}
                     title="送信"
                 >
                     {#if sending}
@@ -428,10 +470,7 @@ return;
 </div>
 
 {#if showChannelDialog}
-    <ChannelDialog
-        {server}
-        onClose={() => (showChannelDialog = false)}
-    />
+    <ChannelDialog {server} onClose={() => (showChannelDialog = false)} />
 {/if}
 
 {#if showMemberDialog}
@@ -443,7 +482,5 @@ return;
 {/if}
 
 {#if showServerDialog}
-    <ServerDialog
-        onClose={() => (showServerDialog = false)}
-    />
+    <ServerDialog onClose={() => (showServerDialog = false)} />
 {/if}

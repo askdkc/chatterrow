@@ -47,8 +47,9 @@
         if (twoFactorEnabled) {
             return {
                 title: t('Two-factor authentication enabled'),
-                description:
-                    t('Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.'),
+                description: t(
+                    'Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.',
+                ),
                 buttonText: t('Close'),
             };
         }
@@ -56,16 +57,18 @@
         if (showVerificationStep) {
             return {
                 title: t('Verify authentication code'),
-                description:
-                    t('Enter the 6-digit code from your authenticator app'),
+                description: t(
+                    'Enter the 6-digit code from your authenticator app',
+                ),
                 buttonText: t('Continue'),
             };
         }
 
         return {
             title: t('Enable two-factor authentication'),
-            description:
-                t('To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app'),
+            description: t(
+                'To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app',
+            ),
             buttonText: t('Continue'),
         };
     });
@@ -186,7 +189,9 @@
                                     >
                                         <img
                                             src={qrCodeDataUrl}
-                                            alt={t('Two-factor authentication QR code')}
+                                            alt={t(
+                                                'Two-factor authentication QR code',
+                                            )}
                                             class="size-full"
                                         />
                                     </div>

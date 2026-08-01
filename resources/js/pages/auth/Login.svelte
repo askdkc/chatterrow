@@ -99,7 +99,7 @@
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            {t('Don\'t have an account?')}
+            {t("Don't have an account?")}
             <TextLink href={register()}>{t('Sign up')}</TextLink>
         </div>
     {/snippet}

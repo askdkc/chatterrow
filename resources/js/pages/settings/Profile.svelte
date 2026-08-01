@@ -85,7 +85,9 @@
 
                     {#if page.props.status === 'verification-link-sent'}
                         <div class="mt-2 text-sm font-medium text-green-600">
-                            {t('A new verification link has been sent to your email address.')}
+                            {t(
+                                'A new verification link has been sent to your email address.',
+                            )}
                         </div>
                     {/if}
                 </div>

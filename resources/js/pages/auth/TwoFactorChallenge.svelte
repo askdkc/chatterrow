@@ -20,16 +20,18 @@
         if (showRecoveryInput) {
             return {
                 title: t('Recovery code'),
-                description:
-                    t('Please confirm access to your account by entering one of your emergency recovery codes.'),
+                description: t(
+                    'Please confirm access to your account by entering one of your emergency recovery codes.',
+                ),
                 buttonText: t('login using an authentication code'),
             };
         }
 
         return {
             title: t('Authentication code'),
-            description:
-                t('Enter the authentication code provided by your authenticator application.'),
+            description: t(
+                'Enter the authentication code provided by your authenticator application.',
+            ),
             buttonText: t('login using a recovery code'),
         };
     });

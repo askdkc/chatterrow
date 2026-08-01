@@ -10,7 +10,11 @@
         ChevronDown,
         Settings,
     } from 'lucide-svelte';
-    import type { ChannelResource, ServerResource, UserResource } from '@/types';
+    import type {
+        ChannelResource,
+        ServerResource,
+        UserResource,
+    } from '@/types';
 
     let {
         server,
@@ -44,7 +48,9 @@
 
     <div class="flex-1 overflow-y-auto py-3">
         <div class="mb-1 flex items-center justify-between px-3">
-            <span class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide">
+            <span
+                class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide"
+            >
                 <ChevronDown class="h-3 w-3" />
                 テキストチャンネル
             </span>
@@ -62,7 +68,9 @@
             <Link
                 href={`/servers/${server.id}/channels/${channel.id}`}
                 class={`group mx-2 mb-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[15px] font-medium transition hover:bg-white/10 hover:text-[#dbdee1] ${
-                    channel.id === activeChannelId ? 'bg-white/10 text-[#dbdee1]' : ''
+                    channel.id === activeChannelId
+                        ? 'bg-white/10 text-[#dbdee1]'
+                        : ''
                 }`}
             >
                 <Hash class="h-5 w-5 shrink-0 opacity-70" />
@@ -77,7 +85,9 @@
         {/each}
 
         {#if channels.length === 0}
-            <p class="px-4 py-2 text-sm text-[#80848e]">チャンネルがありません</p>
+            <p class="px-4 py-2 text-sm text-[#80848e]">
+                チャンネルがありません
+            </p>
         {/if}
     </div>
 
@@ -108,7 +118,9 @@
 
     <!-- Member list footer -->
     <div class="border-t border-black/10 px-4 py-2 dark:border-black/20">
-        <div class="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide">
+        <div
+            class="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide"
+        >
             <Users class="h-3.5 w-3.5" />
             メンバー {members.length}
         </div>

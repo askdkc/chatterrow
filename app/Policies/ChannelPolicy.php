@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Channel;
+use App\Models\Server;
 use App\Models\User;
 
 class ChannelPolicy
@@ -12,9 +13,9 @@ class ChannelPolicy
         return $channel->server->members()->whereKey($user->id)->exists();
     }
 
-    public function create(User $user, Channel $channel): bool
+    public function create(User $user, Server $server): bool
     {
-        return $channel->server->members()->whereKey($user->id)->exists();
+        return $server->members()->whereKey($user->id)->exists();
     }
 
     public function update(User $user, Channel $channel): bool

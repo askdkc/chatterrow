@@ -193,7 +193,9 @@
             // eslint-disable-next-line svelte/no-dom-manipulating
             previewHost.replaceChildren(viewer);
         } catch (error) {
-            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            if (!(
+                error instanceof DOMException && error.name === 'AbortError'
+            )) {
                 previewError = t('Could not load this file preview.');
             }
         } finally {
@@ -230,7 +232,12 @@
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 {#if file}
-                    <Button variant="ghost" size="icon" aria-label={t('Download')} asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t('Download')}
+                        asChild
+                    >
                         {#snippet children(buttonProps)}
                             <a
                                 {...buttonProps}
@@ -271,7 +278,9 @@
                     role="alert"
                 >
                     <div>
-                        <FileText class="mx-auto size-10 text-muted-foreground" />
+                        <FileText
+                            class="mx-auto size-10 text-muted-foreground"
+                        />
                         <p class="mt-3 font-semibold">{previewError}</p>
                         <p class="mt-1 text-sm text-muted-foreground">
                             {t(

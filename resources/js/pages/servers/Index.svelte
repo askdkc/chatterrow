@@ -25,10 +25,17 @@
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
-    <ServerRail servers={authServers} activeServerId={null} {onAddServer} {onBrowse} />
+    <ServerRail
+        servers={authServers}
+        activeServerId={null}
+        {onAddServer}
+        {onBrowse}
+    />
 
     <main class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <header class="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-black/10 bg-[#313338] px-6 dark:border-black/20">
+        <header
+            class="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-black/10 bg-[#313338] px-6 dark:border-black/20"
+        >
             <h1 class="text-[15px] font-bold">サーバー一覧</h1>
             <button
                 type="button"
@@ -42,8 +49,12 @@
 
         <div class="mx-auto w-full max-w-3xl flex-1 p-6">
             {#if servers.length === 0}
-                <div class="flex flex-col items-center justify-center py-24 text-center">
-                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#5865f2]/20">
+                <div
+                    class="flex flex-col items-center justify-center py-24 text-center"
+                >
+                    <div
+                        class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#5865f2]/20"
+                    >
                         <Hash class="h-8 w-8 text-[#5865f2]" />
                     </div>
                     <h2 class="text-lg font-bold">まだサーバーがありません</h2>
@@ -64,17 +75,28 @@
                         <button
                             type="button"
                             class="flex w-full items-center gap-4 rounded-xl bg-[#2b2d31] p-4 text-left transition hover:bg-[#383a40]"
-                            onclick={() => router.visit(`/servers/${server.id}`)}
+                            onclick={() =>
+                                router.visit(`/servers/${server.id}`)}
                         >
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5865f2] text-base font-bold text-white">
+                            <span
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5865f2] text-base font-bold text-white"
+                            >
                                 {server.name.slice(0, 2).toUpperCase()}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate font-semibold">{server.name}</p>
+                                <p class="truncate font-semibold">
+                                    {server.name}
+                                </p>
                                 {#if server.description}
-                                    <p class="mt-0.5 truncate text-sm text-[#80848e]">{server.description}</p>
+                                    <p
+                                        class="mt-0.5 truncate text-sm text-[#80848e]"
+                                    >
+                                        {server.description}
+                                    </p>
                                 {/if}
-                                <div class="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[#80848e]">
+                                <div
+                                    class="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[#80848e]"
+                                >
                                     <span class="flex items-center gap-1">
                                         <Hash class="h-3 w-3" />
                                         チャンネル {server.channels_count ?? 0}
@@ -86,7 +108,8 @@
                                     {#if server.starts_on || server.ends_on}
                                         <span class="flex items-center gap-1">
                                             <CalendarRange class="h-3 w-3" />
-                                            {server.starts_on ?? '?'} 〜 {server.ends_on ?? '未定'}
+                                            {server.starts_on ?? '?'} 〜 {server.ends_on ??
+                                                '未定'}
                                         </span>
                                     {/if}
                                 </div>

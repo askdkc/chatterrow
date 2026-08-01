@@ -47,7 +47,9 @@
     <Heading
         variant="small"
         title={t('Update password')}
-        description={t('Ensure your account is using a long, random password to stay secure')}
+        description={t(
+            'Ensure your account is using a long, random password to stay secure',
+        )}
     />
 
     <Form
@@ -84,7 +86,9 @@
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">{t('Confirm password')}</Label>
+                <Label for="password_confirmation"
+                    >{t('Confirm password')}</Label
+                >
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"

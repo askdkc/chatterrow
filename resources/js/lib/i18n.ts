@@ -6,8 +6,14 @@ import { page } from '@inertiajs/svelte';
  *
  * Added by Breezejp (https://github.com/askdkc/breezejp)
  */
-export function t(key: string, replacements: Record<string, string> = {}): string {
-    const translations = (page.props.translations ?? {}) as Record<string, string>;
+export function t(
+    key: string,
+    replacements: Record<string, string> = {},
+): string {
+    const translations = (page.props.translations ?? {}) as Record<
+        string,
+        string
+    >;
 
     let translated = translations[key] ?? key;
 

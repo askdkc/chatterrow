@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Channel;
 use App\Models\Server;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class ChannelController extends Controller
 {
-    public function store(Request $request, Server $server): RedirectResponse
+    public function store(Request $request, Server $server): JsonResponse
     {
         Gate::authorize('create', [Channel::class, $server]);
 
@@ -27,10 +27,10 @@ class ChannelController extends Controller
             'created_by' => $request->user()?->id,
         ]);
 
-        return redirect()->route('servers.channels.show', [$server, $channel]);
+        return response()->json(['channel' => $channel], 201);
     }
 
-    public function update(Request $request, Server $server, Channel $channel): RedirectResponse
+    public function update(Request $request, Server $server, Channel $channel): JsonResponse
     {
         abort_unless($channel->server_id === $server->id, 404);
         Gate::authorize('update', $channel);
@@ -44,16 +44,16 @@ class ChannelController extends Controller
 
         $channel->update($validated);
 
-        return back();
+        return response()->json(['channel' => $channel->fresh()]);
     }
 
-    public function destroy(Server $server, Channel $channel): RedirectResponse
+    public function destroy(Server $server, Channel $channel): JsonResponse
     {
         abort_unless($channel->server_id === $server->id, 404);
         Gate::authorize('delete', $channel);
 
         $channel->delete();
 
-        return redirect()->route('servers.show', $server);
+        return response()->json(['ok' => true]);
     }
 }

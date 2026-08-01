@@ -78,7 +78,10 @@
         <DialogContent>
             <DialogTitle>{t('Remove passkey')}</DialogTitle>
             <DialogDescription>
-                {t('Are you sure you want to remove the ":name" passkey? You will no longer be able to use it to sign in.', { name: passkey.name })}
+                {t(
+                    'Are you sure you want to remove the ":name" passkey? You will no longer be able to use it to sign in.',
+                    { name: passkey.name },
+                )}
             </DialogDescription>
             <DialogFooter>
                 <DialogClose asChild>
