@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import type { Snippet } from 'svelte';
     import Heading from '@/components/Heading.svelte';
@@ -19,15 +20,15 @@
 
     const sidebarNavItems: NavItem[] = [
         {
-            title: 'Profile',
+            title: t('Profile'),
             href: editProfile(),
         },
         {
-            title: 'Security',
+            title: t('Security'),
             href: editSecurity(),
         },
         {
-            title: 'Appearance',
+            title: t('Appearance'),
             href: editAppearance(),
         },
     ];
@@ -37,15 +38,15 @@
 
 <div class="px-4 py-6">
     <Heading
-        title="Settings"
-        description="Manage your profile and account settings"
+        title={t('Settings')}
+        description={t('Manage your profile and account settings')}
     />
 
     <div class="flex flex-col lg:flex-row lg:space-x-12">
         <aside class="w-full max-w-xl lg:w-48">
             <nav
                 class="flex flex-col space-y-1 space-x-0"
-                aria-label="Settings"
+                aria-label={t('Settings')}
             >
                 {#each sidebarNavItems as item (toUrl(item.href))}
                     <Button

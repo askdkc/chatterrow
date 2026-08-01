@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import BookOpen from 'lucide-svelte/icons/book-open';
     import FolderGit2 from 'lucide-svelte/icons/folder-git-2';
@@ -18,7 +19,7 @@
         SidebarMenuItem,
     } from '@/components/ui/sidebar';
     import { toUrl } from '@/lib/utils';
-    import { dashboard } from '@/routes';
+    import { index as serversIndex } from '@/routes/servers';
     import type { NavItem } from '@/types';
 
     let {
@@ -29,20 +30,20 @@
 
     const mainNavItems: NavItem[] = [
         {
-            title: 'Dashboard',
-            href: dashboard(),
+            title: t('サーバー一覧'),
+            href: serversIndex(),
             icon: LayoutGrid,
         },
     ];
 
     const footerNavItems: NavItem[] = [
         {
-            title: 'Repository',
+            title: t('Repository'),
             href: 'https://github.com/laravel/svelte-starter-kit',
             icon: FolderGit2,
         },
         {
-            title: 'Documentation',
+            title: t('Documentation'),
             href: 'https://laravel.com/docs/starter-kits#svelte',
             icon: BookOpen,
         },
@@ -57,7 +58,7 @@
                     {#snippet children(props)}
                         <Link
                             {...props}
-                            href={toUrl(dashboard())}
+                            href={toUrl(serversIndex())}
                             class={props.class}
                         >
                             <AppLogo />

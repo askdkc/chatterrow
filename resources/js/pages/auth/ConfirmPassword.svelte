@@ -7,6 +7,7 @@
 </script>
 
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import {
         index as confirmOptions,
@@ -22,23 +23,23 @@
     import { store } from '@/routes/password/confirm';
 </script>
 
-<AppHead title="Confirm password" />
+<AppHead title={t('Confirm password')} />
 
 <PasskeyVerify
     routes={{
         options: confirmOptions(),
         submit: confirmStore(),
     }}
-    label="Confirm with passkey"
-    loadingLabel="Confirming..."
-    separator="Or confirm with password"
+    label={t('Confirm with passkey')}
+    loadingLabel={t('Confirming...')}
+    separator={t('Or confirm with password')}
 />
 
 <Form {...store.form()} resetOnSuccess>
     {#snippet children({ errors, processing })}
         <div class="space-y-6">
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">{t('Password')}</Label>
                 <PasswordInput
                     id="password"
                     name="password"
@@ -57,7 +58,7 @@
                     data-test="confirm-password-button"
                 >
                     {#if processing}<Spinner />{/if}
-                    Confirm password
+                    {t('Confirm password')}
                 </Button>
             </div>
         </div>

@@ -7,6 +7,7 @@
 </script>
 
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import TextLink from '@/components/TextLink.svelte';
@@ -22,12 +23,11 @@
     } = $props();
 </script>
 
-<AppHead title="Email verification" />
+<AppHead title={t('Email verification')} />
 
 {#if status === 'verification-link-sent'}
     <div class="mb-4 text-center text-sm font-medium text-green-600">
-        A new verification link has been sent to the email address you provided
-        during registration.
+        {t('A new verification link has been sent to the email address you provided during registration.')}
     </div>
 {/if}
 
@@ -35,11 +35,11 @@
     {#snippet children({ processing })}
         <Button type="submit" disabled={processing} variant="secondary">
             {#if processing}<Spinner />{/if}
-            Resend verification email
+            {t('Resend verification email')}
         </Button>
 
         <TextLink href={logout()} as="button" class="mx-auto block text-sm">
-            Log out
+            {t('Log out')}
         </TextLink>
     {/snippet}
 </Form>

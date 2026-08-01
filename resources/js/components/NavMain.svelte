@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import {
         SidebarGroup,
@@ -21,14 +22,14 @@
 </script>
 
 <SidebarGroup class="px-2 py-0">
-    <SidebarGroupLabel>Platform</SidebarGroupLabel>
+    <SidebarGroupLabel>{t('Platform')}</SidebarGroupLabel>
     <SidebarMenu>
         {#each items as item (toUrl(item.href))}
             <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
                     isActive={url.isCurrentUrl(item.href, url.currentUrl)}
-                    tooltip={item.title}
+                    tooltip={t(item.title)}
                 >
                     {#snippet children(props)}
                         <Link
@@ -39,7 +40,7 @@
                             {#if item.icon}
                                 <item.icon class="size-4 shrink-0" />
                             {/if}
-                            <span>{item.title}</span>
+                            <span>{t(item.title)}</span>
                         </Link>
                     {/snippet}
                 </SidebarMenuButton>

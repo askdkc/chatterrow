@@ -28,6 +28,21 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'libreoffice' => [
+        'path' => env('LIBREOFFICE_PATH', 'soffice'),
+        'timeout' => (int) env('LIBREOFFICE_TIMEOUT', 120),
+    ],
+
+    'imagemagick' => [
+        'path' => env('IMAGEMAGICK_PATH', 'convert'),
+        'timeout' => (int) env('IMAGEMAGICK_TIMEOUT', 45),
+    ],
+
+    'poppler' => [
+        'path' => env('POPPLER_PATH', 'pdftoppm'),
+        'timeout' => (int) env('POPPLER_TIMEOUT', 45),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

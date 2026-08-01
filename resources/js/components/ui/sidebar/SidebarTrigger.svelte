@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { getContext } from 'svelte';
     import { PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
     import { Button } from '@/components/ui/button';
@@ -23,5 +24,5 @@
     {:else}
         <PanelLeftClose class="size-4" />
     {/if}
-    <span class="sr-only">Toggle sidebar</span>
+    <span class="sr-only">{t('Toggle sidebar')}</span>
 </Button>

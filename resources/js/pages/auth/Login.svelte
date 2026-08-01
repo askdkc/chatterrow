@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
@@ -30,7 +31,7 @@
     } = $props();
 </script>
 
-<AppHead title="Log in" />
+<AppHead title={t('Log in')} />
 
 {#if status}
     <div class="mb-4 text-center text-sm font-medium text-green-600">
@@ -48,7 +49,7 @@
     {#snippet children({ errors, processing })}
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{t('Email address')}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -62,10 +63,10 @@
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password">{t('Password')}</Label>
                     {#if canResetPassword}
                         <TextLink href={request()} class="text-sm">
-                            Forgot your password?
+                            {t('Forgot your password?')}
                         </TextLink>
                     {/if}
                 </div>
@@ -74,7 +75,7 @@
                     name="password"
                     required
                     autocomplete="current-password"
-                    placeholder="Password"
+                    placeholder={t('Password')}
                 />
                 <InputError message={errors.password} />
             </div>
@@ -82,7 +83,7 @@
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" />
-                    <span>Remember me</span>
+                    <span>{t('Remember me')}</span>
                 </Label>
             </div>
 
@@ -93,13 +94,13 @@
                 data-test="login-button"
             >
                 {#if processing}<Spinner />{/if}
-                Log in
+                {t('Log in')}
             </Button>
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <TextLink href={register()}>Sign up</TextLink>
+            {t('Don\'t have an account?')}
+            <TextLink href={register()}>{t('Sign up')}</TextLink>
         </div>
     {/snippet}
 </Form>

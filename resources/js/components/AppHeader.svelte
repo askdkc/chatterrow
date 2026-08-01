@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Link, page } from '@inertiajs/svelte';
     import BookOpen from 'lucide-svelte/icons/book-open';
     import Folder from 'lucide-svelte/icons/folder';
@@ -42,7 +43,7 @@
     import { currentUrlState } from '@/lib/currentUrl.svelte';
     import { getInitials } from '@/lib/initials';
     import { toUrl } from '@/lib/utils';
-    import { dashboard } from '@/routes';
+    import { index as serversIndex } from '@/routes/servers';
     import type { BreadcrumbItem, NavItem } from '@/types';
 
     let {
@@ -59,20 +60,20 @@
 
     const mainNavItems: NavItem[] = [
         {
-            title: 'Dashboard',
-            href: dashboard(),
+            title: t('サーバー一覧'),
+            href: serversIndex(),
             icon: LayoutGrid,
         },
     ];
 
     const rightNavItems: NavItem[] = [
         {
-            title: 'Repository',
+            title: t('Repository'),
             href: 'https://github.com/laravel/svelte-starter-kit',
             icon: Folder,
         },
         {
-            title: 'Documentation',
+            title: t('Documentation'),
             href: 'https://laravel.com/docs/starter-kits#svelte',
             icon: BookOpen,
         },
@@ -99,7 +100,7 @@
                         {/snippet}
                     </SheetTrigger>
                     <SheetContent side="left" class="w-[300px] p-6">
-                        <SheetTitle class="sr-only">Navigation menu</SheetTitle>
+                        <SheetTitle class="sr-only">{t('Navigation menu')}</SheetTitle>
                         <SheetHeader class="flex justify-start text-left">
                             <AppLogoIcon
                                 class="size-6 fill-current text-black dark:text-white"
@@ -122,7 +123,7 @@
                                         {#if item.icon}
                                             <item.icon class="h-5 w-5" />
                                         {/if}
-                                        {item.title}
+                                        {t(item.title)}
                                     </Link>
                                 {/each}
                             </nav>
@@ -137,7 +138,7 @@
                                         {#if item.icon}
                                             <item.icon class="h-5 w-5" />
                                         {/if}
-                                        <span>{item.title}</span>
+                                        <span>{t(item.title)}</span>
                                     </a>
                                 {/each}
                             </div>
@@ -146,7 +147,7 @@
                 </Sheet>
             </div>
 
-            <Link href={toUrl(dashboard())} class="flex items-center gap-x-2">
+            <Link href={toUrl(serversIndex())} class="flex items-center gap-x-2">
                 <AppLogo />
             </Link>
 
@@ -172,7 +173,7 @@
                                     {#if item.icon}
                                         <item.icon class="mr-2 h-4 w-4" />
                                     {/if}
-                                    {item.title}
+                                    {t(item.title)}
                                 </Link>
                                 {#if url.isCurrentUrl(item.href, url.currentUrl)}
                                     <div
@@ -211,7 +212,7 @@
                                                 class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 w-9 group cursor-pointer"
                                             >
                                                 <span class="sr-only"
-                                                    >{item.title}</span
+                                                    >{t(item.title)}</span
                                                 >
                                                 <item.icon
                                                     class="size-5 opacity-80 group-hover:opacity-100"
@@ -220,7 +221,7 @@
                                         {/snippet}
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>{item.title}</p>
+                                        <p>{t(item.title)}</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>

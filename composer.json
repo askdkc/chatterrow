@@ -10,16 +10,21 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "firebase/php-jwt": "^7.1",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
+        "laravel/reverb": "^1.11",
         "laravel/tinker": "^3.0",
-        "laravel/wayfinder": "^0.1.14"
+        "laravel/wayfinder": "^0.1.14",
+        "symfony/html-sanitizer": "^8.1"
     },
     "require-dev": {
+        "askdkc/breezejp": "^2.6",
         "fakerphp/faker": "^1.24",
         "larastan/larastan": "^3.9",
+        "laravel/boost": "^2.4",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",

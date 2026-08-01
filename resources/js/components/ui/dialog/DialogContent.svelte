@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import type { Snippet } from 'svelte';
     import { getContext } from 'svelte';
     import { cn } from '@/lib/utils';
@@ -16,7 +17,7 @@
         <button
             type="button"
             class="fixed inset-0 bg-black/50"
-            aria-label="Close"
+            aria-label={t('Close')}
             onclick={close}
         ></button>
         <div

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import {
         SidebarGroup,
         SidebarGroupContent,
@@ -38,7 +39,7 @@
                                 {#if item.icon}
                                     <item.icon class="size-4 shrink-0" />
                                 {/if}
-                                <span>{item.title}</span>
+                                <span>{t(item.title)}</span>
                             </a>
                         {/snippet}
                     </SidebarMenuButton>

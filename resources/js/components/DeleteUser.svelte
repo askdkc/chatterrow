@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
     import Heading from '@/components/Heading.svelte';
@@ -20,22 +21,22 @@
 <div class="space-y-6">
     <Heading
         variant="small"
-        title="Delete account"
-        description="Delete your account and all of its resources"
+        title={t('Delete account')}
+        description={t('Delete your account and all of its resources')}
     />
     <div
         class="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10"
     >
         <div class="relative space-y-0.5 text-red-600 dark:text-red-100">
-            <p class="font-medium">Warning</p>
+            <p class="font-medium">{t('Warning')}</p>
             <p class="text-sm">
-                Please proceed with caution, this cannot be undone.
+                {t('Please proceed with caution, this cannot be undone.')}
             </p>
         </div>
         <Dialog>
             <DialogTrigger>
                 <Button variant="destructive" data-test="delete-user-button"
-                    >Delete account</Button
+                    >{t('Delete account')}</Button
                 >
             </DialogTrigger>
             <DialogContent>
@@ -47,32 +48,28 @@
                     {#snippet children({ errors, processing })}
                         <div class="space-y-3">
                             <DialogTitle
-                                >Are you sure you want to delete your account?</DialogTitle
+                                >{t('Are you sure you want to delete your account?')}</DialogTitle
                             >
                             <DialogDescription>
-                                Once your account is deleted, all of its
-                                resources and data will also be permanently
-                                deleted. Please enter your password to confirm
-                                you would like to permanently delete your
-                                account.
+                                {t('Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.')}
                             </DialogDescription>
                         </div>
 
                         <div class="grid gap-2">
                             <Label for="password" class="sr-only"
-                                >Password</Label
+                                >{t('Password')}</Label
                             >
                             <PasswordInput
                                 id="password"
                                 name="password"
-                                placeholder="Password"
+                                placeholder={t('Password')}
                             />
                             <InputError message={errors.password} />
                         </div>
 
                         <DialogFooter class="gap-2">
                             <DialogClose>
-                                <Button variant="secondary">Cancel</Button>
+                                <Button variant="secondary">{t('Cancel')}</Button>
                             </DialogClose>
 
                             <Button
@@ -81,7 +78,7 @@
                                 disabled={processing}
                                 data-test="confirm-delete-user-button"
                             >
-                                Delete account
+                                {t('Delete account')}
                             </Button>
                         </DialogFooter>
                     {/snippet}

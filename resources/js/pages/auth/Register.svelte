@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
@@ -21,7 +22,7 @@
     let { passwordRules }: { passwordRules: string } = $props();
 </script>
 
-<AppHead title="Register" />
+<AppHead title={t('Register')} />
 
 <Form
     {...store.form()}
@@ -31,20 +32,20 @@
     {#snippet children({ errors, processing })}
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="name">Name</Label>
+                <Label for="name">{t('Name')}</Label>
                 <Input
                     id="name"
                     type="text"
                     required
                     autocomplete="name"
                     name="name"
-                    placeholder="Full name"
+                    placeholder={t('Full name')}
                 />
                 <InputError message={errors.name} />
             </div>
 
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{t('Email address')}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -57,26 +58,26 @@
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">{t('Password')}</Label>
                 <PasswordInput
                     id="password"
                     required
                     autocomplete="new-password"
                     name="password"
-                    placeholder="Password"
+                    placeholder={t('Password')}
                     passwordrules={passwordRules}
                 />
                 <InputError message={errors.password} />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label for="password_confirmation">{t('Confirm password')}</Label>
                 <PasswordInput
                     id="password_confirmation"
                     required
                     autocomplete="new-password"
                     name="password_confirmation"
-                    placeholder="Confirm password"
+                    placeholder={t('Confirm password')}
                     passwordrules={passwordRules}
                 />
                 <InputError message={errors.password_confirmation} />
@@ -89,14 +90,14 @@
                 data-test="register-user-button"
             >
                 {#if processing}<Spinner />{/if}
-                Create account
+                {t('Create account')}
             </Button>
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            Already have an account?
+            {t('Already have an account?')}
             <TextLink href={login()} class="underline underline-offset-4">
-                Log in
+                {t('Log in')}
             </TextLink>
         </div>
     {/snippet}

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import type { Snippet } from 'svelte';
     import { getContext } from 'svelte';
     import X from 'lucide-svelte/icons/x';
@@ -53,7 +54,7 @@
         <button
             type="button"
             class="fixed inset-0 border-0 bg-black/50"
-            aria-label="Close"
+            aria-label={t('Close')}
             onclick={close}
         ></button>
         <div
@@ -69,11 +70,11 @@
             <button
                 type="button"
                 class="ring-offset-background focus-visible:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none"
-                aria-label="Close"
+                aria-label={t('Close')}
                 onclick={close}
             >
                 <X class="size-4" />
-                <span class="sr-only">Close</span>
+                <span class="sr-only">{t('Close')}</span>
             </button>
             {@render children?.()}
         </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import Eye from 'lucide-svelte/icons/eye';
     import EyeOff from 'lucide-svelte/icons/eye-off';
     import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@
         type="button"
         onclick={() => (showPassword = !showPassword)}
         class="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex items-center rounded-r-md px-3 focus-visible:outline-none focus-visible:ring-[3px]"
-        aria-label={showPassword ? 'Hide password' : 'Show password'}
+        aria-label={showPassword ? t('Hide password') : t('Show password')}
         tabindex={-1}
     >
         {#if showPassword}

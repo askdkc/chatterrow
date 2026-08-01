@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import type { Snippet } from 'svelte';
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
@@ -40,9 +41,9 @@
         <div class="flex flex-col gap-6">
             <Card class="rounded-xl">
                 <CardHeader class="px-10 pt-8 pb-0 text-center">
-                    <CardTitle class="text-xl">{title}</CardTitle>
+                    <CardTitle class="text-xl">{t(title)}</CardTitle>
                     <CardDescription>
-                        {description}
+                        {t(description)}
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="px-10 py-8">

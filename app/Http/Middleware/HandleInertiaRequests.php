@@ -35,11 +35,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
+            'translations' => fn (): array => is_file(lang_path(app()->getLocale().'.json'))
+                ? json_decode((string) file_get_contents(lang_path(app()->getLocale().'.json')), true, 512, JSON_THROW_ON_ERROR)
+                : [],
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                'servers' => $user
+                    ? $user->servers()->orderBy('servers.name')->get(['servers.id', 'servers.name'])
+                    : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

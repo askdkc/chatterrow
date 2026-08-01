@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
@@ -24,7 +25,7 @@
     } = $props();
 </script>
 
-<AppHead title="Forgot password" />
+<AppHead title={t('Forgot password')} />
 
 {#if status}
     <div class="mb-4 text-center text-sm font-medium text-green-600">
@@ -36,7 +37,7 @@
     <Form {...email.form()}>
         {#snippet children({ errors, processing })}
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{t('Email address')}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -55,14 +56,14 @@
                     data-test="email-password-reset-link-button"
                 >
                     {#if processing}<Spinner />{/if}
-                    Email password reset link
+                    {t('Email password reset link')}
                 </Button>
             </div>
         {/snippet}
     </Form>
 
     <div class="space-x-1 text-center text-sm text-muted-foreground">
-        <span>Or, return to</span>
-        <TextLink href={login()}>log in</TextLink>
+        <span>{t('Or, return to')}</span>
+        <TextLink href={login()}>{t('log in')}</TextLink>
     </div>
 </div>
