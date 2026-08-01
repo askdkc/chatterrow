@@ -11,14 +11,22 @@
     } = $props();
 
     function formatTime(iso: string | undefined): string {
-        if (!iso) return '';
+        if (!iso) {
+return '';
+}
+
         const d = new Date(iso);
+
         return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     }
 
     function formatDate(iso: string | undefined): string {
-        if (!iso) return '';
+        if (!iso) {
+return '';
+}
+
         const d = new Date(iso);
+
         return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
     }
 
@@ -28,10 +36,6 @@
 
     function isVideo(file: StoredFileResource): boolean {
         return (file.mime_type ?? '').startsWith('video/');
-    }
-
-    function isPdf(file: StoredFileResource): boolean {
-        return file.mime_type === 'application/pdf' || file.original_name.toLowerCase().endsWith('.pdf');
     }
 </script>
 

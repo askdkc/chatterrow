@@ -28,8 +28,13 @@
 
     async function addTodo() {
         const title = newTitle.trim();
-        if (!title) return;
+
+        if (!title) {
+return;
+}
+
         adding = true;
+
         try {
             const res = await fetch(`/servers/${serverId}/channels/${channelId}/todos`, {
                 method: 'POST',
@@ -40,6 +45,7 @@
                     assignee_id: newAssigneeId === '' ? null : newAssigneeId,
                 }),
             });
+
             if (res.ok) {
                 newTitle = '';
                 newDueOn = '';
@@ -57,6 +63,7 @@
             method: 'PATCH',
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
+
         if (res.ok) {
             const data = await res.json();
             todos = todos.map((t) => (t.id === todo.id ? data.todo : t));
@@ -68,13 +75,17 @@
             method: 'DELETE',
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
+
         if (res.ok) {
             todos = todos.filter((t) => t.id !== todo.id);
         }
     }
 
     function formatDue(iso: string | null): string {
-        if (!iso) return '';
+        if (!iso) {
+return '';
+}
+
         return new Date(iso).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
     }
 
@@ -151,7 +162,9 @@
                 placeholder="新しいタスク"
                 class="min-w-0 flex-1 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 onkeydown={(e) => {
-                    if (e.key === 'Enter') addTodo();
+                    if (e.key === 'Enter') {
+addTodo();
+}
                 }}
             />
             <button

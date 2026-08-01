@@ -7,7 +7,6 @@
 </script>
 
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import {
         index as confirmOptions,
@@ -20,6 +19,7 @@
     import { Button } from '@/components/ui/button';
     import { Label } from '@/components/ui/label';
     import { Spinner } from '@/components/ui/spinner';
+    import { t } from '@/lib/i18n';
     import { store } from '@/routes/password/confirm';
 </script>
 

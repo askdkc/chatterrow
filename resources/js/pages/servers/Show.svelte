@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import { router } from '@inertiajs/svelte';
-    import { Plus, Hash, Users, CalendarRange, ListTodo, FileText } from 'lucide-svelte';
-    import type { ServerResource, ChannelResource, UserResource } from '@/types';
-    import ServerRail from '@/components/discord/ServerRail.svelte';
-    import ChannelList from '@/components/discord/ChannelList.svelte';
+    import { Plus, Users, CalendarRange, ListTodo, FileText } from 'lucide-svelte';
+    import { onMount } from 'svelte';
     import ChannelDialog from '@/components/discord/ChannelDialog.svelte';
+    import ChannelList from '@/components/discord/ChannelList.svelte';
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
+    import ServerRail from '@/components/discord/ServerRail.svelte';
+    import type { ServerResource, ChannelResource, UserResource } from '@/types';
 
     let {
         server,

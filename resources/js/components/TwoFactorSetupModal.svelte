@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import Check from 'lucide-svelte/icons/check';
     import Copy from 'lucide-svelte/icons/copy';
@@ -20,6 +19,7 @@
         InputOTPSlot,
     } from '@/components/ui/input-otp';
     import { Spinner } from '@/components/ui/spinner';
+    import { t } from '@/lib/i18n';
     import { themeState } from '@/lib/theme.svelte';
     import { twoFactorAuthState } from '@/lib/twoFactorAuth.svelte';
     import { confirm } from '@/routes/two-factor';

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import type { Snippet } from 'svelte';
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
@@ -10,6 +9,7 @@
         CardHeader,
         CardTitle,
     } from '@/components/ui/card';
+    import { t } from '@/lib/i18n';
     import { home } from '@/routes';
 
     let {

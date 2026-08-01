@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link, page } from '@inertiajs/svelte';
     import BookOpen from 'lucide-svelte/icons/book-open';
     import Folder from 'lucide-svelte/icons/folder';
@@ -41,6 +40,7 @@
     } from '@/components/ui/tooltip';
     import UserMenuContent from '@/components/UserMenuContent.svelte';
     import { currentUrlState } from '@/lib/currentUrl.svelte';
+    import { t } from '@/lib/i18n';
     import { getInitials } from '@/lib/initials';
     import { toUrl } from '@/lib/utils';
     import { index as serversIndex } from '@/routes/servers';

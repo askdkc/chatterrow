@@ -21,6 +21,9 @@ export interface ChannelResource {
     ends_on: string | null;
     created_by: number | null;
     created_at?: string;
+    open_todos_count?: number;
+    todos_count?: number;
+    todos?: TodoResource[];
 }
 
 export interface UserResource {

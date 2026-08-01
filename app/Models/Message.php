@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $user_id
  * @property int|null $parent_id
  * @property string $body
+ * @property bool $is_reminder
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Server $server
@@ -28,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Message> $replies
  * @property-read Collection<int, StoredFile> $attachments
  */
-#[Fillable(['server_id', 'channel_id', 'user_id', 'parent_id', 'body'])]
+#[Fillable(['server_id', 'channel_id', 'user_id', 'parent_id', 'body', 'is_reminder'])]
 class Message extends Model
 {
     /** @use HasFactory<MessageFactory> */

@@ -62,9 +62,9 @@ class TaskController extends Controller
     }
 
     /**
-     * Gantt data for a server: all channels as bars + todos as bars grouped by channel.
+     * Gantt page for a server: all channels as bars + todos as bars grouped by channel.
      */
-    public function gantt(Server $server): JsonResponse
+    public function gantt(Server $server): Response
     {
         Gate::authorize('view', $server);
 
@@ -100,7 +100,7 @@ class TaskController extends Controller
             'completed' => $todo->completed_at !== null,
         ]))->values();
 
-        return response()->json([
+        return Inertia::render('servers/Gantt', [
             'server' => $server,
             'tasks' => $tasks,
         ]);

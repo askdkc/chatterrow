@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import type { Snippet } from 'svelte';
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
+    import { t } from '@/lib/i18n';
     import { home } from '@/routes';
 
     let {

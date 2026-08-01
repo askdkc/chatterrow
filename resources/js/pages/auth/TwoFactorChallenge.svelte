@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form, setLayoutProps } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
@@ -10,6 +9,7 @@
         InputOTPGroup,
         InputOTPSlot,
     } from '@/components/ui/input-otp';
+    import { t } from '@/lib/i18n';
     import { store } from '@/routes/two-factor/login';
     import type { TwoFactorConfigContent } from '@/types';
 

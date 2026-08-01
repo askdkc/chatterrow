@@ -22,9 +22,13 @@
     }
 
     async function create() {
-        if (!name.trim()) return;
+        if (!name.trim()) {
+return;
+}
+
         saving = true;
         error = '';
+
         try {
             const res = await fetch('/servers', {
                 method: 'POST',
@@ -37,6 +41,7 @@
                 }),
             });
             const data = await res.json().catch(() => ({}));
+
             if (res.ok) {
                 window.location.href = `/servers/${data.server.id}`;
             } else {
@@ -69,7 +74,9 @@
                     placeholder="例: プロジェクトA"
                     class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                     onkeydown={(e) => {
-                        if (e.key === 'Enter') create();
+                        if (e.key === 'Enter') {
+create();
+}
                     }}
                 />
             </div>

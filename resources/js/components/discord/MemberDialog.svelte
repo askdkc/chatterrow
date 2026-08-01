@@ -25,10 +25,14 @@
     }
 
     async function invite() {
-        if (!email.trim()) return;
+        if (!email.trim()) {
+return;
+}
+
         searching = true;
         error = '';
         success = '';
+
         try {
             const res = await fetch(`/servers/${server.id}/members`, {
                 method: 'POST',
@@ -36,6 +40,7 @@
                 body: JSON.stringify({ email: email.trim() }),
             });
             const data = await res.json().catch(() => ({}));
+
             if (res.ok) {
                 success = `${data.user?.name ?? email} を追加しました`;
                 email = '';
@@ -55,6 +60,7 @@
             method: 'DELETE',
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
+
         if (res.ok) {
             members = members.filter((m) => m.id !== member.id);
         }
@@ -92,7 +98,9 @@
                 placeholder="メールアドレスでメンバーを追加"
                 class="min-w-0 flex-1 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 onkeydown={(e) => {
-                    if (e.key === 'Enter') invite();
+                    if (e.key === 'Enter') {
+invite();
+}
                 }}
             />
             <button

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import {
         SidebarGroup,
         SidebarGroupContent,
@@ -7,6 +6,7 @@
         SidebarMenuButton,
         SidebarMenuItem,
     } from '@/components/ui/sidebar';
+    import { t } from '@/lib/i18n';
     import { toUrl } from '@/lib/utils';
     import type { NavItem } from '@/types';
 

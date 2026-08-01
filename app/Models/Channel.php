@@ -26,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Message> $messages
  * @property-read Collection<int, Todo> $todos
  */
-#[Fillable(['server_id', 'created_by', 'name', 'description', 'starts_on', 'ends_on'])]
+#[Fillable(['server_id', 'created_by', 'name', 'description', 'starts_on', 'ends_on', 'reminded_at'])]
 class Channel extends Model
 {
     /** @use HasFactory<ChannelFactory> */

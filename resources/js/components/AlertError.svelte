@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import CircleAlert from 'lucide-svelte/icons/circle-alert';
     import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+    import { t } from '@/lib/i18n';
 
     let {
         errors = [],

@@ -12,7 +12,6 @@
 </script>
 
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form, page } from '@inertiajs/svelte';
     import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
     import AppHead from '@/components/AppHead.svelte';
@@ -23,6 +22,7 @@
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
+    import { t } from '@/lib/i18n';
     import { send } from '@/routes/verification';
 
     const user = $derived(page.props.auth.user);

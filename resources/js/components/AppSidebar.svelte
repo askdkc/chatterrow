@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link } from '@inertiajs/svelte';
     import BookOpen from 'lucide-svelte/icons/book-open';
     import FolderGit2 from 'lucide-svelte/icons/folder-git-2';
@@ -18,6 +17,7 @@
         SidebarMenuButton,
         SidebarMenuItem,
     } from '@/components/ui/sidebar';
+    import { t } from '@/lib/i18n';
     import { toUrl } from '@/lib/utils';
     import { index as serversIndex } from '@/routes/servers';
     import type { NavItem } from '@/types';

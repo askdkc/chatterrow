@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import Eye from 'lucide-svelte/icons/eye';
     import EyeOff from 'lucide-svelte/icons/eye-off';
     import { Input } from '@/components/ui/input';
+    import { t } from '@/lib/i18n';
     import { cn } from '@/lib/utils';
 
     let { class: className = '', ...rest } = $props();

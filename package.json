@@ -3,9 +3,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "build:ssr": "vite build && vite build --ssr",
-        "dev": "vite",
+        "build": "npm run file-viewer:assets && vite build",
+        "build:ssr": "npm run file-viewer:assets && vite build && vite build --ssr",
+        "dev": "npm run file-viewer:assets && vite",
+        "file-viewer:assets": "file-viewer-copy-assets",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",

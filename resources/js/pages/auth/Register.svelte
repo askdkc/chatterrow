@@ -6,7 +6,6 @@
 </script>
 
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
@@ -16,6 +15,7 @@
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
     import { Spinner } from '@/components/ui/spinner';
+    import { t } from '@/lib/i18n';
     import { login } from '@/routes';
     import { store } from '@/routes/register';
 

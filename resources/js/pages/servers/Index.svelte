@@ -1,9 +1,9 @@
 <script lang="ts">
     import { router } from '@inertiajs/svelte';
-    import { Plus, Hash, Users, CalendarRange, ListTodo, FileText } from 'lucide-svelte';
-    import type { ServerResource } from '@/types';
-    import ServerRail from '@/components/discord/ServerRail.svelte';
+    import { Plus, Hash, Users, CalendarRange } from 'lucide-svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
+    import ServerRail from '@/components/discord/ServerRail.svelte';
+    import type { ServerResource } from '@/types';
 
     let {
         servers,

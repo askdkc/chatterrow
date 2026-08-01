@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import type { UrlMethodPair } from '@inertiajs/core';
     import { router } from '@inertiajs/svelte';
     import { usePasskeyVerify } from '@laravel/passkeys/svelte';
@@ -9,6 +8,7 @@
     import { Button } from '@/components/ui/button';
     import { Separator } from '@/components/ui/separator';
     import { Spinner } from '@/components/ui/spinner';
+    import { t } from '@/lib/i18n';
 
     type Props = {
         routes?: {

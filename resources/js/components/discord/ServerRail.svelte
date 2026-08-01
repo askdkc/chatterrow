@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Link, usePage } from '@inertiajs/svelte';
+    import { Link } from '@inertiajs/svelte';
     import { Plus, Settings, Compass } from 'lucide-svelte';
     import type { ServerResource } from '@/types';
 
@@ -14,8 +14,6 @@
         onAddServer: () => void;
         onBrowse: () => void;
     } = $props();
-
-    const page = usePage();
 </script>
 
 <nav

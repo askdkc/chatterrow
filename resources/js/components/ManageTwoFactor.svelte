@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import ShieldCheck from 'lucide-svelte/icons/shield-check';
     import { onDestroy } from 'svelte';
@@ -7,6 +6,7 @@
     import TwoFactorRecoveryCodes from '@/components/TwoFactorRecoveryCodes.svelte';
     import TwoFactorSetupModal from '@/components/TwoFactorSetupModal.svelte';
     import { Button } from '@/components/ui/button';
+    import { t } from '@/lib/i18n';
     import { twoFactorAuthState } from '@/lib/twoFactorAuth.svelte';
     import { disable, enable } from '@/routes/two-factor';
 

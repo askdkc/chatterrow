@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import KeyRound from 'lucide-svelte/icons/key-round';
     import Trash2 from 'lucide-svelte/icons/trash-2';
     import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@
         DialogTitle,
         DialogTrigger,
     } from '@/components/ui/dialog';
+    import { t } from '@/lib/i18n';
     import type { Passkey } from '@/types/auth';
 
     let {

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link, router } from '@inertiajs/svelte';
     import LogOut from 'lucide-svelte/icons/log-out';
     import Settings from 'lucide-svelte/icons/settings';
@@ -10,6 +9,7 @@
         DropdownMenuSeparator,
     } from '@/components/ui/dropdown-menu';
     import UserInfo from '@/components/UserInfo.svelte';
+    import { t } from '@/lib/i18n';
     import { toUrl } from '@/lib/utils';
     import { logout } from '@/routes';
     import { edit } from '@/routes/profile';

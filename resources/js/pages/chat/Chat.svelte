@@ -1,10 +1,7 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
     import { router } from '@inertiajs/svelte';
-    import { getEcho } from '@/lib/echo';
     import {
         Hash,
-        Plus,
         Send,
         Paperclip,
         X,
@@ -12,12 +9,17 @@
         ListTodo,
         CalendarRange,
         FileText,
-        CheckCircle2,
-        Circle,
-        UserPlus,
-        ChevronDown,
         Loader2,
     } from 'lucide-svelte';
+    import { onMount } from 'svelte';
+    import ChannelDialog from '@/components/discord/ChannelDialog.svelte';
+    import ChannelList from '@/components/discord/ChannelList.svelte';
+    import MemberDialog from '@/components/discord/MemberDialog.svelte';
+    import MessageItem from '@/components/discord/MessageItem.svelte';
+    import ServerDialog from '@/components/discord/ServerDialog.svelte';
+    import ServerRail from '@/components/discord/ServerRail.svelte';
+    import TodoPanel from '@/components/discord/TodoPanel.svelte';
+    import { getEcho } from '@/lib/echo';
     import type {
         ServerResource,
         ChannelResource,
@@ -26,13 +28,6 @@
         StoredFileResource,
         TodoResource,
     } from '@/types';
-    import ServerRail from '@/components/discord/ServerRail.svelte';
-    import ChannelList from '@/components/discord/ChannelList.svelte';
-    import TodoPanel from '@/components/discord/TodoPanel.svelte';
-    import MessageItem from '@/components/discord/MessageItem.svelte';
-    import ChannelDialog from '@/components/discord/ChannelDialog.svelte';
-    import MemberDialog from '@/components/discord/MemberDialog.svelte';
-    import ServerDialog from '@/components/discord/ServerDialog.svelte';
 
     let {
         server,
@@ -67,6 +62,7 @@
 
     async function loadTodos() {
         const res = await fetch(`/servers/${serverId}/channels/${channelId}/todos`);
+
         if (res.ok) {
             const data = await res.json();
             todos = data.todos;
@@ -82,17 +78,23 @@
         broadcastChannel.listen('.MessageCreated', (e: { message: MessageResource }) => {
             appendMessage(e.message);
         });
+        broadcastChannel.listen('.ReminderCreated', (e: { message: MessageResource }) => {
+            appendMessage(e.message);
+        });
         broadcastChannel.listen('.TodoUpdated', (e: { todo: TodoResource }) => {
             upsertTodo(e.todo);
         });
 
         const onKeydown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') threadParent = null;
+            if (e.key === 'Escape') {
+threadParent = null;
+}
         };
         window.addEventListener('keydown', onKeydown);
 
         return () => {
             broadcastChannel.stopListening('.MessageCreated');
+            broadcastChannel.stopListening('.ReminderCreated');
             broadcastChannel.stopListening('.TodoUpdated');
             echo.leaveChannel(`private-server-${serverId}-channel-${channelId}`);
             window.removeEventListener('keydown', onKeydown);
@@ -100,16 +102,22 @@
     });
 
     function appendMessage(message: MessageResource) {
-        if (message.channel_id !== channelId) return;
+        if (message.channel_id !== channelId) {
+return;
+}
+
         if (message.parent_id) {
             messages = messages.map((m) =>
                 m.id === message.parent_id ? { ...m, reply_count: (m.reply_count ?? 0) + 1 } : m,
             );
+
             return;
         }
+
         if (!messages.some((m) => m.id === message.id)) {
             messages = [...messages, message];
         }
+
         scrollToBottom();
     }
 
@@ -127,8 +135,13 @@
 
     async function sendMessage() {
         const body = draft.trim();
-        if (!body && pendingFiles.length === 0) return;
+
+        if (!body && pendingFiles.length === 0) {
+return;
+}
+
         sending = true;
+
         try {
             const res = await fetch(`/servers/${serverId}/channels/${channelId}/messages`, {
                 method: 'POST',
@@ -144,6 +157,7 @@
                     })),
                 }),
             });
+
             if (res.ok) {
                 const data = await res.json();
                 appendMessage(data.message);
@@ -164,16 +178,22 @@
     }
 
     async function onFilesPicked(fileList: FileList | null) {
-        if (!fileList || fileList.length === 0) return;
+        if (!fileList || fileList.length === 0) {
+return;
+}
+
         const form = new FormData();
+
         for (const file of Array.from(fileList)) {
             form.append('files[]', file);
         }
+
         const res = await fetch(`/servers/${serverId}/files`, {
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken() },
             body: form,
         });
+
         if (res.ok) {
             const data = await res.json();
             pendingFiles = [...pendingFiles, ...data.files];
@@ -188,10 +208,6 @@
 
     function openThread(message: MessageResource) {
         threadParent = message;
-    }
-
-    function switchChannel(target: ChannelResource) {
-        router.visit(`/servers/${serverId}/channels/${target.id}`);
     }
 
     function onAddServer() {
@@ -315,7 +331,6 @@
                     {members}
                     serverId={serverId}
                     channelId={channelId}
-                    onAdd={() => {}}
                 />
             {/if}
         </div>

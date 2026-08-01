@@ -1,0 +1,862 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-01T05:31:16.288Z",
+  "rendererAssetManifests": [
+    {
+      "rendererId": "model",
+      "assets": [
+        {
+          "id": "model-occt-worker",
+          "rendererId": "model",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/model/occt-worker.js",
+          "optionPath": "model.workerUrl",
+          "description": "File Viewer worker that runs STEP, IGES, and BREP tessellation off the UI thread."
+        },
+        {
+          "id": "model-occt-runtime",
+          "rendererId": "model",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/model/occt-import-js.js",
+          "packagePath": "occt-import-js/dist/occt-import-js.js",
+          "optionPath": "model.runtimeUrl",
+          "description": "Self-hosted occt-import-js runtime for browser-native STEP, IGES, and BREP preview."
+        },
+        {
+          "id": "model-occt-wasm",
+          "rendererId": "model",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/model/occt-import-js.wasm",
+          "packagePath": "occt-import-js/dist/occt-import-js.wasm",
+          "optionPath": "model.wasmUrl",
+          "description": "OpenCascade WebAssembly geometry kernel used by the model renderer."
+        },
+        {
+          "id": "model-occt-license",
+          "rendererId": "model",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/model/LICENSE.occt.txt",
+          "packagePath": "occt-import-js/dist/license.occt.txt",
+          "description": "OpenCascade license notice distributed with the browser geometry kernel."
+        },
+        {
+          "id": "model-occt-import-license",
+          "rendererId": "model",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/model/LICENSE.occt-import-js.txt",
+          "packagePath": "occt-import-js/dist/license.occt-import-js.txt",
+          "description": "occt-import-js license notice distributed with the browser geometry kernel."
+        }
+      ]
+    },
+    {
+      "rendererId": "drawing",
+      "assets": [
+        {
+          "id": "drawio-viewer-script",
+          "rendererId": "drawing",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/drawio/viewer-static.min.js",
+          "optionPath": "drawing.viewerScriptUrl",
+          "description": "Official diagrams.net viewer-static.min.js self-hosted for offline Draw.io rendering."
+        },
+        {
+          "id": "drawio-offline-assets",
+          "rendererId": "drawing",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/drawio/",
+          "description": "Official diagrams.net styles, shapes, stencils, images, mxGraph and math assets for offline rendering."
+        }
+      ]
+    },
+    {
+      "rendererId": "pdf",
+      "assets": [
+        {
+          "id": "pdf-worker",
+          "rendererId": "pdf",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/pdf.worker.mjs",
+          "optionPath": "pdf.workerUrl",
+          "description": "PDF.js module worker copied into viewer assets for offline PDF rendering."
+        },
+        {
+          "id": "pdf-cmaps",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/cmaps/",
+          "optionPath": "pdf.cMapUrl",
+          "description": "PDF.js packed CMaps used for CJK and embedded text decoding."
+        },
+        {
+          "id": "pdf-wasm",
+          "rendererId": "pdf",
+          "kind": "wasm-directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/wasm/",
+          "optionPath": "pdf.wasmUrl",
+          "description": "PDF.js WebAssembly helpers for image decoding and fully self-hosted PDF rendering."
+        },
+        {
+          "id": "pdf-standard-fonts",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/standard_fonts/",
+          "optionPath": "pdf.standardFontDataUrl",
+          "description": "PDF.js standard font data used when PDF files reference base fonts."
+        },
+        {
+          "id": "pdf-cjk-font-fallback",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/fonts/",
+          "optionPath": "pdf.cjkFontFallbackPath",
+          "description": "Self-hosted Noto Sans SC variable font shards used for missing unembedded CJK fonts."
+        }
+      ]
+    },
+    {
+      "rendererId": "archive",
+      "assets": [
+        {
+          "id": "libarchive-worker",
+          "rendererId": "archive",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/libarchive/worker-bundle.js",
+          "optionPath": "archive.workerUrl",
+          "description": "libarchive.js module worker used for broad archive format parsing."
+        },
+        {
+          "id": "libarchive-wasm",
+          "rendererId": "archive",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/libarchive/libarchive.wasm",
+          "optionPath": "archive.wasmUrl",
+          "description": "libarchive.js WebAssembly module expected next to the public worker."
+        }
+      ]
+    },
+    {
+      "rendererId": "cad",
+      "assets": [
+        {
+          "id": "cad-wasm-directory",
+          "rendererId": "cad",
+          "kind": "wasm-directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/cad/0.8.0/",
+          "optionPath": "cad.wasmPath",
+          "description": "@flyfish-dev/cad-viewer WebAssembly directory for DWG/DXF helpers."
+        },
+        {
+          "id": "cad-dwg-worker",
+          "rendererId": "cad",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/cad/0.8.0/dwg-worker.js",
+          "optionPath": "cad.workerUrl",
+          "description": "DWG worker entry used by @flyfish-dev/cad-viewer."
+        },
+        {
+          "id": "cad-dwf-wasm",
+          "rendererId": "cad",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/cad/0.8.0/dwfv-render.wasm",
+          "optionPath": "cad.dwfWasmUrl",
+          "description": "DWF/DWFx/XPS raster WebAssembly module used by @flyfish-dev/cad-viewer."
+        },
+        {
+          "id": "cad-libredwg-script",
+          "rendererId": "cad",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/cad/0.8.0/libredwg-web.js",
+          "description": "LibreDWG JavaScript runtime loaded by the CAD DWG worker for offline parsing."
+        },
+        {
+          "id": "cad-libredwg-wasm",
+          "rendererId": "cad",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/cad/0.8.0/libredwg-web.wasm",
+          "description": "LibreDWG WebAssembly runtime loaded by the CAD DWG worker for offline parsing."
+        },
+        {
+          "id": "cad-legacy-dwg-worker",
+          "rendererId": "cad",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "wasm/cad/dwg-worker.js",
+          "description": "Unversioned compatibility alias for deployments that explicitly configured the former DWG worker path."
+        },
+        {
+          "id": "cad-legacy-dwf-wasm",
+          "rendererId": "cad",
+          "kind": "wasm",
+          "target": "public",
+          "required": false,
+          "defaultPath": "wasm/cad/dwfv-render.wasm",
+          "description": "Unversioned compatibility alias for deployments that explicitly configured the former DWF runtime path."
+        },
+        {
+          "id": "cad-legacy-libredwg-script",
+          "rendererId": "cad",
+          "kind": "script",
+          "target": "public",
+          "required": false,
+          "defaultPath": "wasm/cad/libredwg-web.js",
+          "description": "Unversioned compatibility alias for the former LibreDWG JavaScript runtime path."
+        },
+        {
+          "id": "cad-legacy-libredwg-wasm",
+          "rendererId": "cad",
+          "kind": "wasm",
+          "target": "public",
+          "required": false,
+          "defaultPath": "wasm/cad/libredwg-web.wasm",
+          "description": "Unversioned compatibility alias for the former LibreDWG WebAssembly runtime path."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-word-openxml",
+      "assets": [
+        {
+          "id": "docx-worker",
+          "rendererId": "office-word-openxml",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/docx/docx.worker.js",
+          "optionPath": "docx.workerUrl",
+          "description": "Optional @file-viewer/docx worker for off-main-thread DOCX ZIP/XML parsing."
+        },
+        {
+          "id": "docx-worker-jszip",
+          "rendererId": "office-word-openxml",
+          "kind": "script",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/docx/jszip.min.js",
+          "optionPath": "docx.workerJsZipUrl",
+          "description": "JSZip runtime loaded by the @file-viewer/docx worker for fully offline DOCX parsing."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-presentation-binary",
+      "assets": [
+        {
+          "id": "ppt-module",
+          "rendererId": "office-presentation-binary",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/index.mjs",
+          "optionPath": "presentation.pptModuleUrl",
+          "description": "Official @file-viewer/ppt 0.3 browser entry for PowerPoint 97–2003 preview."
+        },
+        {
+          "id": "ppt-worker",
+          "rendererId": "office-presentation-binary",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/worker.mjs",
+          "optionPath": "presentation.pptWorkerUrl",
+          "description": "Official @file-viewer/ppt 0.3 module Worker."
+        },
+        {
+          "id": "ppt-frame-cache",
+          "rendererId": "office-presentation-binary",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/frame-cache.mjs",
+          "description": "Bounded IndexedDB frame cache imported by the binary-PPT Worker."
+        },
+        {
+          "id": "ppt-wasm",
+          "rendererId": "office-presentation-binary",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/ppt-native.wasm",
+          "optionPath": "presentation.pptWasmUrl",
+          "description": "Official @file-viewer/ppt 0.3 native WebAssembly parser and renderer."
+        },
+        {
+          "id": "ppt-cjk-font",
+          "rendererId": "office-presentation-binary",
+          "kind": "font",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/ppt-font-cjk.otf",
+          "optionPath": "presentation.pptFontUrl",
+          "description": "CJK font pack verified and loaded by the binary-PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-manifest",
+          "rendererId": "office-presentation-binary",
+          "kind": "metadata",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/manifest.json",
+          "description": "Integrity and edition metadata for the official binary-PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-package",
+          "rendererId": "office-presentation-binary",
+          "kind": "metadata",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/package.json",
+          "description": "Package identity metadata for the official binary-PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-license",
+          "rendererId": "office-presentation-binary",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/LICENSE",
+          "description": "License shipped by the independently versioned @file-viewer/ppt package."
+        },
+        {
+          "id": "ppt-runtime-notice",
+          "rendererId": "office-presentation-binary",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/NOTICE",
+          "description": "Notices shipped by the independently versioned @file-viewer/ppt package."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-presentation",
+      "assets": [
+        {
+          "id": "pptx-worker",
+          "rendererId": "office-presentation",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/pptx/pptx.worker.js",
+          "optionPath": "presentation.workerUrl",
+          "description": "Optional @file-viewer/pptx worker for stable PPTX parsing in IIFE, CDN, and offline deployments."
+        }
+      ]
+    },
+    {
+      "rendererId": "spreadsheet-openxml",
+      "assets": [
+        {
+          "id": "spreadsheet-worker",
+          "rendererId": "spreadsheet-openxml",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/xlsx/sheet.worker.js",
+          "optionPath": "spreadsheet.workerUrl",
+          "description": "Optional Spreadsheet worker for off-main-thread styled-exceljs workbook parsing."
+        }
+      ]
+    },
+    {
+      "rendererId": "typst",
+      "assets": [
+        {
+          "id": "typst-compiler-wasm",
+          "rendererId": "typst",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/typst/typst_ts_web_compiler_bg.wasm",
+          "packagePath": "@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm",
+          "optionPath": "typst.compilerWasmUrl",
+          "description": "Typst compiler WebAssembly module copied to the public assets directory."
+        },
+        {
+          "id": "typst-renderer-wasm",
+          "rendererId": "typst",
+          "kind": "wasm",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/typst/typst_ts_renderer_bg.wasm",
+          "packagePath": "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm",
+          "optionPath": "typst.rendererWasmUrl",
+          "description": "Typst SVG renderer WebAssembly module copied to the public assets directory."
+        },
+        {
+          "id": "typst-font-assets",
+          "rendererId": "typst",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "wasm/typst/fonts/",
+          "optionPath": "typst.fontAssetsUrl",
+          "description": "Self-hosted default Typst text fonts used by typst.ts without public CDN requests."
+        }
+      ]
+    },
+    {
+      "rendererId": "data-asset",
+      "assets": [
+        {
+          "id": "data-sql-wasm",
+          "rendererId": "data-asset",
+          "kind": "wasm",
+          "target": "public",
+          "required": false,
+          "defaultPath": "wasm/data/sql-wasm.wasm",
+          "packagePath": "sql.js/dist/sql-wasm.wasm",
+          "optionPath": "data.sqlWasmUrl",
+          "description": "sql.js WebAssembly module copied to the public assets directory for SQLite previews."
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "valid": true,
+    "checkedAt": "2026-08-01T05:31:16.287Z",
+    "assets": [
+      {
+        "id": "model-occt-worker",
+        "rendererId": "model",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/model/occt-worker.js",
+        "exists": true,
+        "description": "File Viewer worker that runs STEP, IGES, and BREP tessellation off the UI thread."
+      },
+      {
+        "id": "model-occt-runtime",
+        "rendererId": "model",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/model/occt-import-js.js",
+        "exists": true,
+        "description": "Self-hosted occt-import-js runtime for browser-native STEP, IGES, and BREP preview."
+      },
+      {
+        "id": "model-occt-wasm",
+        "rendererId": "model",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/model/occt-import-js.wasm",
+        "exists": true,
+        "description": "OpenCascade WebAssembly geometry kernel used by the model renderer."
+      },
+      {
+        "id": "model-occt-license",
+        "rendererId": "model",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/model/LICENSE.occt.txt",
+        "exists": true,
+        "description": "OpenCascade license notice distributed with the browser geometry kernel."
+      },
+      {
+        "id": "model-occt-import-license",
+        "rendererId": "model",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/model/LICENSE.occt-import-js.txt",
+        "exists": true,
+        "description": "occt-import-js license notice distributed with the browser geometry kernel."
+      },
+      {
+        "id": "drawio-viewer-script",
+        "rendererId": "drawing",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/drawio/viewer-static.min.js",
+        "exists": true,
+        "description": "Official diagrams.net viewer-static.min.js self-hosted for offline Draw.io rendering."
+      },
+      {
+        "id": "drawio-offline-assets",
+        "rendererId": "drawing",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/drawio/",
+        "exists": true,
+        "description": "Official diagrams.net styles, shapes, stencils, images, mxGraph and math assets for offline rendering."
+      },
+      {
+        "id": "pdf-worker",
+        "rendererId": "pdf",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/pdf.worker.mjs",
+        "exists": true,
+        "description": "PDF.js module worker copied into viewer assets for offline PDF rendering."
+      },
+      {
+        "id": "pdf-cmaps",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/cmaps/",
+        "exists": true,
+        "description": "PDF.js packed CMaps used for CJK and embedded text decoding."
+      },
+      {
+        "id": "pdf-wasm",
+        "rendererId": "pdf",
+        "kind": "wasm-directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/wasm/",
+        "exists": true,
+        "description": "PDF.js WebAssembly helpers for image decoding and fully self-hosted PDF rendering."
+      },
+      {
+        "id": "pdf-standard-fonts",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/standard_fonts/",
+        "exists": true,
+        "description": "PDF.js standard font data used when PDF files reference base fonts."
+      },
+      {
+        "id": "pdf-cjk-font-fallback",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/fonts/",
+        "exists": true,
+        "description": "Self-hosted Noto Sans SC variable font shards used for missing unembedded CJK fonts."
+      },
+      {
+        "id": "libarchive-worker",
+        "rendererId": "archive",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/libarchive/worker-bundle.js",
+        "exists": true,
+        "description": "libarchive.js module worker used for broad archive format parsing."
+      },
+      {
+        "id": "libarchive-wasm",
+        "rendererId": "archive",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/libarchive/libarchive.wasm",
+        "exists": true,
+        "description": "libarchive.js WebAssembly module expected next to the public worker."
+      },
+      {
+        "id": "cad-wasm-directory",
+        "rendererId": "cad",
+        "kind": "wasm-directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/cad/0.8.0/",
+        "exists": true,
+        "description": "@flyfish-dev/cad-viewer WebAssembly directory for DWG/DXF helpers."
+      },
+      {
+        "id": "cad-dwg-worker",
+        "rendererId": "cad",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/cad/0.8.0/dwg-worker.js",
+        "exists": true,
+        "description": "DWG worker entry used by @flyfish-dev/cad-viewer."
+      },
+      {
+        "id": "cad-dwf-wasm",
+        "rendererId": "cad",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/cad/0.8.0/dwfv-render.wasm",
+        "exists": true,
+        "description": "DWF/DWFx/XPS raster WebAssembly module used by @flyfish-dev/cad-viewer."
+      },
+      {
+        "id": "cad-libredwg-script",
+        "rendererId": "cad",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/cad/0.8.0/libredwg-web.js",
+        "exists": true,
+        "description": "LibreDWG JavaScript runtime loaded by the CAD DWG worker for offline parsing."
+      },
+      {
+        "id": "cad-libredwg-wasm",
+        "rendererId": "cad",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/cad/0.8.0/libredwg-web.wasm",
+        "exists": true,
+        "description": "LibreDWG WebAssembly runtime loaded by the CAD DWG worker for offline parsing."
+      },
+      {
+        "id": "cad-legacy-dwg-worker",
+        "rendererId": "cad",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "wasm/cad/dwg-worker.js",
+        "exists": true,
+        "description": "Unversioned compatibility alias for deployments that explicitly configured the former DWG worker path."
+      },
+      {
+        "id": "cad-legacy-dwf-wasm",
+        "rendererId": "cad",
+        "kind": "wasm",
+        "target": "public",
+        "required": false,
+        "relativePath": "wasm/cad/dwfv-render.wasm",
+        "exists": true,
+        "description": "Unversioned compatibility alias for deployments that explicitly configured the former DWF runtime path."
+      },
+      {
+        "id": "cad-legacy-libredwg-script",
+        "rendererId": "cad",
+        "kind": "script",
+        "target": "public",
+        "required": false,
+        "relativePath": "wasm/cad/libredwg-web.js",
+        "exists": true,
+        "description": "Unversioned compatibility alias for the former LibreDWG JavaScript runtime path."
+      },
+      {
+        "id": "cad-legacy-libredwg-wasm",
+        "rendererId": "cad",
+        "kind": "wasm",
+        "target": "public",
+        "required": false,
+        "relativePath": "wasm/cad/libredwg-web.wasm",
+        "exists": true,
+        "description": "Unversioned compatibility alias for the former LibreDWG WebAssembly runtime path."
+      },
+      {
+        "id": "docx-worker",
+        "rendererId": "office-word-openxml",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/docx/docx.worker.js",
+        "exists": true,
+        "description": "Optional @file-viewer/docx worker for off-main-thread DOCX ZIP/XML parsing."
+      },
+      {
+        "id": "docx-worker-jszip",
+        "rendererId": "office-word-openxml",
+        "kind": "script",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/docx/jszip.min.js",
+        "exists": true,
+        "description": "JSZip runtime loaded by the @file-viewer/docx worker for fully offline DOCX parsing."
+      },
+      {
+        "id": "ppt-module",
+        "rendererId": "office-presentation-binary",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/index.mjs",
+        "exists": true,
+        "description": "Official @file-viewer/ppt 0.3 browser entry for PowerPoint 97–2003 preview."
+      },
+      {
+        "id": "ppt-worker",
+        "rendererId": "office-presentation-binary",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/worker.mjs",
+        "exists": true,
+        "description": "Official @file-viewer/ppt 0.3 module Worker."
+      },
+      {
+        "id": "ppt-frame-cache",
+        "rendererId": "office-presentation-binary",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/frame-cache.mjs",
+        "exists": true,
+        "description": "Bounded IndexedDB frame cache imported by the binary-PPT Worker."
+      },
+      {
+        "id": "ppt-wasm",
+        "rendererId": "office-presentation-binary",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/ppt-native.wasm",
+        "exists": true,
+        "description": "Official @file-viewer/ppt 0.3 native WebAssembly parser and renderer."
+      },
+      {
+        "id": "ppt-cjk-font",
+        "rendererId": "office-presentation-binary",
+        "kind": "font",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/ppt-font-cjk.otf",
+        "exists": true,
+        "description": "CJK font pack verified and loaded by the binary-PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-manifest",
+        "rendererId": "office-presentation-binary",
+        "kind": "metadata",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/manifest.json",
+        "exists": true,
+        "description": "Integrity and edition metadata for the official binary-PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-package",
+        "rendererId": "office-presentation-binary",
+        "kind": "metadata",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/package.json",
+        "exists": true,
+        "description": "Package identity metadata for the official binary-PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-license",
+        "rendererId": "office-presentation-binary",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/LICENSE",
+        "exists": true,
+        "description": "License shipped by the independently versioned @file-viewer/ppt package."
+      },
+      {
+        "id": "ppt-runtime-notice",
+        "rendererId": "office-presentation-binary",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/NOTICE",
+        "exists": true,
+        "description": "Notices shipped by the independently versioned @file-viewer/ppt package."
+      },
+      {
+        "id": "pptx-worker",
+        "rendererId": "office-presentation",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/pptx/pptx.worker.js",
+        "exists": true,
+        "description": "Optional @file-viewer/pptx worker for stable PPTX parsing in IIFE, CDN, and offline deployments."
+      },
+      {
+        "id": "spreadsheet-worker",
+        "rendererId": "spreadsheet-openxml",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/xlsx/sheet.worker.js",
+        "exists": true,
+        "description": "Optional Spreadsheet worker for off-main-thread styled-exceljs workbook parsing."
+      },
+      {
+        "id": "typst-compiler-wasm",
+        "rendererId": "typst",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/typst/typst_ts_web_compiler_bg.wasm",
+        "exists": true,
+        "description": "Typst compiler WebAssembly module copied to the public assets directory."
+      },
+      {
+        "id": "typst-renderer-wasm",
+        "rendererId": "typst",
+        "kind": "wasm",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/typst/typst_ts_renderer_bg.wasm",
+        "exists": true,
+        "description": "Typst SVG renderer WebAssembly module copied to the public assets directory."
+      },
+      {
+        "id": "typst-font-assets",
+        "rendererId": "typst",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "wasm/typst/fonts/",
+        "exists": true,
+        "description": "Self-hosted default Typst text fonts used by typst.ts without public CDN requests."
+      },
+      {
+        "id": "data-sql-wasm",
+        "rendererId": "data-asset",
+        "kind": "wasm",
+        "target": "public",
+        "required": false,
+        "relativePath": "wasm/data/sql-wasm.wasm",
+        "exists": true,
+        "description": "sql.js WebAssembly module copied to the public assets directory for SQLite previews."
+      }
+    ],
+    "missingRequired": [],
+    "missingOptional": []
+  }
+}

@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Link, page } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
+    import { t } from '@/lib/i18n';
     import { toUrl } from '@/lib/utils';
     import { login } from '@/routes';
-    import { index as serversIndex } from '@/routes/servers';
     import { register } from '@/routes';
+    import { index as serversIndex } from '@/routes/servers';
 
     const auth = $derived(page.props.auth);
 </script>

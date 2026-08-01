@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { router } from '@inertiajs/svelte';
     import KeyRound from 'lucide-svelte/icons/key-round';
     import { destroy } from '@/actions/Laravel/Passkeys/Http/Controllers/PasskeyRegistrationController';
     import Heading from '@/components/Heading.svelte';
     import PasskeyItem from '@/components/PasskeyItem.svelte';
     import PasskeyRegister from '@/components/PasskeyRegister.svelte';
+    import { t } from '@/lib/i18n';
     import type { Passkey } from '@/types/auth';
 
     export type Props = {

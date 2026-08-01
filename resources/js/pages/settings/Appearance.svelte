@@ -12,10 +12,10 @@
 </script>
 
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import AppearanceTabs from '@/components/AppearanceTabs.svelte';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
+    import { t } from '@/lib/i18n';
 </script>
 
 <AppHead title={t('Appearance settings')} />

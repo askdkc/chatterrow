@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import Eye from 'lucide-svelte/icons/eye';
     import EyeOff from 'lucide-svelte/icons/eye-off';
@@ -15,6 +14,7 @@
         CardHeader,
         CardTitle,
     } from '@/components/ui/card';
+    import { t } from '@/lib/i18n';
     import { twoFactorAuthState } from '@/lib/twoFactorAuth.svelte';
     import { regenerateRecoveryCodes } from '@/routes/two-factor';
 

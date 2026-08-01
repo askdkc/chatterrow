@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { usePasskeyRegister } from '@laravel/passkeys/svelte';
     import InputError from '@/components/InputError.svelte';
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
+    import { t } from '@/lib/i18n';
 
     let {
         onSuccess,

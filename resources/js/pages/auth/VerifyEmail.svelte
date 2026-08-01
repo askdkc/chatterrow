@@ -7,12 +7,12 @@
 </script>
 
 <script lang="ts">
-    import { t } from '@/lib/i18n';
     import { Form } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import TextLink from '@/components/TextLink.svelte';
     import { Button } from '@/components/ui/button';
     import { Spinner } from '@/components/ui/spinner';
+    import { t } from '@/lib/i18n';
     import { logout } from '@/routes';
     import { send } from '@/routes/verification';
 

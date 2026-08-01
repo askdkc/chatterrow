@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $creator
  * @property-read Collection<int, StoredFile> $attachments
  */
-#[Fillable(['channel_id', 'assignee_id', 'created_by', 'title', 'details', 'due_on', 'completed_at', 'completed_by', 'position'])]
+#[Fillable(['channel_id', 'assignee_id', 'created_by', 'title', 'details', 'due_on', 'completed_at', 'completed_by', 'position', 'reminded_at'])]
 class Todo extends Model
 {
     /** @use HasFactory<TodoFactory> */
