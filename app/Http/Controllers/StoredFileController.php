@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -113,7 +114,7 @@ class StoredFileController extends Controller
 
         $results = app(MarkdownSearchIndex::class)
             ->search($server->id, $validated['q'])
-            ->map(fn (object $row) => [
+            ->map(fn (stdClass $row) => [
                 'id' => $row->id,
                 'original_name' => $row->original_name,
                 'mime_type' => $row->mime_type,

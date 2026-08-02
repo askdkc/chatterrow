@@ -4,6 +4,7 @@ namespace App\Support;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 class MarkdownSearchIndex
 {
@@ -28,7 +29,7 @@ class MarkdownSearchIndex
     }
 
     /**
-     * @return Collection<int, object>
+     * @return Collection<int, stdClass>
      */
     public function search(int $serverId, string $query, int $limit = 50): Collection
     {
