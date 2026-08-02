@@ -14,6 +14,7 @@
     import ChannelList from '@/components/discord/ChannelList.svelte';
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import TodoDialog from '@/components/discord/TodoDialog.svelte';
     import type {
         ServerResource,
         ChannelResource,
@@ -40,6 +41,7 @@
     );
 
     let showMemberDialog = $state(false);
+    let editingTodo = $state<TodoResource | null>(null);
 
     function onAddServer() {
         window.location.href = '/servers';
@@ -50,6 +52,33 @@
     }
 
     function onAddChannel() {}
+
+    function updateTodo(updated: TodoResource) {
+        todos = todos.map((todo) =>
+            todo.id === updated.id
+                ? { ...todo, ...updated, channel: todo.channel }
+                : todo,
+        );
+    }
+
+    function openTodoFromClick(event: MouseEvent, todo: TodoResource) {
+        if ((event.target as HTMLElement).closest('a')) {
+            return;
+        }
+
+        editingTodo = todo;
+    }
+
+    function todosForChannel(channelId: number) {
+        return todos.filter((todo) => todo.channel_id === channelId);
+    }
+
+    function handleTodoKeydown(event: KeyboardEvent, todo: TodoResource) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            editingTodo = todo;
+        }
+    }
 
     function formatDue(iso: string | null): string {
         if (!iso) {
@@ -112,140 +141,167 @@
             </Link>
             <ListTodo class="h-4 w-4 text-[#5865f2]" />
             <h1 class="text-[15px] font-bold">タスク一覧</h1>
-            <span class="ml-auto text-xs text-[#80848e]">
+            <span class="ml-auto text-sm font-semibold text-[#4e5058]">
                 {todos.filter((t) => !t.completed_at).length} 未完了 / {todos.length}
                 件
             </span>
         </header>
 
         <div class="flex-1 space-y-6 p-6">
-            <!-- Channels as tasks -->
             <section>
                 <h2
                     class="mb-2 text-xs font-bold uppercase tracking-wide text-[#80848e]"
                 >
                     チャンネル（タスク）
                 </h2>
-                <div class="space-y-2">
-                    {#each channels as channel (channel.id)}
-                        <div
-                            class="flex items-center gap-3 rounded-lg bg-[#2b2d31] p-3 transition hover:bg-[#383a40]"
-                        >
-                            <Hash class="h-4 w-4 shrink-0 text-[#80848e]" />
-                            <div class="min-w-0 flex-1">
-                                <Link
-                                    href={`/servers/${server.id}/channels/${channel.id}`}
-                                    class="font-medium hover:underline"
-                                >
-                                    {channel.name}
-                                </Link>
-                                {#if channel.description}
-                                    <p class="truncate text-xs text-[#80848e]">
-                                        {channel.description}
-                                    </p>
-                                {/if}
-                            </div>
-                            <div
-                                class="flex shrink-0 items-center gap-4 text-xs text-[#80848e]"
-                            >
-                                <span class="flex items-center gap-1">
-                                    <CalendarDays class="h-3.5 w-3.5" />
-                                    {channel.starts_on
-                                        ? formatDue(channel.starts_on)
-                                        : '開始未定'} 〜
-                                    {channel.ends_on
-                                        ? formatDue(channel.ends_on)
-                                        : '期限未定'}
-                                </span>
-                                <span class="flex items-center gap-1">
-                                    <ListTodo class="h-3.5 w-3.5" />
-                                    {channel.open_todos_count ??
-                                        0}/{channel.todos_count ?? 0}
-                                </span>
-                            </div>
-                        </div>
-                    {/each}
-                </div>
-            </section>
-
-            <!-- All todos across channels -->
-            <section>
-                <h2
-                    class="mb-2 text-xs font-bold uppercase tracking-wide text-[#80848e]"
-                >
-                    全タスク
-                </h2>
-                {#if todos.length === 0}
+                {#if channels.length === 0}
                     <p
                         class="rounded-lg bg-[#2b2d31] p-6 text-center text-sm text-[#80848e]"
                     >
-                        タスクがありません。チャンネル内で todo
-                        を作成してください。
+                        チャンネルがありません
                     </p>
                 {:else}
-                    <div class="space-y-2">
-                        {#each todos as todo (todo.id)}
-                            <div
-                                class="flex items-center gap-3 rounded-lg bg-[#2b2d31] p-3 transition hover:bg-[#383a40]"
-                                class:opacity-60={Boolean(todo.completed_at)}
-                            >
-                                {#if todo.completed_at}
-                                    <CheckCircle2
-                                        class="h-5 w-5 shrink-0 text-[#23a559]"
-                                    />
-                                {:else}
-                                    <Circle
-                                        class="h-5 w-5 shrink-0 text-[#80848e]"
-                                    />
-                                {/if}
-                                <div class="min-w-0 flex-1">
-                                    <p
-                                        class="truncate text-sm font-medium"
-                                        class:line-through={Boolean(
-                                            todo.completed_at,
-                                        )}
-                                    >
-                                        {todo.title}
-                                    </p>
-                                    {#if todo.details}
-                                        <p
-                                            class="mt-0.5 line-clamp-2 text-xs text-[#80848e]"
-                                        >
-                                            {todo.details}
-                                        </p>
-                                    {/if}
-                                    <Link
-                                        href={`/servers/${server.id}/channels/${todo.channel.id}`}
-                                        class="text-xs text-[#5865f2] hover:underline"
-                                    >
-                                        #{todo.channel.name}
-                                    </Link>
-                                </div>
+                    <div class="space-y-4">
+                        {#each channels as channel (channel.id)}
+                            <div>
                                 <div
-                                    class="flex shrink-0 items-center gap-4 text-xs text-[#80848e]"
+                                    class="flex items-center gap-3 rounded-lg bg-[#dbeafe] p-3 text-[#1e3a8a] transition hover:bg-[#bfdbfe] dark:bg-[#243b5a] dark:text-[#dbeafe] dark:hover:bg-[#2f4d73]"
                                 >
-                                    {#if todo.starts_at}
-                                        <span class="flex items-center gap-1">
-                                            <Clock3 class="h-3.5 w-3.5" />
-                                            {formatDateTime(todo.starts_at)}
-                                        </span>
-                                    {/if}
-                                    {#if todo.due_at || todo.due_on}
+                                    <Hash
+                                        class="h-4 w-4 shrink-0 text-[#80848e]"
+                                    />
+                                    <div class="min-w-0 flex-1">
+                                        <Link
+                                            href={`/servers/${server.id}/channels/${channel.id}`}
+                                            class="font-medium hover:underline"
+                                        >
+                                            {channel.name}
+                                        </Link>
+                                        {#if channel.description}
+                                            <p
+                                                class="truncate text-xs text-[#80848e]"
+                                            >
+                                                {channel.description}
+                                            </p>
+                                        {/if}
+                                    </div>
+                                    <div
+                                        class="flex shrink-0 items-center gap-4 text-xs text-[#80848e]"
+                                    >
                                         <span class="flex items-center gap-1">
                                             <CalendarDays class="h-3.5 w-3.5" />
-                                            {todo.due_at
-                                                ? formatDateTime(todo.due_at)
-                                                : formatDue(todo.due_on)}
+                                            {channel.starts_on
+                                                ? formatDue(channel.starts_on)
+                                                : '開始未定'} 〜
+                                            {channel.ends_on
+                                                ? formatDue(channel.ends_on)
+                                                : '期限未定'}
                                         </span>
-                                    {/if}
-                                    <span class="flex items-center gap-1">
-                                        <Flag class="h-3.5 w-3.5" />
-                                        {priorityLabel(todo.priority)}
-                                    </span>
-                                    <span class="flex items-center gap-1">
-                                        <User class="h-3.5 w-3.5" />
-                                        {todo.assignee?.name ?? '未割当'}
-                                    </span>
+                                        <span class="flex items-center gap-1">
+                                            <ListTodo class="h-3.5 w-3.5" />
+                                            {channel.open_todos_count ??
+                                                0}/{channel.todos_count ?? 0}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 ml-8 space-y-2">
+                                    {#each todosForChannel(channel.id) as todo (todo.id)}
+                                        <div
+                                            class="flex cursor-pointer items-center gap-3 rounded-lg bg-[#383a40] px-3 py-2 transition hover:bg-[#404249]"
+                                            class:opacity-60={Boolean(
+                                                todo.completed_at,
+                                            )}
+                                            role="button"
+                                            tabindex="0"
+                                            aria-label={`${todo.title}を編集`}
+                                            onclick={(event) =>
+                                                openTodoFromClick(event, todo)}
+                                            onkeydown={(event) =>
+                                                handleTodoKeydown(event, todo)}
+                                        >
+                                            {#if todo.completed_at}
+                                                <CheckCircle2
+                                                    class="h-4 w-4 shrink-0 text-[#23a559]"
+                                                />
+                                            {:else}
+                                                <Circle
+                                                    class="h-4 w-4 shrink-0 text-[#80848e]"
+                                                />
+                                            {/if}
+                                            <div class="min-w-0 flex-1">
+                                                <p
+                                                    class="truncate text-sm font-medium"
+                                                    class:line-through={Boolean(
+                                                        todo.completed_at,
+                                                    )}
+                                                >
+                                                    {todo.title}
+                                                </p>
+                                                {#if todo.details}
+                                                    <p
+                                                        class="mt-0.5 line-clamp-1 text-xs text-[#80848e]"
+                                                    >
+                                                        {todo.details}
+                                                    </p>
+                                                {/if}
+                                            </div>
+                                            <div
+                                                class="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 text-sm font-medium text-[#4e5058] dark:text-[#b5bac1]"
+                                            >
+                                                {#if todo.starts_at}
+                                                    <span
+                                                        class="flex items-center gap-1 rounded-md bg-white/60 px-2 py-1 dark:bg-white/10"
+                                                    >
+                                                        <Clock3
+                                                            class="h-3.5 w-3.5"
+                                                        />
+                                                        <span
+                                                            class="text-xs text-[#6a6f78] dark:text-[#949ba4]"
+                                                            >開始</span
+                                                        >
+                                                        {formatDateTime(
+                                                            todo.starts_at,
+                                                        )}
+                                                    </span>
+                                                {/if}
+                                                {#if todo.due_at || todo.due_on}
+                                                    <span
+                                                        class="flex items-center gap-1 rounded-md bg-white/60 px-2 py-1 dark:bg-white/10"
+                                                    >
+                                                        <CalendarDays
+                                                            class="h-3.5 w-3.5"
+                                                        />
+                                                        <span
+                                                            class="text-xs text-[#6a6f78] dark:text-[#949ba4]"
+                                                            >期限</span
+                                                        >
+                                                        {todo.due_at
+                                                            ? formatDateTime(
+                                                                  todo.due_at,
+                                                              )
+                                                            : formatDue(
+                                                                  todo.due_on,
+                                                              )}
+                                                    </span>
+                                                {/if}
+                                                <span
+                                                    class="flex items-center gap-1"
+                                                >
+                                                    <Flag class="h-3.5 w-3.5" />
+                                                    {priorityLabel(
+                                                        todo.priority,
+                                                    )}
+                                                </span>
+                                                <span
+                                                    class="flex items-center gap-1"
+                                                >
+                                                    <User class="h-3.5 w-3.5" />
+                                                    {todo.assignee?.name ??
+                                                        '未割当'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    {/each}
                                 </div>
                             </div>
                         {/each}
@@ -262,5 +318,15 @@
         {members}
         onUpdated={(updated) => (server = { ...server, ...updated })}
         onClose={() => (showMemberDialog = false)}
+    />
+{/if}
+
+{#if editingTodo}
+    <TodoDialog
+        serverId={server.id}
+        channelId={editingTodo.channel_id}
+        todo={editingTodo}
+        onUpdated={updateTodo}
+        onClose={() => (editingTodo = null)}
     />
 {/if}

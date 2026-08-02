@@ -26,6 +26,7 @@
         threads = [],
         activeThreadId = null,
         onAddChannel,
+        onEditChannel,
         onManageMembers,
         onOpenThread,
     }: {
@@ -36,6 +37,7 @@
         threads?: MessageResource[];
         activeThreadId?: number | null;
         onAddChannel: () => void;
+        onEditChannel?: (channel: ChannelResource) => void;
         onManageMembers: () => void;
         onOpenThread?: (message: MessageResource) => void;
     } = $props();
@@ -46,6 +48,12 @@
             message.attachments?.[0]?.original_name ||
             '無題のスレッド'
         );
+    }
+
+    function handleEditChannel(event: MouseEvent, channel: ChannelResource) {
+        event.preventDefault();
+        event.stopPropagation();
+        onEditChannel?.(channel);
     }
 </script>
 
@@ -81,23 +89,40 @@
         </div>
 
         {#each channels as channel (channel.id)}
-            <Link
-                href={`/servers/${server.id}/channels/${channel.id}`}
-                class={`group mx-2 mb-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[15px] font-medium transition hover:bg-white/10 hover:text-[#dbdee1] ${
+            <div
+                class={`group relative mx-2 mb-0.5 flex items-center rounded-md text-[15px] font-medium transition hover:bg-[#e8f1ff] hover:text-[#1e3a8a] dark:hover:bg-white/10 dark:hover:text-[#dbdee1] ${
                     channel.id === activeChannelId
-                        ? 'bg-white/10 text-[#dbdee1]'
+                        ? 'bg-[#dbeafe] text-[#1e3a8a] dark:bg-white/10 dark:text-[#dbdee1]'
                         : ''
                 }`}
             >
-                <Hash class="h-5 w-5 shrink-0 opacity-70" />
-                <span class="truncate">{channel.name}</span>
-                {#if channel.starts_on || channel.ends_on}
-                    <span
-                        class="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#f0b232]"
-                        title="タスク期間設定あり"
-                    ></span>
+                <Link
+                    href={`/servers/${server.id}/channels/${channel.id}`}
+                    class={`flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 ${
+                        onEditChannel ? 'group-hover:pr-8' : ''
+                    }`}
+                >
+                    <Hash class="h-5 w-5 shrink-0 opacity-70" />
+                    <span class="truncate">{channel.name}</span>
+                    {#if channel.starts_on || channel.ends_on}
+                        <span
+                            class="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#f0b232]"
+                            title="タスク期間設定あり"
+                        ></span>
+                    {/if}
+                </Link>
+                {#if onEditChannel}
+                    <button
+                        type="button"
+                        class="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 rounded p-1 text-[#80848e] opacity-0 transition hover:bg-white/10 hover:text-[#dbdee1] group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                        aria-label={`${channel.name}の設定`}
+                        title="チャンネル設定"
+                        onclick={(event) => handleEditChannel(event, channel)}
+                    >
+                        <Settings class="h-4 w-4" />
+                    </button>
                 {/if}
-            </Link>
+            </div>
 
             {#if channel.id === activeChannelId && threads.length > 0}
                 <div

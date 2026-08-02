@@ -103,6 +103,7 @@ export default ts.config(
             'bootstrap/ssr',
             'tailwind.config.js',
             'vite.config.ts',
+            '.markitdown/**',
             'resources/js/actions/**',
             'resources/js/components/ui/*',
             'resources/js/routes/**',

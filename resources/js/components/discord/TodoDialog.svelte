@@ -1,27 +1,109 @@
 <script lang="ts">
     import { Loader2, Plus, X } from 'lucide-svelte';
+    import TimePicker from '@/components/ui/TimePicker.svelte';
     import { apiJson, HttpError } from '@/lib/http';
     import type { TodoResource } from '@/types';
 
     let {
         serverId,
         channelId,
+        channelStartsOn = null,
+        todo = null,
         onCreated,
+        onUpdated,
         onClose,
     }: {
         serverId: number;
         channelId: number;
-        onCreated: (todo: TodoResource) => void;
+        channelStartsOn?: string | null;
+        todo?: TodoResource | null;
+        onCreated?: (todo: TodoResource) => void;
+        onUpdated?: (todo: TodoResource) => void;
         onClose: () => void;
     } = $props();
 
-    let title = $state('');
-    let startsOn = $state('');
-    let startsTime = $state('');
-    let dueOn = $state('');
-    let dueTime = $state('');
-    let priority = $state<TodoResource['priority']>('normal');
-    let details = $state('');
+    const isEditing = $derived(todo !== null);
+
+    function nextHalfHour(): Date {
+        const now = new Date();
+        const slot = 30 * 60 * 1000;
+        const next = now.getTime() - (now.getTime() % slot) + slot;
+
+        return new Date(next);
+    }
+
+    function dateValue(value: Date): string {
+        const pad = (part: number) => String(part).padStart(2, '0');
+
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+    }
+
+    function timeValue(value: Date): string {
+        const pad = (part: number) => String(part).padStart(2, '0');
+
+        return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    }
+
+    function dateInputValue(value: string | null): string {
+        if (!value) {
+            return '';
+        }
+
+        const parsed = new Date(value);
+
+        return Number.isNaN(parsed.getTime()) ? '' : dateValue(parsed);
+    }
+
+    function timeInputValue(value: string | null): string {
+        if (!value) {
+            return '';
+        }
+
+        const parsed = new Date(value);
+
+        return Number.isNaN(parsed.getTime()) ? '' : timeValue(parsed);
+    }
+
+    const nextStart = nextHalfHour();
+    const initialStartDate = $derived(
+        channelStartsOn && channelStartsOn > dateValue(nextStart)
+            ? channelStartsOn
+            : dateValue(nextStart),
+    );
+    const initialStart = $derived(
+        new Date(`${initialStartDate}T${timeValue(nextStart)}`),
+    );
+    const initialDue = $derived(
+        new Date(initialStart.getTime() + 30 * 60 * 1000),
+    );
+
+    let title = $derived(todo?.title ?? '');
+    let startsOn = $derived(
+        todo ? dateInputValue(todo.starts_at) : dateValue(initialStart),
+    );
+    let startsTime = $derived(
+        todo ? timeInputValue(todo.starts_at) : timeValue(initialStart),
+    );
+    let dueOn = $derived(
+        todo
+            ? todo.due_at
+                ? dateInputValue(todo.due_at)
+                : (todo.due_on ?? '')
+            : dateValue(initialDue),
+    );
+    let dueTime = $derived(
+        todo ? timeInputValue(todo.due_at) : timeValue(initialDue),
+    );
+    let dueManuallyEdited = $state(false);
+    $effect(() => {
+        if (todo) {
+            dueManuallyEdited = true;
+        }
+    });
+    let priority = $derived<TodoResource['priority']>(
+        todo?.priority ?? 'normal',
+    );
+    let details = $derived(todo?.details ?? '');
     let saving = $state(false);
     let error = $state('');
 
@@ -29,7 +111,25 @@
         return date ? `${date}T${time || '00:00'}` : null;
     }
 
-    async function createTodo() {
+    function syncDueFromStart() {
+        if (dueManuallyEdited || !startsOn || !startsTime) {
+            return;
+        }
+
+        const start = new Date(`${startsOn}T${startsTime}`);
+
+        if (Number.isNaN(start.getTime())) {
+            return;
+        }
+
+        const due = new Date(start.getTime() + 30 * 60 * 1000);
+
+        const pad = (value: number) => String(value).padStart(2, '0');
+        dueOn = `${due.getFullYear()}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}`;
+        dueTime = `${pad(due.getHours())}:${pad(due.getMinutes())}`;
+    }
+
+    async function saveTodo() {
         const trimmedTitle = title.trim();
 
         if (!trimmedTitle || saving) {
@@ -41,9 +141,11 @@
 
         try {
             const data = await apiJson<{ todo: TodoResource }>(
-                `/servers/${serverId}/channels/${channelId}/todos`,
+                todo
+                    ? `/servers/${serverId}/channels/${channelId}/todos/${todo.id}`
+                    : `/servers/${serverId}/channels/${channelId}/todos`,
                 {
-                    method: 'POST',
+                    method: todo ? 'PATCH' : 'POST',
                     body: JSON.stringify({
                         title: trimmedTitle,
                         starts_at: dateTime(startsOn, startsTime),
@@ -54,13 +156,20 @@
                 },
             );
 
-            onCreated(data.todo);
+            if (todo) {
+                onUpdated?.(data.todo);
+            } else {
+                onCreated?.(data.todo);
+            }
+
             onClose();
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '追加に失敗しました';
+                    : isEditing
+                      ? '保存に失敗しました'
+                      : '追加に失敗しました';
         } finally {
             saving = false;
         }
@@ -75,7 +184,7 @@
             (event.metaKey || event.ctrlKey)
         ) {
             event.preventDefault();
-            createTodo();
+            saveTodo();
         }
     }
 </script>
@@ -97,7 +206,7 @@
     >
         <div class="mb-5 flex items-center justify-between">
             <h2 id="todo-dialog-title" class="text-lg font-bold text-[#dbdee1]">
-                タスクを作成
+                {isEditing ? 'タスクを編集' : 'タスクを作成'}
             </h2>
             <button
                 type="button"
@@ -141,17 +250,16 @@
                             id="todo-starts-on"
                             bind:value={startsOn}
                             type="date"
+                            oninput={syncDueFromStart}
                             class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
                         />
                         <label for="todo-starts-time" class="sr-only"
                             >開始時刻</label
                         >
-                        <input
+                        <TimePicker
                             id="todo-starts-time"
                             bind:value={startsTime}
-                            type="time"
-                            disabled={!startsOn}
-                            class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2] disabled:opacity-50"
+                            onValueChange={() => syncDueFromStart()}
                         />
                     </div>
                 </fieldset>
@@ -168,20 +276,16 @@
                             bind:value={dueOn}
                             type="date"
                             min={startsOn || undefined}
+                            oninput={() => (dueManuallyEdited = true)}
                             class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
                         />
                         <label for="todo-due-time" class="sr-only"
                             >終了時刻</label
                         >
-                        <input
+                        <TimePicker
                             id="todo-due-time"
                             bind:value={dueTime}
-                            type="time"
-                            min={dueOn === startsOn
-                                ? startsTime || undefined
-                                : undefined}
-                            disabled={!dueOn}
-                            class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2] disabled:opacity-50"
+                            onValueChange={() => (dueManuallyEdited = true)}
                         />
                     </div>
                 </fieldset>
@@ -244,15 +348,15 @@
             <button
                 type="button"
                 class="flex items-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4] disabled:opacity-50"
-                onclick={createTodo}
+                onclick={saveTodo}
                 disabled={saving || !title.trim()}
             >
                 {#if saving}
                     <Loader2 class="h-4 w-4 animate-spin" />
-                {:else}
+                {:else if !isEditing}
                     <Plus class="h-4 w-4" />
                 {/if}
-                作成
+                {isEditing ? '保存' : '作成'}
             </button>
         </div>
     </div>

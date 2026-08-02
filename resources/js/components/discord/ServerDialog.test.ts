@@ -6,6 +6,7 @@ import {
     waitFor,
 } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ServerResource } from '@/types';
 import ServerDialog from './ServerDialog.svelte';
 
 afterEach(cleanup);
@@ -47,5 +48,47 @@ describe('ServerDialog', () => {
         await fireEvent.keyDown(nameInput, { key: 'Enter', ...modifier });
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    });
+
+    it('updates an existing project from its settings dialog', async () => {
+        const server: ServerResource = {
+            id: 1,
+            name: 'Before',
+            description: 'Old description',
+            starts_on: '2026-08-19',
+            ends_on: '2026-08-31',
+            created_by: 1,
+        };
+        const updated = {
+            ...server,
+            name: 'After',
+            description: 'New description',
+            starts_on: '2026-08-20',
+            ends_on: '2026-09-01',
+        };
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ server: updated }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        const onUpdated = vi.fn();
+        const onClose = vi.fn();
+
+        render(ServerDialog, {
+            props: { server, onUpdated, onClose },
+        });
+
+        await fireEvent.input(screen.getByLabelText('プロジェクト名'), {
+            target: { value: 'After' },
+        });
+        await fireEvent.click(screen.getByRole('button', { name: '保存' }));
+
+        await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(url).toBe('/servers/1');
+        expect(init.method).toBe('PATCH');
+        expect(onClose).toHaveBeenCalledOnce();
     });
 });

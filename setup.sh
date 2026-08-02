@@ -29,7 +29,11 @@ set_env() {
     escaped="$(printf '%s' "$value" | sed 's/[&|\\]/\\&/g')"
 
     if grep -Eq "^[[:space:]]*#?[[:space:]]*${key}=" "$file"; then
-        sed -i -E "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' -E "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
+        else
+            sed -i -E "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
+        fi
     else
         printf '%s=%s\n' "$key" "$value" >> "$file"
     fi
@@ -49,6 +53,91 @@ valid_hostname() {
 
 valid_local_hostname() {
     valid_hostname "$1" || [[ "$1" == "localhost" ]] || [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]
+}
+
+setup_macos_onlyoffice() {
+    [[ "$(uname -m)" == "arm64" ]] || die "Apple Container requires an Apple silicon Mac"
+    command -v container >/dev/null || die "Apple Container is required; install it from https://github.com/apple/container"
+    command -v curl >/dev/null || die "curl is required"
+
+    # Source Han fonts for system-wide Japanese rendering on macOS. The PDF
+    # export uses the bundled font, so a failure here is not fatal.
+    if command -v brew >/dev/null; then
+        if ! brew list --cask font-source-han-code-jp >/dev/null 2>&1; then
+            log "Installing Source Han Code JP font via Homebrew..."
+            brew install --cask font-source-han-code-jp || \
+                warn "Homebrew font install failed; the bundled PDF font still works"
+        else
+            log "Source Han Code JP font is already installed"
+        fi
+    else
+        warn "Homebrew is missing; run 'brew install --cask font-source-han-code-jp' manually"
+    fi
+
+    local macos_major app_dir env_file jwt_secret
+    macos_major="$(sw_vers -productVersion | cut -d. -f1)"
+    [[ "$macos_major" =~ ^[0-9]+$ && "$macos_major" -ge 26 ]] || die "Apple Container requires macOS 26 or newer"
+
+    app_dir="$APP_DIR"
+    [[ "$app_dir" == "/var/www/chatter" ]] && app_dir="$PWD"
+    env_file="$app_dir/.env"
+
+    [[ -f "$env_file" ]] || {
+        [[ -f "$app_dir/.env.example" ]] || die "Could not find $app_dir/.env.example"
+        cp "$app_dir/.env.example" "$env_file"
+    }
+
+    jwt_secret="$(sed -n 's/^[[:space:]]*ONLYOFFICE_JWT_SECRET=//p' "$env_file" | sed -n '1p')"
+    jwt_secret="${jwt_secret#\"}"
+    jwt_secret="${jwt_secret%\"}"
+    [[ "${#jwt_secret}" -ge 32 ]] || jwt_secret="$(openssl rand -hex 32)"
+
+    log "Starting Apple Container system service..."
+    container system start
+
+    # OnlyOffice must reach the app's signed download route from inside its VM.
+    sudo container system dns create host.container.internal --localhost 192.0.2.113 >/dev/null 2>&1 || \
+        warn "host.container.internal already exists; verify it points to 192.0.2.113"
+
+    if container inspect "$ONLYOFFICE_CONTAINER_NAME" >/dev/null 2>&1; then
+        log "OnlyOffice container already exists; starting it"
+        container start "$ONLYOFFICE_CONTAINER_NAME" >/dev/null || die "Could not start $ONLYOFFICE_CONTAINER_NAME"
+    else
+        log "Pulling and starting OnlyOffice DocumentServer with Apple Container..."
+        container run \
+            --detach \
+            --name "$ONLYOFFICE_CONTAINER_NAME" \
+            --arch amd64 \
+            --publish "127.0.0.1:${ONLYOFFICE_PORT}:80" \
+            --env "JWT_ENABLED=true" \
+            --env "JWT_SECRET=${jwt_secret}" \
+            --env "JWT_HEADER=AuthorizationJwt" \
+            --env "JWT_IN_BODY=true" \
+            "$ONLYOFFICE_IMAGE" >/dev/null || die "Could not start OnlyOffice DocumentServer"
+    fi
+
+    set_env ONLYOFFICE_ENABLED true "$env_file"
+    set_env ONLYOFFICE_DOCUMENT_SERVER_URL "http://127.0.0.1:${ONLYOFFICE_PORT}" "$env_file"
+    set_env ONLYOFFICE_PUBLIC_URL "http://127.0.0.1:${ONLYOFFICE_PORT}" "$env_file"
+    set_env APP_ONLYOFFICE_INTERNAL_URL "http://host.container.internal:${APP_INTERNAL_PORT}" "$env_file"
+    set_env ONLYOFFICE_JWT_SECRET "$jwt_secret" "$env_file"
+
+    for _ in {1..60}; do
+        if curl -fsS "http://127.0.0.1:${ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -Eq 'true|ok'; then
+            log "OnlyOffice DocumentServer is ready on http://127.0.0.1:${ONLYOFFICE_PORT}"
+
+            if [[ -f "$app_dir/artisan" ]] && command -v php >/dev/null; then
+                (cd "$app_dir" && php artisan optimize:clear >/dev/null)
+            fi
+
+            log "Updated $env_file"
+            return 0
+        fi
+        sleep 2
+    done
+
+    container logs "$ONLYOFFICE_CONTAINER_NAME" || true
+    die "OnlyOffice health check failed on 127.0.0.1:${ONLYOFFICE_PORT}"
 }
 
 prompt_required() {
@@ -73,6 +162,8 @@ NO_SSL=0
 REVERB_SERVER_PORT=8081
 ONLYOFFICE_PORT=8080
 APP_INTERNAL_PORT=8090
+ONLYOFFICE_IMAGE="${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}"
+ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatter-onlyoffice}"
 
 usage() {
     cat <<'EOF'
@@ -88,6 +179,7 @@ Options:
   --db-password <password>   PostgreSQL password (default: securely generated)
   --app-dir <path>           App install path (default: /var/www/chatter)
   --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrow.git)
+  --onlyoffice-image <image> OnlyOffice image for macOS Container (default: onlyoffice/documentserver:latest)
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
 
@@ -99,7 +191,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain|--email|--office-domain|--database|--db-name|--db-user|--db-password|--app-dir|--repo)
+        --domain|--email|--office-domain|--database|--db-name|--db-user|--db-password|--app-dir|--repo|--onlyoffice-image)
             [[ $# -ge 2 ]] || die "$1 requires a value"
             case "$1" in
                 --domain)        DOMAIN="$2" ;;
@@ -111,6 +203,7 @@ while [[ $# -gt 0 ]]; do
                 --db-password)   DB_PASSWORD="$2" ;;
                 --app-dir)       APP_DIR="$2" ;;
                 --repo)          REPO_URL="$2" ;;
+                --onlyoffice-image) ONLYOFFICE_IMAGE="$2" ;;
             esac
             shift 2
             ;;
@@ -119,6 +212,11 @@ while [[ $# -gt 0 ]]; do
         *) die "Unknown option: $1 (see --help)" ;;
     esac
 done
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    setup_macos_onlyoffice
+    exit 0
+fi
 
 if [[ -z "$DOMAIN" ]]; then
     [[ -t 0 ]] || die "--domain is required for non-interactive installation"
@@ -231,6 +329,13 @@ dpkg --compare-versions "$NGINX_VERSION" ge 1.30 || die "ONLYOFFICE requires ngi
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ttf-mscorefonts-installer || \
     warn "Microsoft core fonts could not be installed; continuing with open fonts"
+
+# Japanese fonts are required for LibreOffice previews and the file viewer.
+if fc-list :lang=ja 2>/dev/null | grep -q .; then
+    log "Japanese fonts available: $(fc-list :lang=ja family 2>/dev/null | sort -u | paste -sd, - | cut -c1-160)"
+else
+    warn "No Japanese fonts detected; Office previews may render incorrectly"
+fi
 
 # --------------------------------------------------------- PHP 8.4+ --------
 # Ubuntu 24.04 ships PHP 8.3, but the locked Symfony 8 dependencies require

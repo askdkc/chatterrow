@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Server;
 use App\Models\StoredFile;
+use App\Support\MarkdownSearchIndex;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -100,6 +101,35 @@ class StoredFileController extends Controller
         $response->headers->set('X-Content-Type-Options', 'nosniff');
 
         return $response;
+    }
+
+    public function search(Request $request, Server $server): JsonResponse
+    {
+        Gate::authorize('view', $server);
+
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'max:200'],
+        ]);
+
+        $results = app(MarkdownSearchIndex::class)
+            ->search($server->id, $validated['q'])
+            ->map(fn (object $row) => [
+                'id' => $row->id,
+                'original_name' => $row->original_name,
+                'mime_type' => $row->mime_type,
+                'size' => $row->size,
+                'preview_status' => $row->preview_status,
+                'created_at' => $row->created_at,
+                'snippet' => $row->snippet,
+                'stream_url' => route('servers.files.stream', [$server->id, $row->id]),
+                'download_url' => route('servers.files.download', [$server->id, $row->id]),
+                'thumbnail_url' => $row->preview_status === 'ready'
+                    ? route('servers.files.thumbnail', [$server->id, $row->id])
+                    : null,
+            ])
+            ->values();
+
+        return response()->json(['results' => $results]);
     }
 
     public function preview(Server $server, StoredFile $storedFile): JsonResponse

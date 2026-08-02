@@ -77,6 +77,7 @@
     let dragActive = $state(false);
     let pendingFiles: StoredFileResource[] = $state([]);
     let showChannelDialog = $state(false);
+    let editingChannel = $state<ChannelResource | null>(null);
     let showMemberDialog = $state(false);
     let showServerDialog = $state(false);
     let todos = $state<TodoResource[]>([]);
@@ -538,6 +539,11 @@
         showServerDialog = true;
     }
 
+    function onEditChannel(channelToEdit: ChannelResource) {
+        editingChannel = channelToEdit;
+        showChannelDialog = false;
+    }
+
     function onBrowse() {
         router.visit('/servers');
     }
@@ -559,6 +565,7 @@
         threads={threadMessages}
         activeThreadId={threadParent?.id ?? null}
         onAddChannel={() => (showChannelDialog = true)}
+        {onEditChannel}
         onManageMembers={() => (showMemberDialog = true)}
         onOpenThread={openThread}
     />
@@ -1000,7 +1007,13 @@
 
             <!-- Todo panel -->
             {#if showTodos}
-                <TodoPanel {todos} {members} {serverId} {channelId} />
+                <TodoPanel
+                    {todos}
+                    {members}
+                    {serverId}
+                    {channelId}
+                    channelStartsOn={channel.starts_on}
+                />
             {/if}
         </div>
     </main>
@@ -1019,8 +1032,27 @@
     {/if}
 </div>
 
-{#if showChannelDialog}
-    <ChannelDialog {server} onClose={() => (showChannelDialog = false)} />
+{#if showChannelDialog || editingChannel}
+    <ChannelDialog
+        {server}
+        channel={editingChannel}
+        onUpdated={(updated) => {
+            server = {
+                ...server,
+                channels: (server.channels ?? []).map((item) =>
+                    item.id === updated.id ? updated : item,
+                ),
+            };
+
+            if (updated.id === channel.id) {
+                channel = { ...channel, ...updated };
+            }
+        }}
+        onClose={() => {
+            showChannelDialog = false;
+            editingChannel = null;
+        }}
+    />
 {/if}
 
 {#if showMemberDialog}

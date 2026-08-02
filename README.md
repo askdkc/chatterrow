@@ -69,6 +69,54 @@ PostgreSQL password (leave blank to generate):
 
 ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になります。上の例では`office.chat.example.com`です。
 
+## macOSローカルOnlyOffice
+
+macOSではLinux用のOnlyOfficeパッケージをインストールせず、Appleの`container`でDocumentServerを起動できます。Apple siliconとmacOS 26以降が必要です。
+
+1. [Apple Container](https://github.com/apple/container)をインストールします。
+2. `container`のシステムサービスを起動できることを確認します。
+3. リポジトリのルートでセットアップを実行します。
+
+```bash
+cd /path/to/chatterrow
+./setup.sh --onlyoffice-image onlyoffice/documentserver:latest
+```
+
+セットアップは以下を行います。
+
+- `container system start`でApple Containerを起動
+- `onlyoffice/documentserver:latest`をamd64（Rosetta）で起動
+- OnlyOfficeを`127.0.0.1:8080`へ公開
+- JWTを有効化し、`.env`へ共有秘密鍵を設定
+- OnlyOfficeコンテナからホスト上のアプリへアクセスする`host.container.internal`を設定
+- `ONLYOFFICE_DOCUMENT_SERVER_URL`、`ONLYOFFICE_PUBLIC_URL`、`APP_ONLYOFFICE_INTERNAL_URL`を更新
+
+アプリ側はOnlyOfficeから取得できるよう、ホストの`127.0.0.1:8090`で動作させてください。別ポートを使う場合は、`.env`の`APP_ONLYOFFICE_INTERNAL_URL`を次の形式で変更します。
+
+```dotenv
+APP_ONLYOFFICE_INTERNAL_URL=http://host.container.internal:<アプリのポート>
+```
+
+コンテナの確認・停止:
+
+```bash
+container list
+container logs chatter-onlyoffice
+container stop chatter-onlyoffice
+```
+
+### 日本語フォント（macOS）
+
+PDF出力はリポジトリ同梱のSource Han Sans JP（`public/fonts/SourceHanSansJP-Regular.ttf`）を使用するため必須ではありませんが、システム全体で日本語表示を整える場合はHomebrewでインストールできます。
+
+```bash
+brew install --cask font-source-han-code-jp
+```
+
+`setup.sh`はmacOSでHomebrewが利用可能な場合、このフォントのインストールを自動で試みます。インストール済みの場合はスキップされます。
+
+macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューのままです。DocumentServerの変換APIを利用する場合も、このReadOnly設定とは独立して使用できます。
+
 セットアップは以下を自動実行します。
 
 1. nginx公式署名済みリポジトリ、PHP 8.4+、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成

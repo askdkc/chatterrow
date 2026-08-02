@@ -15,7 +15,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog from '@/components/files/StoredFilePreviewDialog.svelte';
-    import { apiFetch, HttpError } from '@/lib/http';
+    import { apiFetch, apiJson, HttpError } from '@/lib/http';
     import type {
         ServerResource,
         ChannelResource,
@@ -33,6 +33,10 @@
         stream_url: string;
         download_url: string;
         thumbnail_url: string | null;
+    }
+
+    interface SearchResult extends StoredFileResource {
+        snippet: string;
     }
 
     const officeExtensions = new Set([
@@ -74,6 +78,10 @@
     let previewFile = $state<StoredFileResource | null>(null);
     let onlyofficeFile = $state<StoredFileResource | null>(null);
     let error = $state('');
+    let searchQuery = $state('');
+    let searchResults = $state<SearchResult[]>([]);
+    let searching = $state(false);
+    let searchTimer: ReturnType<typeof setTimeout> | undefined = $state();
 
     const isImage = (f: StoredFileResource): boolean =>
         (f.mime_type ?? '').startsWith('image/');
@@ -170,6 +178,46 @@
         }
     }
 
+    async function onSearchInput() {
+        clearTimeout(searchTimer);
+        const query = searchQuery.trim();
+
+        if (!query) {
+            searchResults = [];
+
+            return;
+        }
+
+        searching = true;
+        searchTimer = setTimeout(async () => {
+            try {
+                const data = await apiJson<{ results: SearchResult[] }>(
+                    `/servers/${server.id}/files/search?q=${encodeURIComponent(query)}`,
+                );
+                searchResults = data.results;
+            } catch (e) {
+                error =
+                    e instanceof HttpError
+                        ? e.messageText()
+                        : '検索に失敗しました';
+                searchResults = [];
+            } finally {
+                searching = false;
+            }
+        }, 300);
+    }
+
+    function snippetParts(snippet: string): { text: string; hit: boolean }[] {
+        return snippet.split(/<mark>|<\/mark>/).map((part, index) => ({
+            text: part,
+            hit: index % 2 === 1,
+        }));
+    }
+
+    function openSearchResult(result: SearchResult) {
+        openPreview(result);
+    }
+
     function onAddServer() {
         window.location.href = '/servers';
     }
@@ -221,6 +269,65 @@
             <span class="ml-auto text-xs text-[#80848e]">{files.length} 件</span
             >
         </header>
+
+        <div class="border-b border-black/10 px-4 py-2 dark:border-black/20">
+            <input
+                type="search"
+                bind:value={searchQuery}
+                oninput={onSearchInput}
+                placeholder="ファイルの全文を検索（PDF / Word / Excel / PowerPoint）"
+                class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
+                aria-label="ファイル全文検索"
+            />
+        </div>
+
+        {#if searchQuery.trim() && !searching}
+            <div
+                class="max-h-72 shrink-0 overflow-y-auto border-b border-black/10 p-3 dark:border-black/20"
+            >
+                {#if searchResults.length === 0}
+                    <p class="py-4 text-center text-sm text-[#80848e]">
+                        検索結果はありません
+                    </p>
+                {:else}
+                    <p class="mb-2 text-xs text-[#80848e]">
+                        {searchResults.length} 件のファイルが一致
+                    </p>
+                    <div class="space-y-2">
+                        {#each searchResults as result (result.id)}
+                            <button
+                                type="button"
+                                class="block w-full rounded-lg bg-[#2b2d31] p-3 text-left transition hover:bg-[#383a40]"
+                                onclick={() => openSearchResult(result)}
+                            >
+                                <span class="flex items-center gap-2">
+                                    <FileText
+                                        class="h-4 w-4 shrink-0 text-[#5865f2]"
+                                    />
+                                    <span class="truncate text-sm font-medium">
+                                        {result.original_name}
+                                    </span>
+                                </span>
+                                <span
+                                    class="mt-1 block text-xs leading-5 text-[#80848e]"
+                                >
+                                    {#each snippetParts(result.snippet) as part (part.text + part.hit)}
+                                        {#if part.hit}
+                                            <mark
+                                                class="rounded-sm bg-[#f0b232]/40 text-[#dbdee1]"
+                                                >{part.text}</mark
+                                            >
+                                        {:else}
+                                            {part.text}
+                                        {/if}
+                                    {/each}
+                                </span>
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+        {/if}
 
         <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
             <!-- Upload button -->

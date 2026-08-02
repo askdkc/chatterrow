@@ -43,6 +43,11 @@ return [
         'timeout' => (int) env('POPPLER_TIMEOUT', 45),
     ],
 
+    'markitdown' => [
+        'path' => env('MARKITDOWN_PATH', base_path('.markitdown/venv/bin/markitdown')),
+        'timeout' => (int) env('MARKITDOWN_TIMEOUT', 180),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

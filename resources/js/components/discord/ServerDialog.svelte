@@ -1,21 +1,27 @@
 <script lang="ts">
     import { X, Loader2 } from 'lucide-svelte';
     import { apiJson, HttpError } from '@/lib/http';
+    import type { ServerResource } from '@/types';
 
     let {
+        server = null,
+        onUpdated,
         onClose,
     }: {
+        server?: ServerResource | null;
+        onUpdated?: (server: ServerResource) => void;
         onClose: () => void;
     } = $props();
 
-    let name = $state('');
-    let description = $state('');
-    let startsOn = $state('');
-    let endsOn = $state('');
+    const isEditing = $derived(server !== null);
+    let name = $derived(server?.name ?? '');
+    let description = $derived(server?.description ?? '');
+    let startsOn = $derived(server?.starts_on ?? '');
+    let endsOn = $derived(server?.ends_on ?? '');
     let saving = $state(false);
     let error = $state('');
 
-    async function create() {
+    async function save() {
         if (saving || !name.trim()) {
             return;
         }
@@ -24,20 +30,32 @@
         error = '';
 
         try {
-            const data = await apiJson<{ server: { id: number } }>('/servers', {
-                method: 'POST',
-                body: JSON.stringify({
-                    name: name.trim(),
-                    description: description.trim() || null,
-                    starts_on: startsOn || null,
-                    ends_on: endsOn || null,
-                }),
-            });
+            const data = await apiJson<{ server: ServerResource }>(
+                server ? `/servers/${server.id}` : '/servers',
+                {
+                    method: server ? 'PATCH' : 'POST',
+                    body: JSON.stringify({
+                        name: name.trim(),
+                        description: description.trim() || null,
+                        starts_on: startsOn || null,
+                        ends_on: endsOn || null,
+                    }),
+                },
+            );
 
-            window.location.href = `/servers/${data.server.id}`;
+            if (server) {
+                onUpdated?.(data.server);
+                onClose();
+            } else {
+                window.location.href = `/servers/${data.server.id}`;
+            }
         } catch (e) {
             error =
-                e instanceof HttpError ? e.messageText() : '作成に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : isEditing
+                      ? '保存に失敗しました'
+                      : '作成に失敗しました';
         } finally {
             saving = false;
         }
@@ -48,7 +66,7 @@
             onClose();
         } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
-            create();
+            save();
         }
     }
 </script>
@@ -73,7 +91,7 @@
                 id="server-dialog-title"
                 class="text-lg font-bold text-[#dbdee1]"
             >
-                プロジェクトを作成
+                {isEditing ? 'プロジェクト設定' : 'プロジェクトを作成'}
             </h2>
             <button
                 type="button"
@@ -167,13 +185,13 @@
             <button
                 type="button"
                 class="flex items-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4] disabled:opacity-50"
-                onclick={create}
+                onclick={save}
                 disabled={saving || !name.trim()}
             >
                 {#if saving}
                     <Loader2 class="h-4 w-4 animate-spin" />
                 {/if}
-                作成
+                {isEditing ? '保存' : '作成'}
             </button>
         </div>
     </div>

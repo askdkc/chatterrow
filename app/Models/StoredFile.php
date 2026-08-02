@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\MarkdownedDocDispatcher;
+use App\Support\MarkdownedDocGenerator;
+use App\Support\MarkdownSearchIndex;
 use App\Support\StoredFilePreviewDispatcher;
 use App\Support\StoredFilePreviewGenerator;
 use Database\Factories\StoredFileFactory;
@@ -13,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
@@ -27,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property int $size
  * @property string|null $preview_path
  * @property string|null $preview_status
+ * @property string|null $markdown_path
+ * @property string|null $markdown_status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Server $server
@@ -37,7 +43,7 @@ use Illuminate\Support\Carbon;
  * @property-read string|null $thumbnail_url
  */
 #[Appends(['stream_url', 'download_url', 'thumbnail_url'])]
-#[Fillable(['server_id', 'uploaded_by', 'attachable_type', 'attachable_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'preview_path', 'preview_status'])]
+#[Fillable(['server_id', 'uploaded_by', 'attachable_type', 'attachable_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'preview_path', 'preview_status', 'markdown_path', 'markdown_status'])]
 class StoredFile extends Model
 {
     /** @use HasFactory<StoredFileFactory> */
@@ -56,6 +62,14 @@ class StoredFile extends Model
                 $storedFile->preview_path = null;
                 $storedFile->preview_status = null;
             }
+
+            if (MarkdownedDocGenerator::supports($storedFile->original_name)) {
+                $storedFile->markdown_path = null;
+                $storedFile->markdown_status = 'pending';
+            } else {
+                $storedFile->markdown_path = null;
+                $storedFile->markdown_status = null;
+            }
         });
 
         static::created(function (StoredFile $storedFile): void {
@@ -63,6 +77,19 @@ class StoredFile extends Model
                 app(StoredFilePreviewDispatcher::class)
                     ->dispatchAfterCommit($storedFile->id, $storedFile->path);
             }
+
+            if ($storedFile->markdown_status === 'pending') {
+                app(MarkdownedDocDispatcher::class)
+                    ->dispatchAfterCommit($storedFile->id, $storedFile->path);
+            }
+        });
+
+        static::deleting(function (StoredFile $storedFile): void {
+            if ($storedFile->markdown_path !== null) {
+                Storage::disk('markdowned')->delete($storedFile->markdown_path);
+            }
+
+            app(MarkdownSearchIndex::class)->remove($storedFile->id);
         });
     }
 

@@ -47,6 +47,14 @@ return [
             'report' => false,
         ],
 
+        // Markdown conversion output for full-text search and AI ingestion.
+        'markdowned' => [
+            'driver' => 'local',
+            'root' => storage_path('markdowned-docs'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

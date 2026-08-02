@@ -38,6 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Server-wide file viewer.
     Route::get('servers/{server}/files', [FileIndexController::class, 'index'])->name('servers.files.index');
+    Route::get('servers/{server}/files/search', [StoredFileController::class, 'search'])->name('servers.files.search');
     Route::post('servers/{server}/files', [StoredFileController::class, 'store'])->name('servers.files.store');
     Route::get('servers/{server}/files/{stored_file}/stream', [StoredFileController::class, 'stream'])->name('servers.files.stream');
     Route::get('servers/{server}/files/{stored_file}/download', [StoredFileController::class, 'download'])->name('servers.files.download');

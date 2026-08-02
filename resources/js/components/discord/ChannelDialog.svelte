@@ -1,25 +1,46 @@
 <script lang="ts">
     import { X, Loader2 } from 'lucide-svelte';
     import { apiJson, HttpError } from '@/lib/http';
-    import type { ServerResource } from '@/types';
+    import type { ChannelResource, ServerResource } from '@/types';
 
     let {
         server,
+        channel = null,
+        onUpdated,
         onClose,
     }: {
         server: ServerResource;
+        channel?: ChannelResource | null;
+        onUpdated?: (channel: ChannelResource) => void;
         onClose: () => void;
     } = $props();
 
-    let name = $state('');
-    let description = $state('');
-    let startsOn = $state('');
-    let endsOn = $state('');
+    const isEditing = $derived(channel !== null);
+    function dateValue(value: Date): string {
+        const pad = (part: number) => String(part).padStart(2, '0');
+
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+    }
+
+    function defaultStartDate(): string {
+        const today = dateValue(new Date());
+
+        return server.starts_on && server.starts_on > today
+            ? server.starts_on
+            : today;
+    }
+
+    let name = $derived(channel?.name ?? '');
+    let description = $derived(channel?.description ?? '');
+    let startsOn = $derived(
+        channel?.starts_on ?? (isEditing ? '' : defaultStartDate()),
+    );
+    let endsOn = $derived(channel?.ends_on ?? '');
     let saving = $state(false);
     let error = $state('');
 
-    async function create() {
-        if (!name.trim()) {
+    async function save() {
+        if (!name.trim() || saving) {
             return;
         }
 
@@ -27,10 +48,12 @@
         error = '';
 
         try {
-            const data = await apiJson<{ channel: { id: number } }>(
-                `/servers/${server.id}/channels`,
+            const data = await apiJson<{ channel: ChannelResource }>(
+                channel
+                    ? `/servers/${server.id}/channels/${channel.id}`
+                    : `/servers/${server.id}/channels`,
                 {
-                    method: 'POST',
+                    method: channel ? 'PATCH' : 'POST',
                     body: JSON.stringify({
                         name: name.trim(),
                         description: description.trim() || null,
@@ -40,10 +63,19 @@
                 },
             );
 
-            window.location.href = `/servers/${server.id}/channels/${data.channel.id}`;
+            if (channel) {
+                onUpdated?.(data.channel);
+                onClose();
+            } else {
+                window.location.href = `/servers/${server.id}/channels/${data.channel.id}`;
+            }
         } catch (e) {
             error =
-                e instanceof HttpError ? e.messageText() : '作成に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : isEditing
+                      ? '保存に失敗しました'
+                      : '作成に失敗しました';
         } finally {
             saving = false;
         }
@@ -76,7 +108,7 @@
                 id="channel-dialog-title"
                 class="text-lg font-bold text-[#dbdee1]"
             >
-                チャンネルを作成
+                {isEditing ? 'チャンネル設定' : 'チャンネルを作成'}
             </h2>
             <button
                 type="button"
@@ -101,11 +133,6 @@
                     type="text"
                     placeholder="例: プロジェクト進行"
                     class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
-                    onkeydown={(e) => {
-                        if (e.key === 'Enter') {
-                            create();
-                        }
-                    }}
                 />
             </div>
             <div>
@@ -175,13 +202,13 @@
             <button
                 type="button"
                 class="flex items-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4] disabled:opacity-50"
-                onclick={create}
+                onclick={save}
                 disabled={saving || !name.trim()}
             >
                 {#if saving}
                     <Loader2 class="h-4 w-4 animate-spin" />
                 {/if}
-                作成
+                {isEditing ? '保存' : '作成'}
             </button>
         </div>
     </div>

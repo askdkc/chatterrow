@@ -1,6 +1,6 @@
 <script lang="ts">
     import { router, usePage } from '@inertiajs/svelte';
-    import { Plus, Hash, Users, CalendarRange } from 'lucide-svelte';
+    import { Plus, Hash, Users, CalendarRange, Settings } from 'lucide-svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import type { ServerResource } from '@/types';
@@ -18,9 +18,15 @@
     );
 
     let showServerDialog = $state(false);
+    let editingServer = $state<ServerResource | null>(null);
 
     function onAddServer() {
         showServerDialog = true;
+    }
+
+    function editServer(server: ServerResource) {
+        editingServer = server;
+        showServerDialog = false;
     }
 
     function onBrowse() {
@@ -78,49 +84,68 @@
             {:else}
                 <div class="space-y-3">
                     {#each servers as server (server.id)}
-                        <button
-                            type="button"
-                            class="flex w-full items-center gap-4 rounded-xl bg-[#2b2d31] p-4 text-left transition hover:bg-[#383a40]"
-                            onclick={() =>
-                                router.visit(`/servers/${server.id}`)}
-                        >
-                            <span
-                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5865f2] text-base font-bold text-white"
+                        <div class="group relative">
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-4 rounded-xl bg-[#2b2d31] p-4 pr-14 text-left transition hover:bg-[#383a40]"
+                                onclick={() =>
+                                    router.visit(`/servers/${server.id}`)}
                             >
-                                {server.name.slice(0, 2).toUpperCase()}
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate font-semibold">
-                                    {server.name}
-                                </p>
-                                {#if server.description}
-                                    <p
-                                        class="mt-0.5 truncate text-sm text-[#80848e]"
-                                    >
-                                        {server.description}
-                                    </p>
-                                {/if}
-                                <div
-                                    class="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[#80848e]"
+                                <span
+                                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5865f2] text-base font-bold text-white"
                                 >
-                                    <span class="flex items-center gap-1">
-                                        <Hash class="h-3 w-3" />
-                                        チャンネル {server.channels_count ?? 0}
-                                    </span>
-                                    <span class="flex items-center gap-1">
-                                        <Users class="h-3 w-3" />
-                                        メンバー {server.members_count ?? 0}
-                                    </span>
-                                    {#if server.starts_on || server.ends_on}
-                                        <span class="flex items-center gap-1">
-                                            <CalendarRange class="h-3 w-3" />
-                                            {server.starts_on ?? '?'} 〜 {server.ends_on ??
-                                                '未定'}
-                                        </span>
+                                    {server.name.slice(0, 2).toUpperCase()}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate font-semibold">
+                                        {server.name}
+                                    </p>
+                                    {#if server.description}
+                                        <p
+                                            class="mt-0.5 truncate text-sm text-[#80848e]"
+                                        >
+                                            {server.description}
+                                        </p>
                                     {/if}
+                                    <div
+                                        class="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[#80848e]"
+                                    >
+                                        <span class="flex items-center gap-1">
+                                            <Hash class="h-3 w-3" />
+                                            チャンネル {server.channels_count ??
+                                                0}
+                                        </span>
+                                        <span class="flex items-center gap-1">
+                                            <Users class="h-3 w-3" />
+                                            メンバー {server.members_count ?? 0}
+                                        </span>
+                                        {#if server.starts_on || server.ends_on}
+                                            <span
+                                                class="flex items-center gap-1"
+                                            >
+                                                <CalendarRange
+                                                    class="h-3 w-3"
+                                                />
+                                                {server.starts_on ?? '?'} 〜 {server.ends_on ??
+                                                    '未定'}
+                                            </span>
+                                        {/if}
+                                    </div>
                                 </div>
-                            </div>
-                        </button>
+                            </button>
+                            <button
+                                type="button"
+                                class="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-2 text-[#80848e] opacity-0 transition hover:bg-white/10 hover:text-[#dbdee1] group-hover:opacity-100 focus-visible:opacity-100"
+                                aria-label={`${server.name}の設定`}
+                                title="プロジェクト設定"
+                                onclick={(event) => {
+                                    event.stopPropagation();
+                                    editServer(server);
+                                }}
+                            >
+                                <Settings class="h-4 w-4" />
+                            </button>
+                        </div>
                     {/each}
                 </div>
             {/if}
@@ -128,6 +153,17 @@
     </main>
 </div>
 
-{#if showServerDialog}
-    <ServerDialog onClose={() => (showServerDialog = false)} />
+{#if showServerDialog || editingServer}
+    <ServerDialog
+        server={editingServer}
+        onUpdated={(updated) => {
+            servers = servers.map((item) =>
+                item.id === updated.id ? { ...item, ...updated } : item,
+            );
+        }}
+        onClose={() => {
+            showServerDialog = false;
+            editingServer = null;
+        }}
+    />
 {/if}
