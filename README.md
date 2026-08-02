@@ -20,15 +20,15 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 
 ## 技術構成
 
-| レイヤー | 技術 |
-|---|---|
-| Backend | Laravel 13 / PHP 8.4.1+ |
-| Frontend | Inertia 3 / Svelte 5 / Tailwind CSS 4 / Vite 8 |
-| Database | SQLiteまたはPostgreSQL |
-| Realtime | Laravel Reverb（WebSocket） |
-| Preview | Shiki / libreoffice / poppler / ImageMagick |
-| Office | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
-| Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot |
+| レイヤー   | 技術                                                          |
+|------------|---------------------------------------------------------------|
+| Backend    | Laravel 13 / PHP 8.4.1+                                       |
+| Frontend   | Inertia 3 / Svelte 5 / Tailwind CSS 4 / Vite 8                |
+| Database   | SQLiteまたはPostgreSQL                                        |
+| Realtime   | Laravel Reverb（WebSocket）                                   |
+| Preview    | Shiki / libreoffice / poppler / ImageMagick                   |
+| Office     | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
+| Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot                  |
 
 ## 本番要件
 
@@ -54,7 +54,7 @@ ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポート�
 
 ```bash
 git clone git@github.com:askdkc/chatterrow.git
-cd chatter
+cd chatterrow
 ./setup.sh
 ```
 
@@ -101,8 +101,8 @@ APP_ONLYOFFICE_INTERNAL_URL=http://host.container.internal:<アプリのポー�
 
 ```bash
 container list
-container logs chatter-onlyoffice
-container stop chatter-onlyoffice
+container logs chatterrow-onlyoffice
+container stop chatterrow-onlyoffice
 ```
 
 ### 日本語フォント（macOS）
@@ -123,7 +123,7 @@ macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューの
 2. PHP拡張、LibreOffice、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
 3. PostgreSQLをCPU数と搭載RAMに合わせて調整
 4. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
-5. アプリを`/var/www/chatter`へ配備し、依存関係、フロントエンド、マイグレーションを実行
+5. アプリを`/var/www/chatterrow`へ配備し、依存関係、フロントエンド、マイグレーションを実行
 6. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
 7. Supervisorでキュー、Reverb、スケジューラを`www-data`として常駐
 8. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
@@ -143,26 +143,26 @@ macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューの
 
 ### オプション
 
-| オプション | デフォルト | 説明 |
-|---|---|---|
-| `--domain <domain>` | 対話入力 | アプリの公開ドメイン |
-| `--office-domain <domain>` | `office.<domain>` | ONLYOFFICEの公開ドメイン |
-| `--email <email>` | 空 | Let's Encrypt登録・期限通知メール |
-| `--database <driver>` | 対話時は`sqlite` | `sqlite`または`postgresql` |
-| `--db-name <name>` | `chatter` | アプリ用PostgreSQL DB名 |
-| `--db-user <name>` | `chatter` | アプリ用PostgreSQLロール |
-| `--db-password <password>` | 自動生成 | アプリ用PostgreSQLパスワード |
-| `--app-dir <path>` | `/var/www/chatter` | `/var/www`配下の配備先 |
-| `--repo <url>` | GitHub SSH URL | 配備するGitリポジトリ |
-| `--no-ssl` | off | Certbotを省略しHTTPで構成 |
+| オプション                 | デフォルト         | 説明                              |
+|----------------------------|--------------------|-----------------------------------|
+| `--domain <domain>`        | 対話入力           | アプリの公開ドメイン              |
+| `--office-domain <domain>` | `office.<domain>`  | ONLYOFFICEの公開ドメイン          |
+| `--email <email>`          | 空                 | Let's Encrypt登録・期限通知メール |
+| `--database <driver>`      | 対話時は`sqlite`   | `sqlite`または`postgresql`        |
+| `--db-name <name>`         | `chatterrow`          | アプリ用PostgreSQL DB名           |
+| `--db-user <name>`         | `chatterrow`          | アプリ用PostgreSQLロール          |
+| `--db-password <password>` | 自動生成           | アプリ用PostgreSQLパスワード      |
+| `--app-dir <path>`         | `/var/www/chatterrow` | `/var/www`配下の配備先            |
+| `--repo <url>`             | GitHub SSH URL     | 配備するGitリポジトリ             |
+| `--no-ssl`                 | off                | Certbotを省略しHTTPで構成         |
 
 同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`。
 
 PostgreSQLパスワードを省略すると64桁のランダム値を生成し、次の場所へ保存します。
 
 ```text
-/etc/chatter/database-password  root:root 0600
-/var/www/chatter/.env           <deploy-user>:www-data 0640
+/etc/chatterrow/database-password  root:root 0600
+/var/www/chatterrow/.env           <deploy-user>:www-data 0640
 ```
 
 ## PostgreSQL自動調整
@@ -172,31 +172,31 @@ PostgreSQLはONLYOFFICEでも必要なため、アプリでSQLiteを選んだ場
 設定ファイル:
 
 ```text
-/etc/postgresql/<version>/<cluster>/conf.d/99-chatter-tuning.conf
+/etc/postgresql/<version>/<cluster>/conf.d/99-chatterrow-tuning.conf
 ```
 
 主な計算基準:
 
-| 設定 | 基準 |
-|---|---|
-| `shared_buffers` | RAMの20%、128 MBから8 GBの範囲 |
-| `effective_cache_size` | RAMの60%、256 MBから64 GBの範囲 |
-| `maintenance_work_mem` | RAMの5%、64 MBから1 GBの範囲 |
-| `work_mem` | RAM、`shared_buffers`、最大接続数から安全側に算出 |
-| `max_connections` | CPUとRAMから50から300の範囲で算出 |
-| parallel workers | CPU数から算出し上限を設定 |
+| 設定                   | 基準                                              |
+|------------------------|---------------------------------------------------|
+| `shared_buffers`       | RAMの20%、128 MBから8 GBの範囲                    |
+| `effective_cache_size` | RAMの60%、256 MBから64 GBの範囲                   |
+| `maintenance_work_mem` | RAMの5%、64 MBから1 GBの範囲                      |
+| `work_mem`             | RAM、`shared_buffers`、最大接続数から安全側に算出 |
+| `max_connections`      | CPUとRAMから50から300の範囲で算出                 |
+| parallel workers       | CPU数から算出し上限を設定                         |
 
 このサーバーではPHP、ONLYOFFICE、Redis、RabbitMQも同居するため、PostgreSQL専用サーバーより保守的な割り当てです。再実行すると現在のCPU数とRAMから再計算されます。
 
 ## ポート構成
 
-| ポート | 用途 | 公開範囲 |
-|---|---|---|
-| 80 / 443 | nginx、Certbot、公開Web | インターネット |
-| 8080 | ONLYOFFICE Document Server | localhost向け |
-| 8081 | Laravel Reverb | localhost向け |
-| 8090 | ONLYOFFICEから署名済みファイルを取得 | 127.0.0.1のみ |
-| 5432 | PostgreSQL | ローカル接続を推奨 |
+| ポート   | 用途                                 | 公開範囲           |
+|----------|--------------------------------------|--------------------|
+| 80 / 443 | nginx、Certbot、公開Web              | インターネット     |
+| 8080     | ONLYOFFICE Document Server           | localhost向け      |
+| 8081     | Laravel Reverb                       | localhost向け      |
+| 8090     | ONLYOFFICEから署名済みファイルを取得 | 127.0.0.1のみ      |
+| 5432     | PostgreSQL                           | ローカル接続を推奨 |
 
 ## SSLと自動更新
 
@@ -214,8 +214,8 @@ sudo certbot renew --dry-run
 
 ```bash
 sudo supervisorctl status
-sudo supervisorctl restart chatter-queue chatter-reverb chatter-schedule
-sudo tail -f /var/log/chatter-*.log
+sudo supervisorctl restart chatterrow-queue chatterrow-reverb chatterrow-schedule
+sudo tail -f /var/log/chatterrow-*.log
 ```
 
 ### アプリ更新
@@ -223,7 +223,7 @@ sudo tail -f /var/log/chatter-*.log
 同じ設定で`setup.sh`を再実行できます。既存のPostgreSQLパスワードとTLS有効nginx設定は保持され、Gitはfast-forward可能な場合だけ更新されます。
 
 ```bash
-cd /path/to/chatter-source
+cd /path/to/chatterrow-source
 ./setup.sh --domain chat.example.com --database postgresql --email admin@example.com
 ```
 
@@ -233,43 +233,43 @@ SQLite:
 
 ```bash
 sudo install -d /backup
-sudo -u www-data sqlite3 /var/www/chatter/database/database.sqlite \
-    ".backup /backup/chatter-$(date +%F).sqlite"
-sudo rsync -a /var/www/chatter/storage/app/ /backup/storage-app/
+sudo -u www-data sqlite3 /var/www/chatterrow/database/database.sqlite \
+    ".backup /backup/chatterrow-$(date +%F).sqlite"
+sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 ```
 
 PostgreSQL:
 
 ```bash
 sudo install -d /backup
-sudo -u postgres pg_dump --format=custom chatter > /backup/chatter-$(date +%F).dump
-sudo rsync -a /var/www/chatter/storage/app/ /backup/storage-app/
+sudo -u postgres pg_dump --format=custom chatterrow > /backup/chatterrow-$(date +%F).dump
+sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 ```
 
 ## 主な環境変数
 
-| 変数 | 説明 |
-|---|---|
-| `APP_URL` | アプリの公開URL |
-| `DB_CONNECTION` | `sqlite`または`pgsql` |
-| `REVERB_APP_ID/KEY/SECRET` | Reverb認証情報 |
-| `REVERB_HOST/PORT/SCHEME` | ブラウザとLaravelが接続する公開WebSocket |
-| `REVERB_SERVER_HOST/PORT` | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
-| `REVERB_ALLOWED_ORIGINS` | Reverbへの接続を許可する公開ドメイン |
-| `ONLYOFFICE_DOCUMENT_SERVER_URL` | ブラウザから見えるONLYOFFICE URL |
-| `APP_ONLYOFFICE_INTERNAL_URL` | ONLYOFFICEがファイルを取得する内部アプリURL |
-| `ONLYOFFICE_JWT_SECRET` | ONLYOFFICEと共有するJWT秘密鍵 |
+| 変数                             | 説明                                                   |
+|----------------------------------|--------------------------------------------------------|
+| `APP_URL`                        | アプリの公開URL                                        |
+| `DB_CONNECTION`                  | `sqlite`または`pgsql`                                  |
+| `REVERB_APP_ID/KEY/SECRET`       | Reverb認証情報                                         |
+| `REVERB_HOST/PORT/SCHEME`        | ブラウザとLaravelが接続する公開WebSocket               |
+| `REVERB_SERVER_HOST/PORT`        | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
+| `REVERB_ALLOWED_ORIGINS`         | Reverbへの接続を許可する公開ドメイン                   |
+| `ONLYOFFICE_DOCUMENT_SERVER_URL` | ブラウザから見えるONLYOFFICE URL                       |
+| `APP_ONLYOFFICE_INTERNAL_URL`    | ONLYOFFICEがファイルを取得する内部アプリURL            |
+| `ONLYOFFICE_JWT_SECRET`          | ONLYOFFICEと共有するJWT秘密鍵                          |
 
 ## トラブルシューティング
 
-| 症状 | 確認 |
-|---|---|
-| 502 Bad Gateway | `sudo systemctl status php*-fpm`、`sudo nginx -t` |
-| リアルタイム更新されない | `sudo supervisorctl status chatter-reverb`、ブラウザNetworkの`/app/`接続 |
-| 添付プレビューが生成されない | `/var/log/chatter-queue-error.log`、LibreOffice/Poppler/ImageMagick |
-| Officeプレビューが開かない | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL |
-| PostgreSQLへ接続できない | `.env`、`sudo -u postgres pg_isready`、`/etc/chatter/database-password` |
-| 証明書を発行できない | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/` |
+| 症状                         | 確認                                                                     |
+|------------------------------|--------------------------------------------------------------------------|
+| 502 Bad Gateway              | `sudo systemctl status php*-fpm`、`sudo nginx -t`                        |
+| リアルタイム更新されない     | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続 |
+| 添付プレビューが生成されない | `/var/log/chatterrow-queue-error.log`、LibreOffice/Poppler/ImageMagick      |
+| Officeプレビューが開かない   | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL       |
+| PostgreSQLへ接続できない     | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`  |
+| 証明書を発行できない         | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                  |
 
 ## ローカル開発
 

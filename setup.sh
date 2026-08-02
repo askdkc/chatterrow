@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# chatter - one-shot provisioning for Ubuntu 24.04 / 26.04
+# chatterrow - one-shot provisioning for Ubuntu 24.04 / 26.04
 #
 # Run as a regular sudo-capable user. Missing values are prompted when the
 # script is attached to a terminal:
@@ -12,9 +12,9 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------- helpers --
-log()  { printf '\033[1;34m[chatter]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[chatter:warn]\033[0m %s\n' "$*"; }
-die()  { printf '\033[1;31m[chatter:error]\033[0m %s\n' "$*" >&2; exit 1; }
+log()  { printf '\033[1;34m[chatterrow]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[chatterrow:warn]\033[0m %s\n' "$*"; }
+die()  { printf '\033[1;31m[chatterrow:error]\033[0m %s\n' "$*" >&2; exit 1; }
 
 clamp() {
     local value="$1" minimum="$2" maximum="$3"
@@ -79,7 +79,7 @@ setup_macos_onlyoffice() {
     [[ "$macos_major" =~ ^[0-9]+$ && "$macos_major" -ge 26 ]] || die "Apple Container requires macOS 26 or newer"
 
     app_dir="$APP_DIR"
-    [[ "$app_dir" == "/var/www/chatter" ]] && app_dir="$PWD"
+    [[ "$app_dir" == "/var/www/chatterrow" ]] && app_dir="$PWD"
     env_file="$app_dir/.env"
 
     [[ -f "$env_file" ]] || {
@@ -149,21 +149,21 @@ prompt_required() {
     printf '%s' "$value"
 }
 
-APP_DIR="${APP_DIR:-/var/www/chatter}"
-REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
+APP_DIR="${APP_DIR:-/var/www/chatterrow}"
+REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrowrow.git}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 OFFICE_DOMAIN="${OFFICE_DOMAIN:-}"
 DATABASE="${DATABASE:-}"
-DB_NAME="${DB_NAME:-chatter}"
-DB_USER="${DB_USER:-chatter}"
+DB_NAME="${DB_NAME:-chatterrow}"
+DB_USER="${DB_USER:-chatterrow}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 NO_SSL=0
 REVERB_SERVER_PORT=8081
 ONLYOFFICE_PORT=8080
 APP_INTERNAL_PORT=8090
 ONLYOFFICE_IMAGE="${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}"
-ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatter-onlyoffice}"
+ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatterrow-onlyoffice}"
 
 usage() {
     cat <<'EOF'
@@ -174,11 +174,11 @@ Options:
   --email <email>            Let's Encrypt registration / expiry mail
   --office-domain <domain>   OnlyOffice domain (default: office.<domain>)
   --database <driver>        App DB: sqlite or postgresql (prompted; default: sqlite)
-  --db-name <name>           PostgreSQL database name (default: chatter)
-  --db-user <name>           PostgreSQL role name (default: chatter)
+  --db-name <name>           PostgreSQL database name (default: chatterrow)
+  --db-user <name>           PostgreSQL role name (default: chatterrow)
   --db-password <password>   PostgreSQL password (default: securely generated)
-  --app-dir <path>           App install path (default: /var/www/chatter)
-  --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrow.git)
+  --app-dir <path>           App install path (default: /var/www/chatterrow)
+  --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrowrow.git)
   --onlyoffice-image <image> OnlyOffice image for macOS Container (default: onlyoffice/documentserver:latest)
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
@@ -395,7 +395,7 @@ read -r PG_VERSION PG_CLUSTER PG_PORT PG_STATUS PG_OWNER PG_DATA PG_LOG <<< "${P
 PG_SERVICE="postgresql@${PG_VERSION}-${PG_CLUSTER}"
 [[ "$PG_STATUS" == "online" ]] || sudo systemctl start "$PG_SERVICE"
 
-# Chatter, PHP, and OnlyOffice share the host, so PostgreSQL receives a
+# Chatterrow, PHP, and OnlyOffice share the host, so PostgreSQL receives a
 # conservative fraction rather than dedicated-database-server values.
 SHARED_BUFFERS_MB="$(clamp $((MEMORY_MB / 5)) 128 8192)"
 EFFECTIVE_CACHE_MB="$(clamp $((MEMORY_MB * 3 / 5)) 256 65536)"
@@ -421,11 +421,11 @@ PG_CONFIG_DIR="$(dirname "$PG_CONFIG")"
 sudo install -d -o postgres -g postgres -m 0750 "$PG_CONFIG_DIR/conf.d"
 
 if ! sudo grep -Eq "^[[:space:]]*include_dir[[:space:]]*=[[:space:]]*'conf.d'" "$PG_CONFIG"; then
-    printf "\n# Managed by chatter setup.sh\ninclude_dir = 'conf.d'\n" | sudo tee -a "$PG_CONFIG" >/dev/null
+    printf "\n# Managed by chatterrow setup.sh\ninclude_dir = 'conf.d'\n" | sudo tee -a "$PG_CONFIG" >/dev/null
 fi
 
-sudo tee "$PG_CONFIG_DIR/conf.d/99-chatter-tuning.conf" >/dev/null <<POSTGRES
-# Managed by chatter/setup.sh. Re-running setup recalculates these values.
+sudo tee "$PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf" >/dev/null <<POSTGRES
+# Managed by chatterrow/setup.sh. Re-running setup recalculates these values.
 # Detected resources: ${CPU_COUNT} CPU(s), ${MEMORY_MB} MB RAM.
 shared_buffers = '${SHARED_BUFFERS_MB}MB'
 effective_cache_size = '${EFFECTIVE_CACHE_MB}MB'
@@ -444,10 +444,10 @@ max_wal_size = '4GB'
 wal_compression = on
 huge_pages = try
 POSTGRES
-sudo chown postgres:postgres "$PG_CONFIG_DIR/conf.d/99-chatter-tuning.conf"
-sudo chmod 0644 "$PG_CONFIG_DIR/conf.d/99-chatter-tuning.conf"
+sudo chown postgres:postgres "$PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf"
+sudo chmod 0644 "$PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf"
 sudo -u postgres "/usr/lib/postgresql/${PG_VERSION}/bin/postgres" -C shared_buffers -D "$PG_DATA" -c "config_file=$PG_CONFIG" >/dev/null || \
-    die "Generated PostgreSQL configuration is invalid; inspect $PG_CONFIG_DIR/conf.d/99-chatter-tuning.conf"
+    die "Generated PostgreSQL configuration is invalid; inspect $PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf"
 sudo systemctl restart "$PG_SERVICE"
 sudo -u postgres pg_isready -p "$PG_PORT" -q || die "PostgreSQL did not become ready after tuning"
 ACTUAL_SHARED_BUFFERS="$(sudo -u postgres psql -p "$PG_PORT" -Atqc 'SHOW shared_buffers')"
@@ -456,7 +456,7 @@ ACTUAL_MAX_CONNECTIONS="$(sudo -u postgres psql -p "$PG_PORT" -Atqc 'SHOW max_co
 log "PostgreSQL tuned: shared_buffers=${ACTUAL_SHARED_BUFFERS}, work_mem=${WORK_MEM_MB}MB, max_connections=${MAX_CONNECTIONS}, workers=${MAX_WORKER_PROCESSES}"
 
 if [[ "$DATABASE" == "pgsql" ]]; then
-    DB_CREDENTIAL_FILE="/etc/chatter/database-password"
+    DB_CREDENTIAL_FILE="/etc/chatterrow/database-password"
     if [[ -z "$DB_PASSWORD" ]] && sudo test -r "$DB_CREDENTIAL_FILE"; then
         DB_PASSWORD="$(sudo sh -c "tr -d '\\r\\n' < '$DB_CREDENTIAL_FILE'")"
     fi
@@ -471,7 +471,7 @@ if [[ "$DATABASE" == "pgsql" ]]; then
         printf '\n'
     fi
     [[ -n "$DB_PASSWORD" ]] || DB_PASSWORD="$(openssl rand -hex 32)"
-    sudo install -d -o root -g root -m 0700 /etc/chatter
+    sudo install -d -o root -g root -m 0700 /etc/chatterrow
     printf '%s\n' "$DB_PASSWORD" | sudo tee "$DB_CREDENTIAL_FILE" >/dev/null
     sudo chown root:root "$DB_CREDENTIAL_FILE"
     sudo chmod 0600 "$DB_CREDENTIAL_FILE"
@@ -487,13 +487,13 @@ SQL
     [[ "$ROLE_IS_PRIVILEGED" != "t" ]] || die "Refusing to use privileged PostgreSQL role: $DB_USER"
 
     log "Creating/updating PostgreSQL role '$DB_USER' and database '$DB_NAME'..."
-    sudo -u postgres env CHATTER_DB_PASSWORD="$DB_PASSWORD" psql \
+    sudo -u postgres env CHATTERROW_DB_PASSWORD="$DB_PASSWORD" psql \
         -p "$PG_PORT" \
         --set=ON_ERROR_STOP=1 \
         --set=db_name="$DB_NAME" \
         --set=db_user="$DB_USER" \
         postgres <<'SQL'
-\getenv db_password CHATTER_DB_PASSWORD
+\getenv db_password CHATTERROW_DB_PASSWORD
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_password')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user') \gexec
 SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', :'db_user', :'db_password') \gexec
@@ -536,7 +536,7 @@ done
 [[ $ONLYOFFICE_READY -eq 1 ]] || die "ONLYOFFICE health check failed on 127.0.0.1:$ONLYOFFICE_PORT"
 
 # --------------------------------------------------------- app deploy ------
-log "Deploying chatter into $APP_DIR..."
+log "Deploying chatterrow into $APP_DIR..."
 sudo mkdir -p "$APP_DIR"
 sudo chown "$DEPLOY_USER":"$DEPLOY_USER" "$APP_DIR"
 if [[ -d "$APP_DIR/.git" ]]; then
@@ -563,7 +563,7 @@ composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 log "Preparing production environment..."
 [[ -f .env ]] || cp .env.example .env
-set_env APP_NAME chatter
+set_env APP_NAME chatterrow
 set_env APP_ENV production
 set_env APP_DEBUG false
 set_env APP_URL "$PUBLIC_SCHEME://$DOMAIN"
@@ -594,7 +594,7 @@ fi
 
 CURRENT_REVERB_KEY="$(sed -n 's/^REVERB_APP_KEY=//p' .env | sed -n '1p')"
 CURRENT_REVERB_SECRET="$(sed -n 's/^REVERB_APP_SECRET=//p' .env | sed -n '1p')"
-set_env REVERB_APP_ID chatter
+set_env REVERB_APP_ID chatterrow
 set_env REVERB_APP_KEY "${CURRENT_REVERB_KEY:-$(openssl rand -hex 16)}"
 set_env REVERB_APP_SECRET "${CURRENT_REVERB_SECRET:-$(openssl rand -hex 24)}"
 set_env REVERB_HOST "$DOMAIN"
@@ -650,7 +650,7 @@ sudo install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
 printf 'include /etc/nginx/sites-enabled/*;\n' | sudo tee /etc/nginx/conf.d/00-sites-enabled.conf >/dev/null
 
 PRESERVE_NGINX_CONFIG=0
-if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" && -f /etc/nginx/sites-available/chatter && -f /etc/nginx/sites-available/onlyoffice ]]; then
+if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" && -f /etc/nginx/sites-available/chatterrow && -f /etc/nginx/sites-available/onlyoffice ]]; then
     PRESERVE_NGINX_CONFIG=1
     log "Existing TLS-enabled nginx configuration detected; preserving it during redeployment"
 fi
@@ -658,12 +658,12 @@ fi
 NGINX_BACKUP_DIR=""
 if [[ $NO_SSL -eq 0 && $PRESERVE_NGINX_CONFIG -eq 0 ]]; then
     NGINX_BACKUP_DIR="$(mktemp -d)"
-    [[ ! -f /etc/nginx/sites-available/chatter ]] || sudo cp -a /etc/nginx/sites-available/chatter "$NGINX_BACKUP_DIR/chatter"
+    [[ ! -f /etc/nginx/sites-available/chatterrow ]] || sudo cp -a /etc/nginx/sites-available/chatterrow "$NGINX_BACKUP_DIR/chatterrow"
     [[ ! -f /etc/nginx/sites-available/onlyoffice ]] || sudo cp -a /etc/nginx/sites-available/onlyoffice "$NGINX_BACKUP_DIR/onlyoffice"
 fi
 
 if [[ $PRESERVE_NGINX_CONFIG -eq 0 ]]; then
-sudo tee /etc/nginx/sites-available/chatter >/dev/null <<NGINX
+sudo tee /etc/nginx/sites-available/chatterrow >/dev/null <<NGINX
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -769,7 +769,7 @@ server {
 NGINX
 fi
 
-sudo ln -sfn /etc/nginx/sites-available/chatter /etc/nginx/sites-enabled/chatter
+sudo ln -sfn /etc/nginx/sites-available/chatterrow /etc/nginx/sites-enabled/chatterrow
 sudo ln -sfn /etc/nginx/sites-available/onlyoffice /etc/nginx/sites-enabled/onlyoffice
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo rm -f /etc/nginx/conf.d/default.conf
@@ -779,8 +779,8 @@ sudo systemctl reload nginx
 
 # ---------------------------------------------------- supervisor conf ------
 log "Generating queue, Reverb, and scheduler process definitions..."
-sudo tee /etc/supervisor/conf.d/chatter-queue.conf >/dev/null <<SUPERVISOR
-[program:chatter-queue]
+sudo tee /etc/supervisor/conf.d/chatterrow-queue.conf >/dev/null <<SUPERVISOR
+[program:chatterrow-queue]
 directory=${APP_DIR}
 command=php artisan queue:work database --sleep=3 --tries=3 --max-time=3600
 user=www-data
@@ -789,12 +789,12 @@ autorestart=true
 stopasgroup=true
 killasgroup=true
 stopwaitsecs=3700
-stdout_logfile=/var/log/chatter-queue.log
-stderr_logfile=/var/log/chatter-queue-error.log
+stdout_logfile=/var/log/chatterrow-queue.log
+stderr_logfile=/var/log/chatterrow-queue-error.log
 SUPERVISOR
 
-sudo tee /etc/supervisor/conf.d/chatter-reverb.conf >/dev/null <<SUPERVISOR
-[program:chatter-reverb]
+sudo tee /etc/supervisor/conf.d/chatterrow-reverb.conf >/dev/null <<SUPERVISOR
+[program:chatterrow-reverb]
 directory=${APP_DIR}
 command=php artisan reverb:start --host=127.0.0.1 --port=${REVERB_SERVER_PORT}
 user=www-data
@@ -803,12 +803,12 @@ autorestart=true
 stopasgroup=true
 killasgroup=true
 stopwaitsecs=30
-stdout_logfile=/var/log/chatter-reverb.log
-stderr_logfile=/var/log/chatter-reverb-error.log
+stdout_logfile=/var/log/chatterrow-reverb.log
+stderr_logfile=/var/log/chatterrow-reverb-error.log
 SUPERVISOR
 
-sudo tee /etc/supervisor/conf.d/chatter-schedule.conf >/dev/null <<SUPERVISOR
-[program:chatter-schedule]
+sudo tee /etc/supervisor/conf.d/chatterrow-schedule.conf >/dev/null <<SUPERVISOR
+[program:chatterrow-schedule]
 directory=${APP_DIR}
 command=php artisan schedule:work
 user=www-data
@@ -817,14 +817,14 @@ autorestart=true
 stopasgroup=true
 killasgroup=true
 stopwaitsecs=60
-stdout_logfile=/var/log/chatter-schedule.log
-stderr_logfile=/var/log/chatter-schedule-error.log
+stdout_logfile=/var/log/chatterrow-schedule.log
+stderr_logfile=/var/log/chatterrow-schedule-error.log
 SUPERVISOR
 
 sudo systemctl enable --now "php${PHP_VER}-fpm" supervisor redis-server rabbitmq-server
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl restart chatter-queue chatter-reverb chatter-schedule
+sudo supervisorctl restart chatterrow-queue chatterrow-reverb chatterrow-schedule
 
 # ------------------------------------------------- Let's Encrypt SSL -------
 if [[ $NO_SSL -eq 1 ]]; then
@@ -847,8 +847,8 @@ else
         sudo certbot renew --dry-run --cert-name "$DOMAIN" || warn "Certbot dry-run renewal failed; inspect /var/log/letsencrypt before production use"
         log "SSL installed; certbot.timer and nginx reload hook enabled"
     else
-        if [[ -n "$NGINX_BACKUP_DIR" && -f "$NGINX_BACKUP_DIR/chatter" && -f "$NGINX_BACKUP_DIR/onlyoffice" ]]; then
-            sudo cp -a "$NGINX_BACKUP_DIR/chatter" /etc/nginx/sites-available/chatter
+        if [[ -n "$NGINX_BACKUP_DIR" && -f "$NGINX_BACKUP_DIR/chatterrow" && -f "$NGINX_BACKUP_DIR/onlyoffice" ]]; then
+            sudo cp -a "$NGINX_BACKUP_DIR/chatterrow" /etc/nginx/sites-available/chatterrow
             sudo cp -a "$NGINX_BACKUP_DIR/onlyoffice" /etc/nginx/sites-available/onlyoffice
             sudo nginx -t && sudo systemctl reload nginx
         fi
@@ -877,6 +877,6 @@ log "Provisioning complete."
 log "App:        $PUBLIC_SCHEME://$DOMAIN (first user: /register)"
 log "OnlyOffice: $PUBLIC_SCHEME://$OFFICE_DOMAIN"
 log "Database:   $DATABASE"
-log "PostgreSQL: $PG_CONFIG_DIR/conf.d/99-chatter-tuning.conf"
+log "PostgreSQL: $PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf"
 log "Processes:  sudo supervisorctl status"
-log "Logs:       sudo tail -f /var/log/chatter-*.log"
+log "Logs:       sudo tail -f /var/log/chatterrow-*.log"
