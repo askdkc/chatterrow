@@ -29,11 +29,8 @@ set_env() {
     escaped="$(printf '%s' "$value" | sed 's/[&|\\]/\\&/g')"
 
     if grep -Eq "^[[:space:]]*#?[[:space:]]*${key}=" "$file"; then
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            sed -i '' -E "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
-        else
-            sed -i -E "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
-        fi
+        sed -E -i.bak "s|^[[:space:]]*#?[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
+        rm -f "${file}.bak"
     else
         printf '%s=%s\n' "$key" "$value" >> "$file"
     fi
