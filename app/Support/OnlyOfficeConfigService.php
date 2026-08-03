@@ -24,6 +24,11 @@ class OnlyOfficeConfigService
             && Str::length(trim((string) config('onlyoffice.jwt_secret', ''))) >= 32;
     }
 
+    public function isEnabledAndConfigured(): bool
+    {
+        return (bool) config('onlyoffice.enabled', false) && $this->isConfigured();
+    }
+
     public function isDocumentServerAvailable(): bool
     {
         try {
@@ -37,6 +42,11 @@ class OnlyOfficeConfigService
         } catch (Throwable) {
             return false;
         }
+    }
+
+    public function sourceUrl(StoredFile $storedFile): string
+    {
+        return $this->downloadUrl($storedFile, $this->documentVersion->key($storedFile));
     }
 
     /** @return array<string, mixed> */
@@ -74,7 +84,7 @@ class OnlyOfficeConfigService
                 'lang' => 'ja',
                 'region' => 'ja-JP',
                 'user' => [
-                    'id' => hash('sha256', "chatter-onlyoffice-user-v1\0".(string) (auth()->id() ?? 'anonymous')),
+                    'id' => hash('sha256', "chatterrow-onlyoffice-user-v1\0".(string) (auth()->id() ?? 'anonymous')),
                     'name' => Str::limit((string) (auth()->user()->name ?? 'Viewer'), 128, ''),
                 ],
                 'customization' => [

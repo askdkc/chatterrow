@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\MarkdownedDocDispatcher;
 use App\Support\MarkdownedDocGenerator;
 use App\Support\MarkdownSearchIndex;
+use App\Support\OnlyOfficeConfigService;
 use App\Support\StoredFilePreviewDispatcher;
 use App\Support\StoredFilePreviewGenerator;
 use Database\Factories\StoredFileFactory;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 /**
  * @property int $id
@@ -55,7 +57,11 @@ class StoredFile extends Model
     protected static function booted(): void
     {
         static::creating(function (StoredFile $storedFile): void {
-            if (StoredFilePreviewGenerator::supports($storedFile->original_name)) {
+            $onlyOfficeReady = app(OnlyOfficeConfigService::class)->isEnabledAndConfigured();
+            $previewSupported = StoredFilePreviewGenerator::supports($storedFile->original_name)
+                && (! StoredFilePreviewGenerator::requiresOnlyOffice($storedFile->original_name) || $onlyOfficeReady);
+
+            if ($previewSupported) {
                 $storedFile->preview_path = null;
                 $storedFile->preview_status = 'pending';
             } else {
@@ -63,7 +69,10 @@ class StoredFile extends Model
                 $storedFile->preview_status = null;
             }
 
-            if (MarkdownedDocGenerator::supports($storedFile->original_name)) {
+            $markdownSupported = MarkdownedDocGenerator::supports($storedFile->original_name)
+                && (! MarkdownedDocGenerator::requiresOnlyOffice($storedFile->original_name) || $onlyOfficeReady);
+
+            if ($markdownSupported) {
                 $storedFile->markdown_path = null;
                 $storedFile->markdown_status = 'pending';
             } else {
@@ -85,7 +94,7 @@ class StoredFile extends Model
         });
 
         static::deleting(function (StoredFile $storedFile): void {
-            StoredFilePreviewGenerator::cleanup(
+            $previewsDeleted = StoredFilePreviewGenerator::cleanup(
                 Storage::disk($storedFile->disk),
                 $storedFile->id,
                 $storedFile->path,
@@ -93,8 +102,13 @@ class StoredFile extends Model
                 includeLegacy: true,
             );
 
-            if ($storedFile->markdown_path !== null) {
-                Storage::disk('markdowned')->delete($storedFile->markdown_path);
+            if (! $previewsDeleted) {
+                throw new RuntimeException('Stored file preview cleanup failed.');
+            }
+
+            if ($storedFile->markdown_path !== null
+                && ! Storage::disk('markdowned')->delete($storedFile->markdown_path)) {
+                throw new RuntimeException('Stored file markdown cleanup failed.');
             }
 
             app(MarkdownSearchIndex::class)->remove($storedFile->id);

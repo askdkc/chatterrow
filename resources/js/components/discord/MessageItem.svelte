@@ -2,6 +2,7 @@
     import {
         Check,
         Download,
+        FileType2,
         Loader2,
         MessageSquare,
         Paperclip,
@@ -142,6 +143,12 @@
         return officeExtensions.has(
             file.original_name.split('.').pop()?.toLowerCase() ?? '',
         );
+    }
+
+    function fileTypeLabel(file: StoredFileResource): string {
+        const extension = file.original_name.match(/\.([^.]+)$/)?.[1];
+
+        return (extension?.toUpperCase() ?? 'FILE').slice(0, 8);
     }
 
     function openPreview(file: StoredFileResource) {
@@ -322,6 +329,18 @@
                             >
                                 <Download class="h-3.5 w-3.5" />
                             </a>
+                            <span
+                                title={`${fileTypeLabel(file)}ファイル`}
+                                class="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/15 bg-[#2b2d31]/90 px-1.5 py-1 text-[10px] font-bold tracking-wide text-[#dbdee1] shadow-lg backdrop-blur-sm"
+                            >
+                                <FileType2
+                                    class="h-3.5 w-3.5 text-[#5865f2]"
+                                    aria-hidden="true"
+                                />
+                                <span class="max-w-24 truncate"
+                                    >{fileTypeLabel(file)}</span
+                                >
+                            </span>
                         </div>
                     {:else}
                         <a

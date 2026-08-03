@@ -31,6 +31,14 @@ class GenerateMarkdownedDoc implements ShouldQueue
     public function __construct(public int $storedFileId, public string $sourcePath)
     {
         $this->afterCommit = true;
+
+        $this->timeout = max(
+            (int) config('onlyoffice.conversion_timeout', 120)
+                + (int) config('onlyoffice.conversion_download_timeout', 60)
+                + (int) config('services.markitdown.timeout', 180)
+                + 60,
+            240,
+        );
     }
 
     /** @return list<WithoutOverlapping> */
@@ -43,6 +51,12 @@ class GenerateMarkdownedDoc implements ShouldQueue
                 expiresAfter: $this->timeout + 60,
             ),
         ];
+    }
+
+    /** @return list<int> */
+    public function backoff(): array
+    {
+        return [30, 60, 120, 300];
     }
 
     public function handle(MarkdownedDocGenerator $generator): void
@@ -93,21 +107,46 @@ class GenerateMarkdownedDoc implements ShouldQueue
                 'exception' => $exception::class,
             ]);
 
-            $failed = StoredFile::query()
-                ->whereKey($this->storedFileId)
-                ->where('path', $this->sourcePath)
-                ->where('markdown_status', 'processing')
-                ->update([
-                    'markdown_path' => null,
-                    'markdown_status' => 'failed',
-                ]);
+            $this->cleanupIfSourceIsCurrent();
 
-            if ($failed === 1) {
-                Storage::disk('markdowned')->delete(
-                    MarkdownedDocGenerator::markdownPath($this->storedFileId, $this->sourcePath),
-                );
-                app(MarkdownSearchIndex::class)->remove($this->storedFileId);
-            }
+            throw $exception;
         }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $failed = StoredFile::query()
+            ->whereKey($this->storedFileId)
+            ->where('path', $this->sourcePath)
+            ->where('markdown_status', 'processing')
+            ->update([
+                'markdown_path' => null,
+                'markdown_status' => 'failed',
+            ]);
+
+        if ($failed === 1) {
+            $this->cleanup();
+        }
+    }
+
+    private function cleanupIfSourceIsCurrent(): void
+    {
+        $isCurrent = StoredFile::query()
+            ->whereKey($this->storedFileId)
+            ->where('path', $this->sourcePath)
+            ->where('markdown_status', 'processing')
+            ->exists();
+
+        if ($isCurrent) {
+            $this->cleanup();
+        }
+    }
+
+    private function cleanup(): void
+    {
+        Storage::disk('markdowned')->delete(
+            MarkdownedDocGenerator::markdownPath($this->storedFileId, $this->sourcePath),
+        );
+        app(MarkdownSearchIndex::class)->remove($this->storedFileId);
     }
 }

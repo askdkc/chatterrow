@@ -16,7 +16,7 @@ class OnlyOfficeDocumentVersionTest extends TestCase
         $file->size = 152364;
 
         $expected = hash('sha256', implode("\0", [
-            'chatter-onlyoffice-document-v3-source-han-noto-cjk',
+            'chatterrow-onlyoffice-document-v3-source-han-noto-cjk',
             '31',
             'uploads/example.docx',
             '152364',

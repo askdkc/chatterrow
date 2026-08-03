@@ -25,7 +25,7 @@ class MarkdownedDocGenerator
     ];
 
     /** @var list<string> */
-    public const LIBREOFFICE_EXTENSIONS = [
+    public const ONLYOFFICE_EXTENSIONS = [
         'doc',
         'xls',
         'xlsm',
@@ -36,7 +36,7 @@ class MarkdownedDocGenerator
     ];
 
     /** @var array<string, string> */
-    public const LIBREOFFICE_TARGETS = [
+    public const ONLYOFFICE_TARGETS = [
         'doc' => 'docx',
         'xls' => 'xlsx',
         'xlsm' => 'xlsx',
@@ -50,8 +50,17 @@ class MarkdownedDocGenerator
     {
         $extension = strtolower(pathinfo((string) $name, PATHINFO_EXTENSION));
 
-        return in_array($extension, [...self::NATIVE_EXTENSIONS, ...self::LIBREOFFICE_EXTENSIONS], true);
+        return in_array($extension, [...self::NATIVE_EXTENSIONS, ...self::ONLYOFFICE_EXTENSIONS], true);
     }
+
+    public static function requiresOnlyOffice(?string $name): bool
+    {
+        $extension = strtolower(pathinfo((string) $name, PATHINFO_EXTENSION));
+
+        return isset(self::ONLYOFFICE_TARGETS[$extension]);
+    }
+
+    public function __construct(private OnlyOfficeConversionService $onlyOfficeConversion) {}
 
     public static function markdownPath(int $storedFileId, string $sourcePath): string
     {
@@ -85,21 +94,13 @@ class MarkdownedDocGenerator
         try {
             $inputPath = $sourcePath;
 
-            if (isset(self::LIBREOFFICE_TARGETS[$extension])) {
-                $targetExtension = self::LIBREOFFICE_TARGETS[$extension];
+            if (isset(self::ONLYOFFICE_TARGETS[$extension])) {
+                $targetExtension = self::ONLYOFFICE_TARGETS[$extension];
                 $convertedPath = $workDir.'/'.pathinfo($sourcePath, PATHINFO_FILENAME).'.'.$targetExtension;
-                $result = Process::timeout((int) config('services.libreoffice.timeout', 120))->run([
-                    config('services.libreoffice.path', 'soffice'),
-                    '--headless',
-                    '--convert-to',
-                    $targetExtension,
-                    '--outdir',
-                    $workDir,
-                    $sourcePath,
-                ]);
+                $converted = $this->onlyOfficeConversion->document($storedFile, $targetExtension);
 
-                if (! $result->successful() || ! is_file($convertedPath)) {
-                    throw new RuntimeException('LibreOffice conversion failed for markdown input.');
+                if (File::put($convertedPath, $converted) === false) {
+                    throw new RuntimeException('ONLYOFFICE conversion storage failed for markdown input.');
                 }
 
                 $inputPath = $convertedPath;

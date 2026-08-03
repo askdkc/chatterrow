@@ -22,11 +22,11 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 
 | レイヤー   | 技術                                                          |
 |------------|---------------------------------------------------------------|
-| Backend    | Laravel 13 / PHP 8.4.1+                                       |
+| Backend    | Laravel 13 / PHP 8.5+                                         |
 | Frontend   | Inertia 3 / Svelte 5 / Tailwind CSS 4 / Vite 8                |
 | Database   | SQLiteまたはPostgreSQL                                        |
 | Realtime   | Laravel Reverb（WebSocket）                                   |
-| Preview    | Shiki / libreoffice / poppler / ImageMagick                   |
+| Preview    | Shiki / ONLYOFFICE / poppler / ImageMagick                    |
 | Office     | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
 | Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot                  |
 
@@ -71,8 +71,8 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 
 セットアップは以下を自動実行します。
 
-1. nginx公式署名済みリポジトリ、PHP 8.4+、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
-2. PHP拡張、LibreOffice、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
+1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
+2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
 3. PostgreSQLをCPU数と搭載RAMに合わせて調整
 4. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
 5. アプリを`/var/www/chatterrow`へ配備し、依存関係、フロントエンド、マイグレーションを実行
@@ -394,8 +394,8 @@ sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 |------------------------------|--------------------------------------------------------------------------|
 | 502 Bad Gateway              | `sudo systemctl status php*-fpm`、`sudo nginx -t`                        |
 | リアルタイム更新されない     | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続 |
-| 添付プレビューが生成されない | `/var/log/chatterrow-queue-error.log`、LibreOffice/Poppler/ImageMagick      |
-| Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL |
+| 添付プレビューが生成されない | `/var/log/chatterrow-queue-error.log`、ONLYOFFICE/Poppler/ImageMagick       |
+| Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL、`php artisan files:previews` |
 | Officeプレビューが開かない（macOS） | `curl http://127.0.0.1:8086/healthcheck`、JWT秘密鍵、`APP_ONLYOFFICE_INTERNAL_URL`、コンテナ内から`/up`への到達性 |
 | PostgreSQLへ接続できない     | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`  |
 | 証明書を発行できない         | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                  |

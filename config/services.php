@@ -28,11 +28,6 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'libreoffice' => [
-        'path' => env('LIBREOFFICE_PATH', 'soffice'),
-        'timeout' => (int) env('LIBREOFFICE_TIMEOUT', 120),
-    ],
-
     'imagemagick' => [
         'path' => env('IMAGEMAGICK_PATH', 'convert'),
         'timeout' => (int) env('IMAGEMAGICK_TIMEOUT', 45),

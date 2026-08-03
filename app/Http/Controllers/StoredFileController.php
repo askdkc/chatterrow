@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -159,9 +160,17 @@ class StoredFileController extends Controller
         $disk = Storage::disk($storedFile->disk);
         abort_unless($disk->exists($storedFile->preview_path), 404);
 
+        $contentType = match (strtolower(pathinfo($storedFile->preview_path, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            default => 'image/webp',
+        };
+
         return $disk->response($storedFile->preview_path, null, [
-            'Content-Type' => 'image/webp',
+            'Content-Type' => $contentType,
             'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -170,7 +179,29 @@ class StoredFileController extends Controller
         abort_unless($storedFile->server_id === $server->id, 404);
         Gate::authorize('view', $server);
 
-        Storage::disk($storedFile->disk)->delete($storedFile->path);
+        $markedForDeletion = StoredFile::query()
+            ->whereKey($storedFile->id)
+            ->update([
+                'preview_status' => 'deleting',
+                'markdown_status' => 'deleting',
+            ]);
+
+        if ($markedForDeletion !== 1) {
+            return response()->json(['ok' => true]);
+        }
+
+        $storedFile = $storedFile->fresh();
+
+        if ($storedFile === null) {
+            return response()->json(['ok' => true]);
+        }
+
+        $disk = Storage::disk($storedFile->disk);
+
+        if ($disk->exists($storedFile->path) && ! $disk->delete($storedFile->path)) {
+            throw new RuntimeException('Stored file deletion failed.');
+        }
+
         $storedFile->delete();
 
         return response()->json(['ok' => true]);

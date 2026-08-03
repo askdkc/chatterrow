@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Jobs\GenerateMarkdownedDoc;
+use App\Jobs\GenerateStoredFilePreview;
 use App\Models\Server;
 use App\Models\StoredFile;
 use App\Models\User;
 use App\Support\MarkdownedDocGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -46,6 +48,59 @@ class MarkdownedDocTest extends TestCase
 
         $this->assertSame('pending', $file->markdown_status);
         Queue::assertPushed(GenerateMarkdownedDoc::class, fn (GenerateMarkdownedDoc $job) => $job->storedFileId === $file->id);
+    }
+
+    public function test_onlyoffice_dependent_jobs_are_skipped_when_it_is_not_configured(): void
+    {
+        Queue::fake();
+        config([
+            'onlyoffice.enabled' => true,
+            'onlyoffice.jwt_secret' => '',
+        ]);
+
+        $modern = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.docx',
+            'path' => 'uploads/1/report.docx',
+        ]);
+        $legacy = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.doc',
+            'path' => 'uploads/1/report.doc',
+        ]);
+
+        $this->assertNull($modern->preview_status);
+        $this->assertSame('pending', $modern->markdown_status);
+        $this->assertNull($legacy->preview_status);
+        $this->assertNull($legacy->markdown_status);
+        Queue::assertNotPushed(GenerateStoredFilePreview::class);
+        Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
+    }
+
+    public function test_onlyoffice_dependent_jobs_are_queued_when_it_is_configured(): void
+    {
+        Queue::fake();
+        config([
+            'onlyoffice.enabled' => true,
+            'onlyoffice.document_server_url' => 'http://onlyoffice.test',
+            'onlyoffice.public_url' => 'http://onlyoffice.test',
+            'onlyoffice.internal_url' => 'http://chatterrow.test',
+            'onlyoffice.jwt_secret' => str_repeat('secret', 8),
+        ]);
+
+        $file = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.doc',
+            'path' => 'uploads/1/report.doc',
+        ]);
+
+        $this->assertSame('pending', $file->preview_status);
+        $this->assertSame('pending', $file->markdown_status);
+        Queue::assertPushed(GenerateStoredFilePreview::class, 1);
+        Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
     }
 
     public function test_unsupported_files_are_not_marked_for_conversion(): void
@@ -86,6 +141,26 @@ class MarkdownedDocTest extends TestCase
         Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
     }
 
+    public function test_markdown_command_skips_legacy_office_files_when_onlyoffice_is_not_configured(): void
+    {
+        Queue::fake();
+        config(['onlyoffice.enabled' => false]);
+        StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.doc',
+            'path' => 'uploads/1/report.doc',
+            'markdown_path' => null,
+            'markdown_status' => null,
+        ]));
+
+        $this->artisan('files:markdown')
+            ->expectsOutput('Queued 0 files for markdown conversion.')
+            ->assertSuccessful();
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_generator_converts_a_pdf_and_indexes_the_content(): void
     {
         Storage::fake('local');
@@ -113,24 +188,10 @@ class MarkdownedDocTest extends TestCase
         $this->assertStringContainsString('全文検索', $row->content);
     }
 
-    public function test_generator_uses_the_source_basename_for_legacy_office_conversion(): void
+    public function test_generator_converts_legacy_office_input_with_onlyoffice(): void
     {
         Storage::fake('local');
         Storage::fake('markdowned');
-
-        Process::fake(function ($process) {
-            $command = $process->command;
-
-            if (is_array($command) && in_array('--convert-to', $command, true)) {
-                $outdirIndex = array_search('--outdir', $command, true);
-                $outdir = $command[$outdirIndex + 1];
-                file_put_contents($outdir.'/abc123.docx', 'converted document');
-
-                return Process::result();
-            }
-
-            return Process::result(output: '# Converted legacy document');
-        });
 
         $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
             'server_id' => $this->server->id,
@@ -141,6 +202,32 @@ class MarkdownedDocTest extends TestCase
         ]));
 
         Storage::disk('local')->put($file->path, 'legacy office document');
+        config([
+            'onlyoffice.enabled' => true,
+            'onlyoffice.document_server_url' => 'http://onlyoffice.test',
+            'onlyoffice.public_url' => 'http://onlyoffice.test',
+            'onlyoffice.internal_url' => 'http://chatterrow.test',
+            'onlyoffice.jwt_secret' => str_repeat('secret', 8),
+        ]);
+        Http::fake([
+            'http://onlyoffice.test/converter*' => Http::response([
+                'endConvert' => true,
+                'fileType' => 'docx',
+                'fileUrl' => 'http://onlyoffice.test/cache/result.docx',
+                'percent' => 100,
+            ]),
+            'http://onlyoffice.test/cache/result.docx' => Http::response("PK\x03\x04converted document"),
+        ]);
+        Process::fake(function ($process) {
+            $command = $process->command;
+            $inputPath = is_array($command) ? $command[1] : null;
+
+            $this->assertIsString($inputPath);
+            $this->assertSame('abc123.docx', basename($inputPath));
+            $this->assertStringStartsWith("PK\x03\x04", (string) file_get_contents($inputPath));
+
+            return Process::result(output: '# Converted legacy document');
+        });
 
         $path = app(MarkdownedDocGenerator::class)->generate($file);
 

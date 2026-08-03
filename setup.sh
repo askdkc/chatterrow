@@ -852,7 +852,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     nginx supervisor certbot python3-certbot-nginx \
     postgresql postgresql-client postgresql-contrib \
     redis-server rabbitmq-server \
-    libreoffice poppler-utils imagemagick ghostscript \
+    poppler-utils imagemagick ghostscript \
     fonts-dejavu-core fonts-liberation fonts-noto-cjk sqlite3
 
 NGINX_VERSION="$(nginx -v 2>&1 | cut -d/ -f2)"
@@ -863,26 +863,25 @@ echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select t
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ttf-mscorefonts-installer || \
     warn "Microsoft core fonts could not be installed; continuing with open fonts"
 
-# Japanese fonts are required for LibreOffice previews and the file viewer.
+# Japanese fonts are required for ONLYOFFICE previews and the file viewer.
 if fc-list :lang=ja 2>/dev/null | grep -q .; then
     log "Japanese fonts available: $(fc-list :lang=ja family 2>/dev/null | sort -u | paste -sd, - | cut -c1-160)"
 else
     warn "No Japanese fonts detected; Office previews may render incorrectly"
 fi
 
-# --------------------------------------------------------- PHP 8.4+ --------
-# Ubuntu 24.04 ships PHP 8.3, but the locked Symfony 8 dependencies require
-# PHP 8.4.1 or newer. Ubuntu 26.04's distro PHP already satisfies this.
-if [[ "$VERSION_ID" == "24.04" ]]; then
-    log "Enabling the maintained PHP repository for PHP 8.4 on Ubuntu 24.04..."
+# --------------------------------------------------------- PHP 8.5 --------
+# Ubuntu 24.04 ships PHP 8.3 and Ubuntu 26.04 ships PHP 8.4, but the locked
+# Symfony 8 dependencies and the PHP 8.5 baseline require newer. The maintained
+# ondrej/php repository provides php8.5 builds for both releases.
+if [[ "$VERSION_ID" == "24.04" || "$VERSION_ID" == "26.04" ]]; then
+    log "Enabling the maintained PHP repository for PHP 8.5 on Ubuntu $VERSION_ID..."
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update -y
-    PHP_PACKAGE_PREFIX="php8.4"
-else
-    PHP_PACKAGE_PREFIX="php"
+    PHP_PACKAGE_PREFIX="php8.5"
 fi
 
-log "Installing PHP 8.4+ and required extensions..."
+log "Installing PHP 8.5 and required extensions..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     "${PHP_PACKAGE_PREFIX}-cli" "${PHP_PACKAGE_PREFIX}-fpm" "${PHP_PACKAGE_PREFIX}-common" \
     "${PHP_PACKAGE_PREFIX}-opcache" "${PHP_PACKAGE_PREFIX}-curl" "${PHP_PACKAGE_PREFIX}-mbstring" \
@@ -893,7 +892,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
 PHP_FPM_SOCK="/run/php/php${PHP_VER}-fpm.sock"
 PHP_VERSION_ID="$(php -r 'echo PHP_VERSION_ID;')"
-(( PHP_VERSION_ID >= 80401 )) || die "PHP 8.4.1 or newer is required; active CLI is $(php -r 'echo PHP_VERSION;')"
+(( PHP_VERSION_ID >= 80500 )) || die "PHP 8.5 or newer is required; active CLI is $(php -r 'echo PHP_VERSION;')"
 [[ -S "$PHP_FPM_SOCK" || -f "/lib/systemd/system/php${PHP_VER}-fpm.service" ]] || die "PHP-FPM for active PHP $PHP_VER was not installed"
 log "PHP $PHP_VER active; PDO drivers: $(php -r 'echo implode(",", PDO::getAvailableDrivers());')"
 

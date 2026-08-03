@@ -31,6 +31,13 @@ class GenerateStoredFilePreview implements ShouldQueue
     public function __construct(public int $storedFileId, public string $sourcePath)
     {
         $this->afterCommit = true;
+
+        $this->timeout = max(
+            (int) config('onlyoffice.conversion_timeout', 120)
+                + (int) config('onlyoffice.conversion_download_timeout', 60)
+                + 60,
+            180,
+        );
     }
 
     /** @return list<WithoutOverlapping> */
@@ -43,6 +50,12 @@ class GenerateStoredFilePreview implements ShouldQueue
                 expiresAfter: $this->timeout + 60,
             ),
         ];
+    }
+
+    /** @return list<int> */
+    public function backoff(): array
+    {
+        return [30, 60, 120, 300, 600];
     }
 
     public function handle(StoredFilePreviewGenerator $generator): void
@@ -101,20 +114,13 @@ class GenerateStoredFilePreview implements ShouldQueue
                 'exception' => $exception::class,
             ]);
 
-            $failed = StoredFile::query()
-                ->whereKey($this->storedFileId)
-                ->where('path', $this->sourcePath)
-                ->where('preview_status', 'processing')
-                ->update([
-                    'preview_path' => null,
-                    'preview_status' => 'failed',
-                ]);
-
-            if ($failed === 1) {
+            if ($this->sourceIsCurrent()) {
                 StoredFilePreviewGenerator::cleanup($disk, $this->storedFileId, $this->sourcePath);
             } else {
                 $this->cleanupIfSourceIsStale($disk);
             }
+
+            throw $exception;
         }
     }
 
@@ -152,5 +158,14 @@ class GenerateStoredFilePreview implements ShouldQueue
         }
 
         StoredFilePreviewGenerator::cleanup($disk, $this->storedFileId, $this->sourcePath);
+    }
+
+    private function sourceIsCurrent(): bool
+    {
+        return StoredFile::query()
+            ->whereKey($this->storedFileId)
+            ->where('path', $this->sourcePath)
+            ->where('preview_status', 'processing')
+            ->exists();
     }
 }

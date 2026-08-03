@@ -84,6 +84,7 @@ describe('MessageItem attachments', () => {
         expect(
             screen.getByRole('img', { name: 'report.pdf' }).getAttribute('src'),
         ).toBe('/servers/2/files/6/thumbnail');
+        expect(screen.getByText('PDF')).toBeTruthy();
         await fireEvent.click(
             screen.getByRole('button', { name: 'report.pdfをプレビュー' }),
         );
@@ -126,6 +127,7 @@ describe('MessageItem attachments', () => {
             screen.getByRole('button', { name: 'report.docxをプレビュー' }),
         );
 
+        expect(screen.getByText('DOCX')).toBeTruthy();
         expect(screen.getByRole('dialog')).toBeTruthy();
         await waitFor(() =>
             expect(fetchMock).toHaveBeenCalledWith(

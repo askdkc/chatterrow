@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\GenerateMarkdownedDoc;
 use App\Models\StoredFile;
 use App\Support\MarkdownedDocGenerator;
+use App\Support\OnlyOfficeConfigService;
 use Illuminate\Console\Command;
 
 class MarkdownFiles extends Command
@@ -15,6 +16,7 @@ class MarkdownFiles extends Command
 
     public function handle(): int
     {
+        $onlyOfficeReady = app(OnlyOfficeConfigService::class)->isEnabledAndConfigured();
         $query = StoredFile::query()
             ->whereNull('markdown_path')
             ->where(function ($query): void {
@@ -31,7 +33,8 @@ class MarkdownFiles extends Command
         $queued = 0;
 
         foreach ($files as $file) {
-            if (! MarkdownedDocGenerator::supports($file->original_name)) {
+            if (! MarkdownedDocGenerator::supports($file->original_name)
+                || (MarkdownedDocGenerator::requiresOnlyOffice($file->original_name) && ! $onlyOfficeReady)) {
                 continue;
             }
 
