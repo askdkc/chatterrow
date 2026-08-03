@@ -9,7 +9,8 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.4.1",
+        "php": "^8.5",
+        "ext-redis": "*",
         "firebase/php-jwt": "^7.1",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",
@@ -18,6 +19,7 @@
         "laravel/reverb": "^1.11",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
+        "predis/predis": "^3.5",
         "symfony/html-sanitizer": "^8.1"
     },
     "require-dev": {
@@ -48,11 +50,15 @@
     "scripts": {
         "setup": [
             "composer install",
+            "@markitdown:install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
             "npm install",
             "npm run build"
+        ],
+        "markitdown:install": [
+            "@php scripts/install-markitdown.php"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
@@ -69,6 +75,7 @@
             "npm run lint:check",
             "npm run format:check",
             "npm run types:check",
+            "npm run test:unit",
             "@test"
         ],
         "types:check": [

@@ -69,15 +69,12 @@ class StoredFile extends Model
                 $storedFile->preview_status = null;
             }
 
-            $markdownSupported = MarkdownedDocGenerator::supports($storedFile->original_name)
-                && (! MarkdownedDocGenerator::requiresOnlyOffice($storedFile->original_name) || $onlyOfficeReady);
-
-            if ($markdownSupported) {
-                $storedFile->markdown_path = null;
-                $storedFile->markdown_status = 'pending';
-            } else {
+            if (! MarkdownedDocGenerator::supports($storedFile->original_name)) {
                 $storedFile->markdown_path = null;
                 $storedFile->markdown_status = null;
+            } elseif (($storedFile->getAttributes()['markdown_status'] ?? null) === null) {
+                $storedFile->markdown_path = null;
+                $storedFile->markdown_status = 'pending';
             }
         });
 

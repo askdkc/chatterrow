@@ -89,6 +89,7 @@ class OnlyOfficeConfigService
                 ],
                 'customization' => [
                     'integrationMode' => 'embed',
+                    'zoom' => -1,
                     'macros' => false,
                     'macrosMode' => 'disable',
                     'plugins' => false,

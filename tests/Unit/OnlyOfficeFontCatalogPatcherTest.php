@@ -1,5 +1,7 @@
 <?php
 
+namespace Tests\Unit;
+
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__, 2).'/scripts/patch-onlyoffice-font-catalog.php';

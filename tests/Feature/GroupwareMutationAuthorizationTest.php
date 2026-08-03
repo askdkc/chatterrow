@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Events\MessageCreated;
 use App\Models\Channel;
 use App\Models\Message;
 use App\Models\Server;
@@ -11,7 +12,9 @@ use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\Fluent\AssertableJson;
+use RuntimeException;
 use Tests\TestCase;
 
 class GroupwareMutationAuthorizationTest extends TestCase
@@ -449,6 +452,25 @@ class GroupwareMutationAuthorizationTest extends TestCase
             'channel_id' => $this->channel->id,
             'user_id' => $this->member->id,
             'body' => 'hello from member',
+        ]);
+    }
+
+    public function test_message_creation_succeeds_when_realtime_broadcast_dispatch_fails(): void
+    {
+        Event::listen(MessageCreated::class, static function (): never {
+            throw new RuntimeException('Realtime broadcast dispatch failed.');
+        });
+
+        $this->actingAs($this->member)
+            ->postJson(route('servers.channels.messages.store', [$this->server, $this->channel]), [
+                'body' => 'persist despite realtime failure',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('messages', [
+            'channel_id' => $this->channel->id,
+            'user_id' => $this->member->id,
+            'body' => 'persist despite realtime failure',
         ]);
     }
 

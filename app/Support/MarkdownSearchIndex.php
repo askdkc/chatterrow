@@ -50,6 +50,7 @@ class MarkdownSearchIndex
             return DB::table('markdown_docs')
                 ->join('stored_files', 'stored_files.id', '=', 'markdown_docs.rowid')
                 ->where('stored_files.server_id', $serverId)
+                ->where('stored_files.markdown_status', 'ready')
                 ->whereRaw('markdown_docs MATCH ?', [$this->ftsQuery($query)])
                 ->select(
                     'stored_files.id',
@@ -87,6 +88,7 @@ class MarkdownSearchIndex
         return DB::table('markdown_doc_contents')
             ->join('stored_files', 'stored_files.id', '=', 'markdown_doc_contents.stored_file_id')
             ->where('stored_files.server_id', $serverId)
+            ->where('stored_files.markdown_status', 'ready')
             ->whereRaw("markdown_doc_contents.content {$operator} ? ESCAPE '!'", [$pattern])
             ->select(
                 'stored_files.id',

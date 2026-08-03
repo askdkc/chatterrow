@@ -104,9 +104,7 @@
                             >{t('Navigation menu')}</SheetTitle
                         >
                         <SheetHeader class="flex justify-start text-left">
-                            <AppLogoIcon
-                                class="size-6 fill-current text-black dark:text-white"
-                            />
+                            <AppLogoIcon class="size-8 rounded-md" />
                         </SheetHeader>
                         <div
                             class="flex h-full flex-1 flex-col justify-between space-y-4 pt-6 pb-10"

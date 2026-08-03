@@ -52,6 +52,7 @@ class StoredFileController extends Controller
                 'mime_type' => $file->mime_type,
                 'size' => $file->size,
                 'preview_status' => $file->preview_status,
+                'markdown_status' => $file->markdown_status,
             ]),
         ], 201);
     }

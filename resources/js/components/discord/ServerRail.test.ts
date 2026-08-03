@@ -6,7 +6,7 @@ afterEach(cleanup);
 
 describe('ServerRail', () => {
     it('expands to show project names and collapses back to initials', async () => {
-        render(ServerRail, {
+        const { container } = render(ServerRail, {
             props: {
                 servers: [
                     {
@@ -33,8 +33,11 @@ describe('ServerRail', () => {
         });
 
         expect(screen.queryByText('デザインを固める')).toBeNull();
+        expect(
+            container.querySelector('img[src="/chatterrow-icon.png"]'),
+        ).toBeTruthy();
 
-        await fireEvent.click(screen.getByRole('navigation'));
+        await fireEvent.mouseEnter(screen.getByRole('navigation'));
 
         expect(screen.getByText('デザインを固める')).toBeTruthy();
         expect(screen.getByText('ファンドレイズ')).toBeTruthy();
@@ -56,7 +59,7 @@ describe('ServerRail', () => {
             }),
         ).toBeNull();
 
-        await fireEvent.click(screen.getByRole('navigation'));
+        await fireEvent.mouseLeave(screen.getByRole('navigation'));
 
         expect(screen.queryByText('デザインを固める')).toBeNull();
     });

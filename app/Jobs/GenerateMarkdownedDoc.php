@@ -33,9 +33,7 @@ class GenerateMarkdownedDoc implements ShouldQueue
         $this->afterCommit = true;
 
         $this->timeout = max(
-            (int) config('onlyoffice.conversion_timeout', 120)
-                + (int) config('onlyoffice.conversion_download_timeout', 60)
-                + (int) config('services.markitdown.timeout', 180)
+            (int) config('services.markitdown.timeout', 180)
                 + 60,
             240,
         );
@@ -105,6 +103,7 @@ class GenerateMarkdownedDoc implements ShouldQueue
                 'stored_file_id' => $this->storedFileId,
                 'source_path' => $this->sourcePath,
                 'exception' => $exception::class,
+                'message' => $exception->getMessage(),
             ]);
 
             $this->cleanupIfSourceIsCurrent();

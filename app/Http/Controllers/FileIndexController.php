@@ -69,6 +69,7 @@ class FileIndexController extends Controller
             'mime_type' => $file->mime_type,
             'size' => $file->size,
             'preview_status' => $file->preview_status,
+            'markdown_status' => $file->markdown_status,
             'created_at' => $file->created_at?->toISOString(),
             'uploader' => $file->uploader,
             'stream_url' => route('servers.files.stream', [$file->server_id, $file]),

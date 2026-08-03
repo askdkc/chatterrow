@@ -3,14 +3,13 @@
 namespace Tests\Feature;
 
 use App\Jobs\GenerateMarkdownedDoc;
-use App\Jobs\GenerateStoredFilePreview;
 use App\Models\Server;
 use App\Models\StoredFile;
 use App\Models\User;
 use App\Support\MarkdownedDocGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +31,7 @@ class MarkdownedDocTest extends TestCase
         $this->owner = User::factory()->create();
         $this->server = Server::factory()->create(['created_by' => $this->owner->id]);
         $this->server->members()->attach($this->owner->id);
+        config(['services.markitdown.path' => PHP_BINARY]);
     }
 
     public function test_uploading_a_supported_file_queues_markdown_conversion(): void
@@ -50,20 +50,9 @@ class MarkdownedDocTest extends TestCase
         Queue::assertPushed(GenerateMarkdownedDoc::class, fn (GenerateMarkdownedDoc $job) => $job->storedFileId === $file->id);
     }
 
-    public function test_onlyoffice_dependent_jobs_are_skipped_when_it_is_not_configured(): void
+    public function test_legacy_office_files_are_not_marked_for_markdown_conversion(): void
     {
         Queue::fake();
-        config([
-            'onlyoffice.enabled' => true,
-            'onlyoffice.jwt_secret' => '',
-        ]);
-
-        $modern = StoredFile::factory()->create([
-            'server_id' => $this->server->id,
-            'uploaded_by' => $this->owner->id,
-            'original_name' => 'report.docx',
-            'path' => 'uploads/1/report.docx',
-        ]);
         $legacy = StoredFile::factory()->create([
             'server_id' => $this->server->id,
             'uploaded_by' => $this->owner->id,
@@ -71,36 +60,8 @@ class MarkdownedDocTest extends TestCase
             'path' => 'uploads/1/report.doc',
         ]);
 
-        $this->assertNull($modern->preview_status);
-        $this->assertSame('pending', $modern->markdown_status);
-        $this->assertNull($legacy->preview_status);
         $this->assertNull($legacy->markdown_status);
-        Queue::assertNotPushed(GenerateStoredFilePreview::class);
-        Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
-    }
-
-    public function test_onlyoffice_dependent_jobs_are_queued_when_it_is_configured(): void
-    {
-        Queue::fake();
-        config([
-            'onlyoffice.enabled' => true,
-            'onlyoffice.document_server_url' => 'http://onlyoffice.test',
-            'onlyoffice.public_url' => 'http://onlyoffice.test',
-            'onlyoffice.internal_url' => 'http://chatterrow.test',
-            'onlyoffice.jwt_secret' => str_repeat('secret', 8),
-        ]);
-
-        $file = StoredFile::factory()->create([
-            'server_id' => $this->server->id,
-            'uploaded_by' => $this->owner->id,
-            'original_name' => 'report.doc',
-            'path' => 'uploads/1/report.doc',
-        ]);
-
-        $this->assertSame('pending', $file->preview_status);
-        $this->assertSame('pending', $file->markdown_status);
-        Queue::assertPushed(GenerateStoredFilePreview::class, 1);
-        Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
+        Queue::assertNotPushed(GenerateMarkdownedDoc::class);
     }
 
     public function test_unsupported_files_are_not_marked_for_conversion(): void
@@ -188,59 +149,6 @@ class MarkdownedDocTest extends TestCase
         $this->assertStringContainsString('全文検索', $row->content);
     }
 
-    public function test_generator_converts_legacy_office_input_with_onlyoffice(): void
-    {
-        Storage::fake('local');
-        Storage::fake('markdowned');
-
-        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
-            'server_id' => $this->server->id,
-            'uploaded_by' => $this->owner->id,
-            'original_name' => 'report.doc',
-            'path' => 'uploads/1/abc123.doc',
-            'mime_type' => 'application/msword',
-        ]));
-
-        Storage::disk('local')->put($file->path, 'legacy office document');
-        config([
-            'onlyoffice.enabled' => true,
-            'onlyoffice.document_server_url' => 'http://onlyoffice.test',
-            'onlyoffice.public_url' => 'http://onlyoffice.test',
-            'onlyoffice.internal_url' => 'http://chatterrow.test',
-            'onlyoffice.jwt_secret' => str_repeat('secret', 8),
-        ]);
-        Http::fake([
-            'http://onlyoffice.test/converter*' => Http::response([
-                'endConvert' => true,
-                'fileType' => 'docx',
-                'fileUrl' => 'http://onlyoffice.test/cache/result.docx',
-                'percent' => 100,
-            ]),
-            'http://onlyoffice.test/cache/result.docx' => Http::response("PK\x03\x04converted document"),
-        ]);
-        Process::fake(function ($process) {
-            $command = $process->command;
-            $inputPath = is_array($command) ? $command[1] : null;
-
-            $this->assertIsString($inputPath);
-            $this->assertSame('abc123.docx', basename($inputPath));
-            $this->assertStringStartsWith("PK\x03\x04", (string) file_get_contents($inputPath));
-
-            return Process::result(output: '# Converted legacy document');
-        });
-
-        $path = app(MarkdownedDocGenerator::class)->generate($file);
-
-        $expectedContent = "# Converted legacy document\n";
-
-        Storage::disk('markdowned')->assertExists($path);
-        $this->assertSame($expectedContent, Storage::disk('markdowned')->get($path));
-
-        $row = DB::table('markdown_docs')->where('rowid', $file->id)->first();
-        $this->assertNotNull($row);
-        $this->assertSame($expectedContent, $row->content);
-    }
-
     public function test_generator_throws_when_markitdown_fails(): void
     {
         Storage::fake('local');
@@ -261,6 +169,160 @@ class MarkdownedDocTest extends TestCase
         app(MarkdownedDocGenerator::class)->generate($file);
     }
 
+    public function test_markdown_job_publishes_ready_only_after_storage_and_indexing(): void
+    {
+        Storage::fake('local');
+        Storage::fake('markdowned');
+        Process::fake(['*' => Process::result(output: '# Ready document')]);
+
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'ready.pdf',
+            'path' => 'uploads/1/ready.pdf',
+            'markdown_status' => 'pending',
+        ]));
+        Storage::disk('local')->put($file->path, '%PDF-1.4 fixture');
+
+        (new GenerateMarkdownedDoc($file->id, $file->path))->handle(app(MarkdownedDocGenerator::class));
+
+        $file->refresh();
+        $this->assertSame('ready', $file->markdown_status);
+        $this->assertNotNull($file->markdown_path);
+        $this->assertDatabaseHas('markdown_doc_contents', ['stored_file_id' => $file->id]);
+    }
+
+    public function test_markdown_command_recovers_stale_processing_files(): void
+    {
+        Queue::fake();
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'stale.pdf',
+            'path' => 'uploads/1/stale.pdf',
+            'markdown_status' => 'processing',
+        ]));
+        StoredFile::query()->whereKey($file->id)->update([
+            'updated_at' => now()->subHour(),
+        ]);
+
+        $this->artisan('files:markdown', ['--stale-after' => 900])
+            ->expectsOutput('Queued 1 files for markdown conversion.')
+            ->assertSuccessful();
+
+        Queue::assertPushed(GenerateMarkdownedDoc::class, fn (GenerateMarkdownedDoc $job): bool => $job->storedFileId === $file->id);
+        $this->assertDatabaseHas('stored_files', [
+            'id' => $file->id,
+            'markdown_status' => 'pending',
+            'markdown_path' => null,
+        ]);
+    }
+
+    public function test_generator_logs_a_limited_stderr_when_markitdown_fails(): void
+    {
+        Storage::fake('local');
+        Process::fake(['*' => Process::result(
+            output: '',
+            errorOutput: str_repeat('e', 10000),
+            exitCode: 17,
+        )]);
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context): bool {
+                return $message === 'MarkItDown conversion failed.'
+                    && $context['exit_code'] === 17
+                    && strlen($context['stderr']) <= 4099;
+            });
+
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'stderr.pdf',
+            'path' => 'uploads/1/stderr.pdf',
+        ]));
+        Storage::disk('local')->put($file->path, 'fixture');
+
+        $this->expectException(RuntimeException::class);
+        app(MarkdownedDocGenerator::class)->generate($file);
+    }
+
+    public function test_generator_rejects_a_missing_markitdown_cli(): void
+    {
+        Storage::fake('local');
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'missing-cli.pdf',
+            'path' => 'uploads/1/missing-cli.pdf',
+        ]));
+        Storage::disk('local')->put($file->path, 'fixture');
+        config(['services.markitdown.path' => sys_get_temp_dir().'/missing-markitdown-cli']);
+
+        $this->expectExceptionMessage('MarkItDown CLI was not found');
+        app(MarkdownedDocGenerator::class)->generate($file);
+    }
+
+    public function test_generator_rejects_a_non_executable_markitdown_cli(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('POSIX executable permissions are not available on Windows.');
+        }
+
+        Storage::fake('local');
+        $cliPath = tempnam(sys_get_temp_dir(), 'markitdown-cli-');
+        $this->assertNotFalse($cliPath);
+        file_put_contents($cliPath, "#!/bin/sh\nprintf '# output'\n");
+        chmod($cliPath, 0644);
+        config(['services.markitdown.path' => $cliPath]);
+
+        try {
+            $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+                'server_id' => $this->server->id,
+                'uploaded_by' => $this->owner->id,
+                'original_name' => 'permissions.pdf',
+                'path' => 'uploads/1/permissions.pdf',
+            ]));
+            Storage::disk('local')->put($file->path, 'fixture');
+
+            $this->expectExceptionMessage('MarkItDown CLI is not executable');
+            app(MarkdownedDocGenerator::class)->generate($file);
+        } finally {
+            @unlink($cliPath);
+        }
+    }
+
+    public function test_generator_handles_a_markitdown_timeout(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('The timeout fixture uses a POSIX shell.');
+        }
+
+        Storage::fake('local');
+        $cliPath = tempnam(sys_get_temp_dir(), 'markitdown-timeout-');
+        $this->assertNotFalse($cliPath);
+        file_put_contents($cliPath, "#!/bin/sh\nsleep 2\nprintf '# output'\n");
+        chmod($cliPath, 0755);
+        config([
+            'services.markitdown.path' => $cliPath,
+            'services.markitdown.timeout' => 1,
+        ]);
+
+        try {
+            $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+                'server_id' => $this->server->id,
+                'uploaded_by' => $this->owner->id,
+                'original_name' => 'timeout.pdf',
+                'path' => 'uploads/1/timeout.pdf',
+            ]));
+            Storage::disk('local')->put($file->path, 'fixture');
+
+            $this->expectExceptionMessage('MarkItDown conversion timed out');
+            app(MarkdownedDocGenerator::class)->generate($file);
+        } finally {
+            @unlink($cliPath);
+        }
+    }
+
     public function test_generator_rejects_unsupported_extensions(): void
     {
         Storage::fake('local');
@@ -273,6 +335,23 @@ class MarkdownedDocTest extends TestCase
         ]);
 
         Storage::disk('local')->put($file->path, 'zip');
+
+        $this->expectException(RuntimeException::class);
+        app(MarkdownedDocGenerator::class)->generate($file);
+    }
+
+    public function test_generator_rejects_legacy_office_extensions(): void
+    {
+        Storage::fake('local');
+
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'archive.doc',
+            'path' => 'uploads/1/archive.doc',
+        ]));
+
+        Storage::disk('local')->put($file->path, 'legacy office document');
 
         $this->expectException(RuntimeException::class);
         app(MarkdownedDocGenerator::class)->generate($file);

@@ -850,6 +850,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common \
     git unzip zip rsync acl jq openssl \
     nginx supervisor certbot python3-certbot-nginx \
+    python3 python3-venv \
     postgresql postgresql-client postgresql-contrib \
     redis-server rabbitmq-server \
     poppler-utils imagemagick ghostscript \
@@ -871,15 +872,19 @@ else
 fi
 
 # --------------------------------------------------------- PHP 8.5 --------
-# Ubuntu 24.04 ships PHP 8.3 and Ubuntu 26.04 ships PHP 8.4, but the locked
-# Symfony 8 dependencies and the PHP 8.5 baseline require newer. The maintained
-# ondrej/php repository provides php8.5 builds for both releases.
-if [[ "$VERSION_ID" == "24.04" || "$VERSION_ID" == "26.04" ]]; then
-    log "Enabling the maintained PHP repository for PHP 8.5 on Ubuntu $VERSION_ID..."
-    sudo add-apt-repository -y ppa:ondrej/php
-    sudo apt-get update -y
-    PHP_PACKAGE_PREFIX="php8.5"
-fi
+# Ubuntu 24.04 ships PHP 8.3, so use the maintained ondrej/php repository for
+# the PHP 8.5 baseline. Ubuntu 26.04 ships PHP 8.5 and its extensions directly.
+PHP_PACKAGE_PREFIX="php8.5"
+case "$VERSION_ID" in
+    24.04)
+        log "Enabling the maintained PHP repository for PHP 8.5 on Ubuntu $VERSION_ID..."
+        sudo add-apt-repository -y ppa:ondrej/php
+        sudo apt-get update -y
+        ;;
+    26.04)
+        log "Using the Ubuntu repositories for PHP 8.5 on Ubuntu $VERSION_ID..."
+        ;;
+esac
 
 log "Installing PHP 8.5 and required extensions..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -887,14 +892,30 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     "${PHP_PACKAGE_PREFIX}-opcache" "${PHP_PACKAGE_PREFIX}-curl" "${PHP_PACKAGE_PREFIX}-mbstring" \
     "${PHP_PACKAGE_PREFIX}-xml" "${PHP_PACKAGE_PREFIX}-zip" "${PHP_PACKAGE_PREFIX}-bcmath" \
     "${PHP_PACKAGE_PREFIX}-intl" "${PHP_PACKAGE_PREFIX}-sqlite3" "${PHP_PACKAGE_PREFIX}-pgsql" \
-    "${PHP_PACKAGE_PREFIX}-gd"
+    "${PHP_PACKAGE_PREFIX}-gd" "${PHP_PACKAGE_PREFIX}-redis"
 
-PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
-PHP_FPM_SOCK="/run/php/php${PHP_VER}-fpm.sock"
-PHP_VERSION_ID="$(php -r 'echo PHP_VERSION_ID;')"
-(( PHP_VERSION_ID >= 80500 )) || die "PHP 8.5 or newer is required; active CLI is $(php -r 'echo PHP_VERSION;')"
-[[ -S "$PHP_FPM_SOCK" || -f "/lib/systemd/system/php${PHP_VER}-fpm.service" ]] || die "PHP-FPM for active PHP $PHP_VER was not installed"
-log "PHP $PHP_VER active; PDO drivers: $(php -r 'echo implode(",", PDO::getAvailableDrivers());')"
+sudo update-alternatives --install /usr/bin/php php /usr/bin/php8.5 85
+sudo update-alternatives --set php /usr/bin/php8.5
+PHP_VER="8.5"
+PHP_BINARY="/usr/bin/php8.5"
+PHP_FPM_SOCK="/run/php/php8.5-fpm.sock"
+PHP_VERSION_ID="$($PHP_BINARY -r 'echo PHP_VERSION_ID;')"
+(( PHP_VERSION_ID >= 80500 )) || die "PHP 8.5 or newer is required; active CLI is $($PHP_BINARY -r 'echo PHP_VERSION;')"
+[[ "$($PHP_BINARY -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')" == "8.5" ]] || die "PHP CLI was not switched to /usr/bin/php8.5"
+
+for PHP_EXTENSION in curl mbstring xml zip bcmath intl sqlite3 pgsql gd redis; do
+    "$PHP_BINARY" -r "exit(extension_loaded('$PHP_EXTENSION') ? 0 : 1)" \
+        || die "PHP 8.5 extension is missing: $PHP_EXTENSION"
+done
+
+"$PHP_BINARY" -r \
+    'exit(count(array_diff(["sqlite", "pgsql"], PDO::getAvailableDrivers())) === 0 ? 0 : 1)' \
+    || die "PHP 8.5 PDO sqlite and pgsql drivers are required"
+
+sudo systemctl enable --now php8.5-fpm
+sudo systemctl is-active --quiet php8.5-fpm || die "PHP 8.5 FPM is not running"
+[[ -S "$PHP_FPM_SOCK" ]] || die "PHP-FPM socket was not created at $PHP_FPM_SOCK"
+log "PHP 8.5 active; PDO drivers: $($PHP_BINARY -r 'echo implode(",", PDO::getAvailableDrivers());')"
 
 # ------------------------------------------------------------- composer ----
 if ! command -v composer >/dev/null; then
@@ -1092,6 +1113,8 @@ done
 
 log "Installing production PHP dependencies..."
 composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+log "Installing the pinned MarkItDown environment..."
+composer markitdown:install
 
 log "Preparing production environment..."
 [[ -f .env ]] || cp .env.example .env
@@ -1101,7 +1124,9 @@ set_env APP_DEBUG false
 set_env APP_URL "$PUBLIC_SCHEME://$DOMAIN"
 set_env LOG_LEVEL warning
 set_env BROADCAST_CONNECTION reverb
-set_env QUEUE_CONNECTION database
+set_env QUEUE_CONNECTION redis
+set_env REDIS_QUEUE default
+set_env REDIS_QUEUE_RETRY_AFTER 900
 set_env CACHE_STORE database
 
 if [[ "$DATABASE" == "sqlite" ]]; then
@@ -1313,22 +1338,24 @@ sudo systemctl reload nginx
 log "Generating queue, Reverb, and scheduler process definitions..."
 sudo tee /etc/supervisor/conf.d/chatterrow-queue.conf >/dev/null <<SUPERVISOR
 [program:chatterrow-queue]
+process_name=%(program_name)s_%(process_num)02d
 directory=${APP_DIR}
-command=php artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+command=/usr/bin/php8.5 artisan queue:work redis --sleep=3 --tries=5 --max-time=3600
+numprocs=10
 user=www-data
 autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
 stopwaitsecs=3700
-stdout_logfile=/var/log/chatterrow-queue.log
-stderr_logfile=/var/log/chatterrow-queue-error.log
+stdout_logfile=/var/log/chatterrow-queue_%(process_num)02d.log
+stderr_logfile=/var/log/chatterrow-queue-error_%(process_num)02d.log
 SUPERVISOR
 
 sudo tee /etc/supervisor/conf.d/chatterrow-reverb.conf >/dev/null <<SUPERVISOR
 [program:chatterrow-reverb]
 directory=${APP_DIR}
-command=php artisan reverb:start --host=127.0.0.1 --port=${REVERB_SERVER_PORT}
+command=/usr/bin/php8.5 artisan reverb:start --host=127.0.0.1 --port=${REVERB_SERVER_PORT}
 user=www-data
 autostart=true
 autorestart=true
@@ -1342,7 +1369,7 @@ SUPERVISOR
 sudo tee /etc/supervisor/conf.d/chatterrow-schedule.conf >/dev/null <<SUPERVISOR
 [program:chatterrow-schedule]
 directory=${APP_DIR}
-command=php artisan schedule:work
+command=/usr/bin/php8.5 artisan schedule:work
 user=www-data
 autostart=true
 autorestart=true
@@ -1354,9 +1381,13 @@ stderr_logfile=/var/log/chatterrow-schedule-error.log
 SUPERVISOR
 
 sudo systemctl enable --now "php${PHP_VER}-fpm" supervisor redis-server rabbitmq-server
+REDIS_PING="$(redis-cli --raw ping 2>/dev/null || true)"
+[[ "$REDIS_PING" == "PONG" ]] || die "Redis did not respond to redis-cli ping"
+log "Redis is ready"
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl restart chatterrow-queue chatterrow-reverb chatterrow-schedule
+sudo supervisorctl restart 'chatterrow-queue:*'
+sudo supervisorctl restart chatterrow-reverb chatterrow-schedule
 
 # ------------------------------------------------- Let's Encrypt SSL -------
 if [[ $NO_SSL -eq 1 ]]; then
@@ -1393,7 +1424,14 @@ fi
 log "Verifying services..."
 sudo nginx -t
 sudo -u postgres pg_isready -p "$PG_PORT"
-sudo supervisorctl status
+QUEUE_STATUS="$(sudo supervisorctl status 'chatterrow-queue:*')"
+QUEUE_RUNNING="$(printf '%s\n' "$QUEUE_STATUS" | awk '$2 == "RUNNING" { count++ } END { print count + 0 }')"
+[[ "$QUEUE_RUNNING" -eq 10 ]] || {
+    printf '%s\n' "$QUEUE_STATUS" >&2
+    die "Expected 10 running chatterrow queue workers, found $QUEUE_RUNNING"
+}
+printf '%s\n' "$QUEUE_STATUS"
+sudo supervisorctl status chatterrow-reverb chatterrow-schedule
 
 if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
     curl --resolve "$DOMAIN:443:127.0.0.1" -fsS -o /dev/null "https://$DOMAIN/up" || \

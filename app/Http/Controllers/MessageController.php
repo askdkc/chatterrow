@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\Server;
 use App\Models\StoredFile;
 use App\Models\User;
+use App\Support\BestEffortBroadcaster;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -15,6 +16,8 @@ use Illuminate\Validation\Rule;
 
 class MessageController extends Controller
 {
+    public function __construct(private BestEffortBroadcaster $broadcaster) {}
+
     public function index(Server $server, Channel $channel, Request $request): JsonResponse
     {
         abort_unless($channel->server_id === $server->id, 404);
@@ -87,7 +90,7 @@ class MessageController extends Controller
 
         $message->load(['user:id,name,email', 'attachments']);
 
-        broadcast(new MessageCreated($message))->toOthers();
+        $this->broadcaster->broadcastToOthers(new MessageCreated($message));
 
         return response()->json(['message' => $message], 201);
     }

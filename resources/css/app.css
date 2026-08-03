@@ -45,6 +45,15 @@
     --color-input: var(--input);
     --color-ring: var(--ring);
 
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-hover: var(--brand-hover);
+    --color-brand-accent: var(--brand-accent);
+    --color-brand-pink: var(--brand-pink);
+    --color-brand-pink-solid: var(--brand-pink-solid);
+    --color-success: var(--success);
+    --color-danger: var(--danger);
+
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
     --color-chart-3: var(--chart-3);
@@ -110,6 +119,14 @@
     --border: hsl(0 0% 92.8%);
     --input: hsl(0 0% 89.8%);
     --ring: hsl(0 0% 3.9%);
+    --brand: hsl(235 86% 65%);
+    --brand-foreground: hsl(0 0% 100%);
+    --brand-hover: hsl(235 52% 55%);
+    --brand-accent: hsl(235 65% 56%);
+    --brand-pink: hsl(332 68% 45%);
+    --brand-pink-solid: hsl(332 68% 42%);
+    --success: hsl(145 71% 30%);
+    --danger: hsl(359 59% 49%);
     --chart-1: hsl(12 76% 61%);
     --chart-2: hsl(173 58% 39%);
     --chart-3: hsl(197 37% 24%);
@@ -148,6 +165,14 @@
     --border: hsl(0 0% 14.9%);
     --input: hsl(0 0% 14.9%);
     --ring: hsl(0 0% 83.1%);
+    --brand: hsl(235 86% 65%);
+    --brand-foreground: hsl(0 0% 100%);
+    --brand-hover: hsl(235 52% 55%);
+    --brand-accent: hsl(235 89% 76%);
+    --brand-pink: hsl(331 85% 73%);
+    --brand-pink-solid: hsl(332 68% 42%);
+    --success: hsl(145 64% 39%);
+    --danger: hsl(359 59% 49%);
     --chart-1: hsl(220 70% 50%);
     --chart-2: hsl(160 60% 45%);
     --chart-3: hsl(30 80% 55%);
@@ -175,15 +200,15 @@
 
 /* Light palette for the Discord-inspired collaboration screens. */
 @layer utilities {
-    html:not(.dark) [class~='bg-[#313338]'] {
+    html:not(.dark) :where([class~='bg-[#313338]']) {
         background-color: #ffffff;
     }
 
-    html:not(.dark) [class~='bg-[#2b2d31]'] {
+    html:not(.dark) :where([class~='bg-[#2b2d31]']) {
         background-color: #f2f3f5;
     }
 
-    html:not(.dark) [class~='bg-[#383a40]'] {
+    html:not(.dark) :where([class~='bg-[#383a40]']) {
         background-color: #ebedef;
     }
 
@@ -193,21 +218,21 @@
         background-color: #dfe1e5;
     }
 
-    html:not(.dark) [class~='bg-[#1e1f22]'],
-    html:not(.dark) [class~='bg-[#232428]'] {
+    html:not(.dark) :where([class~='bg-[#1e1f22]']),
+    html:not(.dark) :where([class~='bg-[#232428]']) {
         background-color: #e3e5e8;
     }
 
-    html:not(.dark) [class~='text-[#dbdee1]'] {
+    html:not(.dark) :where([class~='text-[#dbdee1]']) {
         color: #2e3338;
     }
 
-    html:not(.dark) [class~='text-[#949ba4]'],
-    html:not(.dark) [class~='text-[#b5bac1]'] {
+    html:not(.dark) :where([class~='text-[#949ba4']]),
+    html:not(.dark) :where([class~='text-[#b5bac1']]) {
         color: #4e5058;
     }
 
-    html:not(.dark) [class~='text-[#80848e]'] {
+    html:not(.dark) :where([class~='text-[#80848e']]) {
         color: #6a6f78;
     }
 
@@ -219,15 +244,15 @@
         border-color: #6a6f78;
     }
 
-    html:not(.dark) [class~='bg-white/5'] {
+    html:not(.dark) :where([class~='bg-white/5']) {
         background-color: rgb(0 0 0 / 0.04);
     }
 
-    html:not(.dark) [class~='bg-white/10'] {
+    html:not(.dark) :where([class~='bg-white/10']) {
         background-color: rgb(0 0 0 / 0.08);
     }
 
-    html:not(.dark) [class~='bg-white/15'] {
+    html:not(.dark) :where([class~='bg-white/15']) {
         background-color: rgb(0 0 0 / 0.12);
     }
 

@@ -27,12 +27,16 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 | Database   | SQLiteまたはPostgreSQL                                        |
 | Realtime   | Laravel Reverb（WebSocket）                                   |
 | Preview    | Shiki / ONLYOFFICE / poppler / ImageMagick                    |
+| Conversion | Microsoft MarkItDown 0.1.7（PDF / DOCX / XLSX / PPTX）        |
+| Queue      | Redis / Laravel queue worker                                  |
 | Office     | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
 | Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot                  |
 
 ## 本番要件
 
 - Ubuntu 24.04 LTSまたはUbuntu 26.04 LTS（amd64）
+- PHP 8.5 CLI/FPMとRedis拡張
+- Python 3.10以上、MarkItDown 0.1.7、Redis Server
 - sudoを使用できる一般ユーザー。rootユーザーとして直接実行しないでください
 - 2 CPU、2 GB RAM、40 GB空きディスク以上
 - 4 GB以上のswapを推奨
@@ -73,13 +77,14 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 
 1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
 2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
-3. PostgreSQLをCPU数と搭載RAMに合わせて調整
-4. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
-5. アプリを`/var/www/chatterrow`へ配備し、依存関係、フロントエンド、マイグレーションを実行
-6. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
-7. Supervisorでキュー、Reverb、スケジューラを`www-data`として常駐
-8. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
-9. PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
+3. Python仮想環境`.markitdown/venv`へMarkItDown 0.1.7を構築し、`pip check`とCLIバージョンを検証
+4. PostgreSQLをCPU数と搭載RAMに合わせて調整
+5. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
+6. アプリを`/var/www/chatterrow`へ配備し、依存関係、フロントエンド、マイグレーションを実行
+7. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
+8. SupervisorでRedisキュー10プロセス、Reverb、スケジューラを`www-data`として常駐
+9. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
+10. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
 
 ## macOSローカルOnlyOffice
 
@@ -111,11 +116,11 @@ ONLYOFFICE_ALLOW_PRINT
 
 `setup.sh`は`valet`と`herd`コマンドの有無、`APP_URL/up`、`127.0.0.1:<ポート>/up`の応答を確認して接続方法を選択します。Valet/Herd側とartisan serve側の両方が応答する場合は、`APP_URL`のValet/Herd側を優先します。
 
-| 開発サーバー | `.env`の`APP_URL`例 | 自動設定される`APP_ONLYOFFICE_INTERNAL_URL` |
-|---|---|---|
-| Laravel Valet | `http://chatterrow.test` | `http://chatterrow.test` |
-| Laravel Herd | `http://chatterrow.test` | `http://chatterrow.test` |
-| `php artisan serve` | `http://localhost:8000` | `http://chatter-host.container.internal:8000` |
+| 開発サーバー        | `.env`の`APP_URL`例      | 自動設定される`APP_ONLYOFFICE_INTERNAL_URL`   |
+|---------------------|--------------------------|-----------------------------------------------|
+| Laravel Valet       | `http://chatterrow.test` | `http://chatterrow.test`                      |
+| Laravel Herd        | `http://chatterrow.test` | `http://chatterrow.test`                      |
+| `php artisan serve` | `http://localhost:8000`  | `http://chatter-host.container.internal:8000` |
 
 artisan serveを使う場合は、セットアップ前またはプレビューを開く前に起動します。
 
@@ -223,9 +228,9 @@ OnlyOffice 9.4のconverterは、Microsoft Officeの日本語テーマフォン�
 
 Microsoftの游明朝／游ゴシックは同梱・再配布しません。OnlyOfficeコンテナ内では次の代替設定を使用します。
 
-| Office指定フォント（DOCX / XLSX / PPTX） | 代替フォント |
-|---|---|
-| 游明朝 / Yu Mincho / MS Mincho | Noto Serif CJK JP |
+| Office指定フォント（DOCX / XLSX / PPTX）    | 代替フォント       |
+|---------------------------------------------|--------------------|
+| 游明朝 / Yu Mincho / MS Mincho              | Noto Serif CJK JP  |
 | 游ゴシック / Yu Gothic / Meiryo / MS Gothic | Source Han Sans JP |
 
 文字欠けと不適切な欧文フォントへの置換は解消しますが、游フォントとの字幅差があるため改行位置やページ数まで完全一致する保証はありません。完全一致が必要なら、利用許諾を確認した游フォント実体をOnlyOfficeのカスタムフォント領域へ別途配置してください。
@@ -259,19 +264,19 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 
 ### オプション
 
-| オプション                 | デフォルト         | 説明                              |
-|----------------------------|--------------------|-----------------------------------|
-| `--domain <domain>`        | 対話入力           | アプリの公開ドメイン              |
-| `--office-domain <domain>` | `office.<domain>`  | ONLYOFFICEの公開ドメイン          |
-| `--email <email>`          | 空                 | Let's Encrypt登録・期限通知メール |
-| `--database <driver>`      | 対話時は`sqlite`   | `sqlite`または`postgresql`        |
-| `--db-name <name>`         | `chatterrow`          | アプリ用PostgreSQL DB名           |
-| `--db-user <name>`         | `chatterrow`          | アプリ用PostgreSQLロール          |
-| `--db-password <password>` | 自動生成           | アプリ用PostgreSQLパスワード      |
-| `--app-dir <path>`         | `/var/www/chatterrow` | `/var/www`配下の配備先            |
-| `--repo <url>`             | GitHub SSH URL     | 配備するGitリポジトリ             |
+| オプション                   | デフォルト                         | 説明                                              |
+|------------------------------|------------------------------------|---------------------------------------------------|
+| `--domain <domain>`          | 対話入力                           | アプリの公開ドメイン                              |
+| `--office-domain <domain>`   | `office.<domain>`                  | ONLYOFFICEの公開ドメイン                          |
+| `--email <email>`            | 空                                 | Let's Encrypt登録・期限通知メール                 |
+| `--database <driver>`        | 対話時は`sqlite`                   | `sqlite`または`postgresql`                        |
+| `--db-name <name>`           | `chatterrow`                       | アプリ用PostgreSQL DB名                           |
+| `--db-user <name>`           | `chatterrow`                       | アプリ用PostgreSQLロール                          |
+| `--db-password <password>`   | 自動生成                           | アプリ用PostgreSQLパスワード                      |
+| `--app-dir <path>`           | `/var/www/chatterrow`              | `/var/www`配下の配備先                            |
+| `--repo <url>`               | GitHub SSH URL                     | 配備するGitリポジトリ                             |
 | `--onlyoffice-image <image>` | `onlyoffice/documentserver:latest` | macOSで毎回pullして使用するDocumentServerイメージ |
-| `--no-ssl`                 | off                | Certbotを省略しHTTPで構成         |
+| `--no-ssl`                   | off                                | Certbotを省略しHTTPで構成                         |
 
 同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`。
 
@@ -319,10 +324,10 @@ Ubuntu本番環境:
 
 macOSローカル環境:
 
-| ポート | 用途 | 公開範囲 |
-|---|---|---|
-| 8086 | Apple Container上のONLYOFFICE Document Server | `127.0.0.1`のみ |
-| 8000 | `php artisan serve`の既定ポート | `127.0.0.1`のみ |
+| ポート | 用途                                          | 公開範囲        |
+|--------|-----------------------------------------------|-----------------|
+| 8086   | Apple Container上のONLYOFFICE Document Server | `127.0.0.1`のみ |
+| 8000   | `php artisan serve`の既定ポート               | `127.0.0.1`のみ |
 
 Valet/Herd使用時、Laravelアプリは`APP_URL`のホスト名と通常のHTTP/HTTPSポートで動作します。artisan serveのポートは`APP_URL`または`MACOS_ARTISAN_PORT`から決定します。
 
@@ -341,10 +346,28 @@ sudo certbot renew --dry-run
 ### プロセス確認
 
 ```bash
-sudo supervisorctl status
-sudo supervisorctl restart chatterrow-queue chatterrow-reverb chatterrow-schedule
-sudo tail -f /var/log/chatterrow-*.log
+php8.5 --version
+php8.5 -m | grep -E 'redis|pdo_sqlite|pdo_pgsql'
+redis-cli ping
+sudo supervisorctl status 'chatterrow-queue:*'
+sudo supervisorctl restart 'chatterrow-queue:*'
+sudo supervisorctl restart chatterrow-reverb chatterrow-schedule
+sudo tail -f /var/log/chatterrow-queue_*.log /var/log/chatterrow-queue-error_*.log
 ```
+
+Queueワーカーは`/usr/bin/php8.5 artisan queue:work redis --sleep=3 --tries=5 --max-time=3600`を10プロセスで実行します。10件すべてが`RUNNING`であることを確認してください。
+
+### Markdown変換の再処理
+
+失敗したファイルと、一定時間更新されていない`pending`／`processing`ファイルを再投入します。
+
+```bash
+php artisan files:markdown
+php artisan files:markdown --server=1 --stale-after=900
+php artisan queue:work redis --once
+```
+
+`files:markdown`は旧Office形式（DOC、XLS、PPT、ODF）をMarkdown変換対象にしません。これらのONLYOFFICEプレビュー機能は引き続き利用できます。
 
 ### アプリ更新
 
@@ -364,6 +387,7 @@ sudo install -d /backup
 sudo -u www-data sqlite3 /var/www/chatterrow/database/database.sqlite \
     ".backup /backup/chatterrow-$(date +%F).sqlite"
 sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
+sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
 ```
 
 PostgreSQL:
@@ -372,6 +396,7 @@ PostgreSQL:
 sudo install -d /backup
 sudo -u postgres pg_dump --format=custom chatterrow > /backup/chatterrow-$(date +%F).dump
 sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
+sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
 ```
 
 ## 主な環境変数
@@ -380,6 +405,10 @@ sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 |----------------------------------|--------------------------------------------------------|
 | `APP_URL`                        | アプリの公開URL                                        |
 | `DB_CONNECTION`                  | `sqlite`または`pgsql`                                  |
+| `QUEUE_CONNECTION`               | Redisキュー（`redis`）                                 |
+| `MARKITDOWN_PATH`                | MarkItDown CLIのパス。未指定時は`.markitdown/venv`内   |
+| `MARKITDOWN_TIMEOUT`             | 1ファイルあたりの変換タイムアウト秒数                  |
+| `MARKITDOWN_PYTHON_MIN_VERSION`  | MarkItDown環境に必要なPythonの最低バージョン（3.10）   |
 | `REVERB_APP_ID/KEY/SECRET`       | Reverb認証情報                                         |
 | `REVERB_HOST/PORT/SCHEME`        | ブラウザとLaravelが接続する公開WebSocket               |
 | `REVERB_SERVER_HOST/PORT`        | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
@@ -390,20 +419,23 @@ sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 
 ## トラブルシューティング
 
-| 症状                         | 確認                                                                     |
-|------------------------------|--------------------------------------------------------------------------|
-| 502 Bad Gateway              | `sudo systemctl status php*-fpm`、`sudo nginx -t`                        |
-| リアルタイム更新されない     | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続 |
-| 添付プレビューが生成されない | `/var/log/chatterrow-queue-error.log`、ONLYOFFICE/Poppler/ImageMagick       |
-| Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL、`php artisan files:previews` |
-| Officeプレビューが開かない（macOS） | `curl http://127.0.0.1:8086/healthcheck`、JWT秘密鍵、`APP_ONLYOFFICE_INTERNAL_URL`、コンテナ内から`/up`への到達性 |
-| PostgreSQLへ接続できない     | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`  |
-| 証明書を発行できない         | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                  |
+| 症状                                 | 確認                                                                                                              |
+|--------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| 502 Bad Gateway                      | `sudo systemctl status php*-fpm`、`sudo nginx -t`                                                                 |
+| リアルタイム更新されない             | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続                                       |
+| 添付プレビューが生成されない         | `/var/log/chatterrow-queue-error_*.log`、ONLYOFFICE/Poppler/ImageMagick                                           |
+| Markdown変換に失敗する               | `storage/logs/laravel.log`、`/var/log/chatterrow-queue-error_*.log`、`php artisan files:markdown`                 |
+| Redisキューが処理されない            | `redis-cli ping`、`php8.5 -m`の`redis`、`sudo supervisorctl status 'chatterrow-queue:*'`                          |
+| Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL、`php artisan files:previews`                  |
+| Officeプレビューが開かない（macOS）  | `curl http://127.0.0.1:8086/healthcheck`、JWT秘密鍵、`APP_ONLYOFFICE_INTERNAL_URL`、コンテナ内から`/up`への到達性 |
+| PostgreSQLへ接続できない             | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`                                        |
+| 証明書を発行できない                 | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                                                           |
 
 ## ローカル開発
 
 ```bash
 composer install
+composer markitdown:install
 cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
@@ -417,12 +449,16 @@ npm run dev
 ```bash
 php artisan serve
 php artisan reverb:start --port=8081
+php artisan queue:work redis
 ```
+
+Redis Serverが起動していない場合は、macOSでは`brew services start redis`、Ubuntuでは`sudo systemctl enable --now redis-server`を実行してください。
 
 検証:
 
 ```bash
 php artisan test
+php artisan files:markdown
 npm run test:unit
 npm run lint:check
 npm run types:check

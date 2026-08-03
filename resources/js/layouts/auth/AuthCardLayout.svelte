@@ -31,10 +31,8 @@
             href={home()}
             class="flex items-center gap-2 self-center font-medium"
         >
-            <div class="flex h-9 w-9 items-center justify-center">
-                <AppLogoIcon
-                    class="size-9 fill-current text-black dark:text-white"
-                />
+            <div class="size-12 overflow-hidden rounded-xl">
+                <AppLogoIcon class="size-12" />
             </div>
         </Link>
 

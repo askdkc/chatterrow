@@ -39,6 +39,7 @@
     let editingTodo = $state<TodoResource | null>(null);
     let collapsed = $state(false);
     let expandedTodoIds = $state<number[]>([]);
+    let hoveredTodoIds = $state<number[]>([]);
     let error = $state('');
     const allTodosExpanded = $derived(
         todos.length > 0 &&
@@ -60,13 +61,26 @@
     }
 
     function isTodoCollapsed(todoId: number): boolean {
-        return !expandedTodoIds.includes(todoId);
+        return (
+            !expandedTodoIds.includes(todoId) &&
+            !hoveredTodoIds.includes(todoId)
+        );
+    }
+
+    function hoverTodo(todoId: number) {
+        if (!hoveredTodoIds.includes(todoId)) {
+            hoveredTodoIds = [...hoveredTodoIds, todoId];
+        }
+    }
+
+    function unhoverTodo(todoId: number) {
+        hoveredTodoIds = hoveredTodoIds.filter((id) => id !== todoId);
     }
 
     function toggleTodoDetails(todoId: number) {
-        expandedTodoIds = isTodoCollapsed(todoId)
-            ? [...expandedTodoIds, todoId]
-            : expandedTodoIds.filter((id) => id !== todoId);
+        expandedTodoIds = expandedTodoIds.includes(todoId)
+            ? expandedTodoIds.filter((id) => id !== todoId)
+            : [...expandedTodoIds, todoId];
     }
 
     function toggleAllTodoDetails() {
@@ -103,6 +117,7 @@
             );
             todos = todos.filter((t) => t.id !== todo.id);
             expandedTodoIds = expandedTodoIds.filter((id) => id !== todo.id);
+            hoveredTodoIds = hoveredTodoIds.filter((id) => id !== todo.id);
         } catch (e) {
             error =
                 e instanceof HttpError ? e.messageText() : '削除に失敗しました';
@@ -118,14 +133,16 @@
     class={`flex shrink-0 flex-col border-l border-black/10 bg-[#2b2d31] transition-[width] duration-200 dark:border-black/20 ${collapsed ? 'w-12' : 'w-72'}`}
 >
     <div
-        class={`flex h-12 items-center border-b border-black/10 dark:border-black/20 ${collapsed ? 'justify-center px-1' : 'gap-2 px-4'}`}
+        class={`flex h-12 items-center border-b border-black/10 dark:border-black/20 ${collapsed ? 'justify-center px-1' : 'gap-1 px-4'}`}
     >
-        <ListTodo class="h-4 w-4 text-[#80848e]" />
+        <ListTodo class="h-4 w-4 shrink-0 text-[#80848e]" />
         {#if !collapsed}
-            <span class="text-sm font-bold">タスク</span>
+            <span class="shrink-0 whitespace-nowrap text-sm font-bold"
+                >タスク</span
+            >
             <button
                 type="button"
-                class="ml-auto flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] disabled:cursor-default disabled:opacity-40"
+                class="ml-auto flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium whitespace-nowrap text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] disabled:cursor-default disabled:opacity-40"
                 aria-label={allTodosExpanded
                     ? 'タスクをすべて折りたたむ'
                     : 'タスクをすべて展開'}
@@ -143,13 +160,15 @@
                     全て展開
                 {/if}
             </button>
-            <span class="rounded-full bg-white/10 px-2 py-0.5 text-xs">
+            <span
+                class="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-xs"
+            >
                 {todos.filter((t) => !t.completed_at).length} 未完了
             </span>
         {/if}
         <button
             type="button"
-            class={`rounded p-1 text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] ${collapsed ? '' : 'ml-1'}`}
+            class={`shrink-0 rounded p-1 text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] ${collapsed ? '' : 'ml-1'}`}
             aria-label={collapsed ? 'タスクを展開' : 'タスクを折りたたむ'}
             title={collapsed ? 'タスクを展開' : 'タスクを折りたたむ'}
             onclick={() => (collapsed = !collapsed)}
@@ -184,6 +203,9 @@
                 <div
                     class="group mb-2 rounded-lg bg-[#383a40] p-3 transition hover:bg-[#404249]"
                     class:opacity-60={Boolean(todo.completed_at)}
+                    role="group"
+                    onmouseenter={() => hoverTodo(todo.id)}
+                    onmouseleave={() => unhoverTodo(todo.id)}
                 >
                     <div class="flex items-start gap-2">
                         <button

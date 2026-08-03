@@ -12,6 +12,19 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      RUN_REDIS_INTEGRATION_TESTS: '1'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -22,9 +35,15 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
+          extensions: redis
           tools: composer:v2
           coverage: none
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -33,6 +52,14 @@ jobs:
 
       - name: Setup Application
         run: composer setup
+
+      - name: Create MarkItDown fixtures
+        run: .markitdown/venv/bin/python scripts/create-markitdown-fixtures.py
+
+      - name: Verify MarkItDown environment
+        run: |
+          .markitdown/venv/bin/python -m pip check
+          .markitdown/venv/bin/markitdown --version
 
       - name: Run CI Checks
         run: composer ci:check

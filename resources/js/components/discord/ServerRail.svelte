@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import { Compass, Plus, Settings } from 'lucide-svelte';
+    import { Plus, Settings } from 'lucide-svelte';
+    import AppLogoIcon from '@/components/AppLogoIcon.svelte';
     import type { ServerResource } from '@/types';
 
     let {
@@ -17,30 +18,30 @@
 
     let collapsed = $state(true);
 
-    function handleRailClick(event: MouseEvent) {
-        if (event.target === event.currentTarget) {
-            collapsed = !collapsed;
-        }
+    function expandRail() {
+        collapsed = false;
+    }
+
+    function collapseRail() {
+        collapsed = true;
     }
 </script>
 
-<!-- The empty rail area intentionally expands the collapsed project rail. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <nav
     class={`flex h-full shrink-0 flex-col gap-2 overflow-y-auto bg-[#1e1f22] py-3 transition-[width] duration-200 dark:bg-[#1e1f22] light:bg-[#e3e5e8] ${collapsed ? 'w-[72px] items-center' : 'w-60 items-stretch'}`}
     aria-label="プロジェクト一覧"
-    onclick={handleRailClick}
+    onmouseenter={expandRail}
+    onmouseleave={collapseRail}
 >
     <!-- Home / browse -->
     <button
         type="button"
-        class={`group relative mx-2 flex h-12 items-center rounded-2xl text-[#dbdee1] transition-all hover:rounded-xl ${collapsed ? 'w-12 justify-center' : 'justify-start gap-2 px-3'} ${!activeServerId ? 'bg-white/80 shadow-sm dark:bg-[#5865f2] dark:text-white' : 'hover:bg-white/70 dark:hover:bg-[#5865f2] dark:hover:text-white'}`}
+        class={`group relative mx-2 flex h-10 items-center rounded-2xl text-[#dbdee1] transition-all hover:rounded-xl ${collapsed ? 'w-12 justify-center' : 'justify-start gap-2 px-3'} ${!activeServerId ? 'bg-white/80 shadow-sm dark:bg-[#5865f2] dark:text-white' : 'hover:bg-white/70 dark:hover:bg-[#5865f2] dark:hover:text-white'}`}
         class:rounded-xl={!activeServerId}
         onclick={onBrowse}
         title="プロジェクト一覧"
     >
-        <Compass class="h-6 w-6" />
+        <AppLogoIcon class="size-8 rounded-lg" />
         {#if !collapsed}
             <span class="truncate text-sm font-semibold">プロジェクト一覧</span>
         {/if}

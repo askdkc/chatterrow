@@ -6,6 +6,7 @@ use App\Events\TodoUpdated;
 use App\Models\Channel;
 use App\Models\Server;
 use App\Models\Todo;
+use App\Support\BestEffortBroadcaster;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class TodoController extends Controller
 {
+    public function __construct(private BestEffortBroadcaster $broadcaster) {}
+
     public function index(Server $server, Channel $channel, Request $request): JsonResponse
     {
         abort_unless($channel->server_id === $server->id, 404);
@@ -66,7 +69,7 @@ class TodoController extends Controller
 
         $todo->load(['assignee:id,name,email', 'creator:id,name,email']);
 
-        broadcast(new TodoUpdated($todo))->toOthers();
+        $this->broadcaster->broadcastToOthers(new TodoUpdated($todo));
 
         return response()->json(['todo' => $todo], 201);
     }
@@ -105,7 +108,7 @@ class TodoController extends Controller
 
         $todo->load(['assignee:id,name,email', 'creator:id,name,email']);
 
-        broadcast(new TodoUpdated($todo))->toOthers();
+        $this->broadcaster->broadcastToOthers(new TodoUpdated($todo));
 
         return response()->json(['todo' => $todo]);
     }
@@ -121,7 +124,7 @@ class TodoController extends Controller
 
         $todo->load(['assignee:id,name,email', 'creator:id,name,email']);
 
-        broadcast(new TodoUpdated($todo))->toOthers();
+        $this->broadcaster->broadcastToOthers(new TodoUpdated($todo));
 
         return response()->json(['todo' => $todo]);
     }

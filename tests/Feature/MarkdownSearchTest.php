@@ -63,7 +63,7 @@ class MarkdownSearchTest extends TestCase
         $file = StoredFile::factory()->create([
             'server_id' => $this->server->id,
             'uploaded_by' => $this->owner->id,
-            'original_name' => 'メモ.txt',
+            'original_name' => 'メモ.pdf',
             'markdown_status' => 'ready',
             'markdown_path' => '2-abc.md',
         ]);
@@ -76,12 +76,31 @@ class MarkdownSearchTest extends TestCase
             ->assertJsonPath('results.0.id', $file->id);
     }
 
+    public function test_indexed_content_is_hidden_until_markdown_is_ready(): void
+    {
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'processing.pdf',
+            'markdown_status' => 'processing',
+            'markdown_path' => null,
+        ]));
+
+        app(MarkdownSearchIndex::class)->index($file->id, '本文はまだ公開されていません');
+
+        $this->assertCount(0, app(MarkdownSearchIndex::class)->search($this->server->id, '公開'));
+
+        $file->update(['markdown_status' => 'ready', 'markdown_path' => 'processing.md']);
+
+        $this->assertCount(1, app(MarkdownSearchIndex::class)->search($this->server->id, '公開'));
+    }
+
     public function test_non_sqlite_fallback_searches_long_queries_without_fts(): void
     {
         $file = StoredFile::factory()->create([
             'server_id' => $this->server->id,
             'uploaded_by' => $this->owner->id,
-            'original_name' => 'portable.txt',
+            'original_name' => 'portable.pdf',
             'markdown_status' => 'ready',
             'markdown_path' => 'portable.md',
         ]);
@@ -111,7 +130,7 @@ class MarkdownSearchTest extends TestCase
         $file = StoredFile::factory()->create([
             'server_id' => $this->server->id,
             'uploaded_by' => $this->owner->id,
-            'original_name' => 'large.txt',
+            'original_name' => 'large.pdf',
             'markdown_status' => 'ready',
             'markdown_path' => 'large.md',
         ]);

@@ -39,8 +39,13 @@ return [
     ],
 
     'markitdown' => [
-        'path' => env('MARKITDOWN_PATH', base_path('.markitdown/venv/bin/markitdown')),
+        'path' => env(
+            'MARKITDOWN_PATH',
+            base_path('.markitdown/venv/'.(PHP_OS_FAMILY === 'Windows' ? 'Scripts/markitdown.exe' : 'bin/markitdown')),
+        ),
         'timeout' => (int) env('MARKITDOWN_TIMEOUT', 180),
+        'python_min_version' => env('MARKITDOWN_PYTHON_MIN_VERSION', '3.10'),
+        'stale_after' => (int) env('MARKITDOWN_STALE_AFTER', 900),
     ],
 
     'slack' => [
