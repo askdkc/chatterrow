@@ -61,15 +61,8 @@
                 <InputError message={errors.email} />
             </div>
 
-            <div class="grid gap-2">
-                <div class="flex items-center justify-between">
-                    <Label for="password">{t('Password')}</Label>
-                    {#if canResetPassword}
-                        <TextLink href={request()} class="text-sm">
-                            {t('Forgot your password?')}
-                        </TextLink>
-                    {/if}
-                </div>
+            <div class="relative grid gap-2">
+                <Label for="password">{t('Password')}</Label>
                 <PasswordInput
                     id="password"
                     name="password"
@@ -77,6 +70,14 @@
                     autocomplete="current-password"
                     placeholder={t('Password')}
                 />
+                {#if canResetPassword}
+                    <TextLink
+                        href={request()}
+                        class="absolute top-0 right-0 text-sm"
+                    >
+                        {t('Forgot your password?')}
+                    </TextLink>
+                {/if}
                 <InputError message={errors.password} />
             </div>
 
