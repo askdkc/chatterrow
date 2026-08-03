@@ -15,6 +15,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog from '@/components/files/StoredFilePreviewDialog.svelte';
+    import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
     import type {
@@ -109,18 +110,6 @@
         }
 
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
-    function formatDate(iso: string | null): string {
-        if (!iso) {
-            return '';
-        }
-
-        return new Date(iso).toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
     }
 
     async function uploadFiles(fileList: FileList | File[] | null) {
@@ -298,8 +287,6 @@
         window.location.href = '/servers';
     }
 
-    function onAddChannel() {}
-
     function onManageMembers() {
         showMemberDialog = true;
     }
@@ -318,7 +305,6 @@
         {channels}
         {members}
         activeChannelId={channel?.id ?? null}
-        {onAddChannel}
         {onManageMembers}
     />
 

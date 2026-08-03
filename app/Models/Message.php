@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $parent_id
  * @property string $body
  * @property bool $is_reminder
+ * @property string|null $reminder_key
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Server $server
@@ -29,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Message> $replies
  * @property-read Collection<int, StoredFile> $attachments
  */
-#[Fillable(['server_id', 'channel_id', 'user_id', 'parent_id', 'body', 'is_reminder'])]
+#[Fillable(['server_id', 'channel_id', 'user_id', 'parent_id', 'body', 'is_reminder', 'reminder_key'])]
 class Message extends Model
 {
     /** @use HasFactory<MessageFactory> */
@@ -69,5 +70,13 @@ class Message extends Model
     public function attachments(): MorphMany
     {
         return $this->morphMany(StoredFile::class, 'attachable');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'is_reminder' => 'boolean',
+        ];
     }
 }

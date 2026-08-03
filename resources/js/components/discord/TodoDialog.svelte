@@ -1,6 +1,13 @@
 <script lang="ts">
     import { Loader2, Plus, X } from 'lucide-svelte';
     import TimePicker from '@/components/ui/TimePicker.svelte';
+    import {
+        dateInputValue,
+        dateValue,
+        localDateTimeIso,
+        timeInputValue,
+        timeValue,
+    } from '@/lib/dates';
     import { apiJson, HttpError } from '@/lib/http';
     import type { TodoResource } from '@/types';
 
@@ -32,38 +39,6 @@
         return new Date(next);
     }
 
-    function dateValue(value: Date): string {
-        const pad = (part: number) => String(part).padStart(2, '0');
-
-        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
-    }
-
-    function timeValue(value: Date): string {
-        const pad = (part: number) => String(part).padStart(2, '0');
-
-        return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
-    }
-
-    function dateInputValue(value: string | null): string {
-        if (!value) {
-            return '';
-        }
-
-        const parsed = new Date(value);
-
-        return Number.isNaN(parsed.getTime()) ? '' : dateValue(parsed);
-    }
-
-    function timeInputValue(value: string | null): string {
-        if (!value) {
-            return '';
-        }
-
-        const parsed = new Date(value);
-
-        return Number.isNaN(parsed.getTime()) ? '' : timeValue(parsed);
-    }
-
     const nextStart = nextHalfHour();
     const initialStartDate = $derived(
         channelStartsOn && channelStartsOn > dateValue(nextStart)
@@ -85,11 +60,7 @@
         todo ? timeInputValue(todo.starts_at) : timeValue(initialStart),
     );
     let dueOn = $derived(
-        todo
-            ? todo.due_at
-                ? dateInputValue(todo.due_at)
-                : (todo.due_on ?? '')
-            : dateValue(initialDue),
+        todo ? dateInputValue(todo.due_at) : dateValue(initialDue),
     );
     let dueTime = $derived(
         todo ? timeInputValue(todo.due_at) : timeValue(initialDue),
@@ -106,10 +77,6 @@
     let details = $derived(todo?.details ?? '');
     let saving = $state(false);
     let error = $state('');
-
-    function dateTime(date: string, time: string): string | null {
-        return date ? `${date}T${time || '00:00'}` : null;
-    }
 
     function syncDueFromStart() {
         if (dueManuallyEdited || !startsOn || !startsTime) {
@@ -140,6 +107,23 @@
         error = '';
 
         try {
+            const startsAt = localDateTimeIso(startsOn, startsTime);
+            const startChanged = todo
+                ? dateInputValue(todo.starts_at) !== startsOn ||
+                  timeInputValue(todo.starts_at) !== startsTime
+                : true;
+            const submittedStartsAt =
+                todo && !startChanged ? todo.starts_at : startsAt;
+            const dueAt = localDateTimeIso(dueOn, dueTime);
+            const deadlineChanged = todo
+                ? dateInputValue(todo.due_at) !== dueOn ||
+                  timeInputValue(todo.due_at) !== dueTime
+                : true;
+            const submittedDueAt =
+                todo && !deadlineChanged ? todo.due_at : dueAt;
+            const browserTimezone =
+                Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
             const data = await apiJson<{ todo: TodoResource }>(
                 todo
                     ? `/servers/${serverId}/channels/${channelId}/todos/${todo.id}`
@@ -148,8 +132,12 @@
                     method: todo ? 'PATCH' : 'POST',
                     body: JSON.stringify({
                         title: trimmedTitle,
-                        starts_at: dateTime(startsOn, startsTime),
-                        due_at: dateTime(dueOn, dueTime),
+                        starts_at: submittedStartsAt,
+                        due_at: submittedDueAt,
+                        due_timezone:
+                            todo && !deadlineChanged
+                                ? todo.due_timezone
+                                : browserTimezone,
                         priority,
                         details: details.trim() || null,
                     }),

@@ -87,7 +87,7 @@ class MarkdownedDocGenerator
 
             if (isset(self::LIBREOFFICE_TARGETS[$extension])) {
                 $targetExtension = self::LIBREOFFICE_TARGETS[$extension];
-                $convertedPath = $workDir.'/'.pathinfo($storedFile->original_name, PATHINFO_FILENAME).'.'.$targetExtension;
+                $convertedPath = $workDir.'/'.pathinfo($sourcePath, PATHINFO_FILENAME).'.'.$targetExtension;
                 $result = Process::timeout((int) config('services.libreoffice.timeout', 120))->run([
                     config('services.libreoffice.path', 'soffice'),
                     '--headless',

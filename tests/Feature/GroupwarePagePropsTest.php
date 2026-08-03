@@ -136,6 +136,23 @@ class GroupwarePagePropsTest extends TestCase
                 ->has('auth.servers', 1));
     }
 
+    public function test_gantt_todo_payload_preserves_absolute_timestamps_for_local_calendar_projection(): void
+    {
+        $todo = Todo::query()->where('channel_id', $this->channel->id)->firstOrFail();
+        $todo->update([
+            'starts_at' => '2026-08-02T15:30:00Z',
+            'due_at' => '2026-08-02T15:30:00Z',
+        ]);
+
+        $this->actingAs($this->member)
+            ->get(route('servers.gantt', $this->server))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tasks.1.id', "todo-{$todo->id}")
+                ->where('tasks.1.start', '2026-08-02T15:30:00.000000Z')
+                ->where('tasks.1.end', '2026-08-02T15:30:00.000000Z'));
+    }
+
     public function test_files_page_has_server_channels_members_files_and_shared_rail(): void
     {
         $this->actingAs($this->member)

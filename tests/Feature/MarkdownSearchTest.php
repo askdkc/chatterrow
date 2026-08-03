@@ -76,6 +76,58 @@ class MarkdownSearchTest extends TestCase
             ->assertJsonPath('results.0.id', $file->id);
     }
 
+    public function test_non_sqlite_fallback_searches_long_queries_without_fts(): void
+    {
+        $file = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'portable.txt',
+            'markdown_status' => 'ready',
+            'markdown_path' => 'portable.md',
+        ]);
+        $index = new class extends MarkdownSearchIndex
+        {
+            protected function usesSqliteFts(): bool
+            {
+                return false;
+            }
+        };
+
+        $index->index($file->id, 'Portable database search works without SQLite FTS.');
+
+        $results = $index->search($this->server->id, 'database search');
+
+        $this->assertCount(1, $results);
+        $this->assertSame($file->id, $results->first()->id);
+        $this->assertStringContainsString('<mark>database search</mark>', $results->first()->snippet);
+
+        $index->remove($file->id);
+
+        $this->assertCount(0, $index->search($this->server->id, 'database search'));
+    }
+
+    public function test_like_fallback_escapes_wildcards_and_limits_snippets(): void
+    {
+        $file = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'large.txt',
+            'markdown_status' => 'ready',
+            'markdown_path' => 'large.md',
+        ]);
+        $content = str_repeat('a', 50_000).' 50% complete '.str_repeat('b', 50_000);
+        $index = app(MarkdownSearchIndex::class);
+        $index->index($file->id, $content);
+
+        $this->assertCount(0, $index->search($this->server->id, '_'));
+
+        $results = $index->search($this->server->id, '%');
+
+        $this->assertCount(1, $results);
+        $this->assertStringContainsString('<mark>%</mark>', $results->first()->snippet);
+        $this->assertLessThan(500, strlen($results->first()->snippet));
+    }
+
     public function test_search_never_leaks_files_from_other_servers(): void
     {
         $other = Server::factory()->create(['created_by' => $this->owner->id]);

@@ -23,21 +23,11 @@
     } from '@/lib/gantt';
     import { buildGanttPdf } from '@/lib/gantt-pdf';
     import type {
-        ServerResource,
         ChannelResource,
+        GanttTask,
+        ServerResource,
         UserResource,
     } from '@/types';
-
-    interface GanttTask {
-        id: string;
-        type: 'channel' | 'todo';
-        title: string;
-        start: string | null;
-        end: string | null;
-        channel_id: number;
-        channel_name: string;
-        completed?: boolean;
-    }
 
     let {
         server,
@@ -165,8 +155,6 @@
         window.location.href = '/servers';
     }
 
-    function onAddChannel() {}
-
     function onManageMembers() {
         showMemberDialog = true;
     }
@@ -213,7 +201,6 @@
         {channels}
         {members}
         activeChannelId={null}
-        {onAddChannel}
         {onManageMembers}
     />
 

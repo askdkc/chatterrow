@@ -6,8 +6,11 @@ use App\Models\Channel;
 use App\Models\Message;
 use App\Models\Server;
 use App\Models\StoredFile;
+use App\Models\Todo;
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Tests\TestCase;
 
@@ -86,6 +89,354 @@ class GroupwareMutationAuthorizationTest extends TestCase
         ]);
     }
 
+    public function test_owner_cannot_remove_a_member_assigned_to_a_todo_in_the_server(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'assignee_id' => $this->member->id,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->deleteJson(route('servers.members.destroy', [$this->server, $this->member]))
+            ->assertConflict();
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->member->id,
+        ]);
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'assignee_id' => $this->member->id,
+        ]);
+    }
+
+    public function test_owner_can_remove_an_unassigned_non_owner_member(): void
+    {
+        $this->actingAs($this->owner)
+            ->deleteJson(route('servers.members.destroy', [$this->server, $this->member]))
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertDatabaseMissing('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->member->id,
+        ]);
+    }
+
+    public function test_channel_start_only_update_rejects_an_effective_invalid_date_range(): void
+    {
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'starts_on' => '2026-08-10',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'name' => $this->channel->name,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_channel_end_only_update_rejects_an_effective_invalid_date_range(): void
+    {
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'ends_on' => '2026-07-31',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'name' => $this->channel->name,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_channel_create_rejects_an_offset_start_date_without_persisting(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson(route('servers.channels.store', $this->server), [
+                'name' => 'offset-start-channel',
+                'starts_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_on');
+
+        $this->assertDatabaseMissing('channels', [
+            'server_id' => $this->server->id,
+            'name' => 'offset-start-channel',
+        ]);
+    }
+
+    public function test_channel_create_rejects_an_offset_end_date_without_persisting(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson(route('servers.channels.store', $this->server), [
+                'name' => 'offset-end-channel',
+                'ends_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseMissing('channels', [
+            'server_id' => $this->server->id,
+            'name' => 'offset-end-channel',
+        ]);
+    }
+
+    public function test_channel_update_rejects_an_offset_start_date_without_changing_the_stored_range(): void
+    {
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'starts_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_on');
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_channel_update_rejects_an_offset_end_date_without_changing_the_stored_range(): void
+    {
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'ends_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_channel_update_preserves_explicit_null_clearing_and_equal_dates(): void
+    {
+        $this->channel->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'starts_on' => null,
+                'ends_on' => null,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'starts_on' => null,
+            'ends_on' => null,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.channels.update', [$this->server, $this->channel]), [
+                'name' => $this->channel->name,
+                'starts_on' => '2026-08-05',
+                'ends_on' => '2026-08-05',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('channels', [
+            'id' => $this->channel->id,
+            'starts_on' => '2026-08-05',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_server_start_only_update_rejects_an_effective_invalid_date_range(): void
+    {
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'starts_on' => '2026-08-10',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'name' => $this->server->name,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_server_end_only_update_rejects_an_effective_invalid_date_range(): void
+    {
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'ends_on' => '2026-07-31',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'name' => $this->server->name,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_server_create_rejects_an_offset_start_date_without_persisting(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson(route('servers.store'), [
+                'name' => 'offset-start-server',
+                'starts_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_on');
+
+        $this->assertDatabaseMissing('servers', [
+            'name' => 'offset-start-server',
+        ]);
+    }
+
+    public function test_server_create_rejects_an_offset_end_date_without_persisting(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson(route('servers.store'), [
+                'name' => 'offset-end-server',
+                'ends_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseMissing('servers', [
+            'name' => 'offset-end-server',
+        ]);
+    }
+
+    public function test_server_update_rejects_an_offset_start_date_without_changing_the_stored_range(): void
+    {
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'starts_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_on');
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_server_update_rejects_an_offset_end_date_without_changing_the_stored_range(): void
+    {
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'ends_on' => '2026-08-02T23:00:00-10:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ends_on');
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
+    public function test_server_update_preserves_explicit_null_clearing_and_equal_dates(): void
+    {
+        $this->server->update([
+            'starts_on' => '2026-08-01',
+            'ends_on' => '2026-08-05',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'starts_on' => null,
+                'ends_on' => null,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'starts_on' => null,
+            'ends_on' => null,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => $this->server->name,
+                'starts_on' => '2026-08-05',
+                'ends_on' => '2026-08-05',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $this->server->id,
+            'starts_on' => '2026-08-05',
+            'ends_on' => '2026-08-05',
+        ]);
+    }
+
     public function test_member_can_create_a_message_in_a_channel(): void
     {
         $this->actingAs($this->member)
@@ -127,6 +478,180 @@ class GroupwareMutationAuthorizationTest extends TestCase
         ]);
     }
 
+    public function test_todo_creation_defaults_due_timezone_to_the_app_timezone(): void
+    {
+        config(['app.timezone' => 'Asia/Tokyo']);
+
+        $this->actingAs($this->member)
+            ->postJson(route('servers.channels.todos.store', [$this->server, $this->channel]), [
+                'title' => 'Tokyo task',
+                'due_at' => '2026-08-03T00:30:00Z',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('todo.due_timezone', 'Asia/Tokyo');
+
+        $this->assertDatabaseHas('todos', [
+            'channel_id' => $this->channel->id,
+            'title' => 'Tokyo task',
+            'due_timezone' => 'Asia/Tokyo',
+        ]);
+    }
+
+    public function test_todo_due_timezone_must_be_valid_on_create_and_update(): void
+    {
+        $this->actingAs($this->member)
+            ->postJson(route('servers.channels.todos.store', [$this->server, $this->channel]), [
+                'title' => 'invalid timezone',
+                'due_timezone' => 'Mars/Olympus',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('due_timezone');
+
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'due_timezone' => 'Asia/Tokyo',
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'due_timezone' => 'Mars/Olympus',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('due_timezone');
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'due_timezone' => 'Asia/Tokyo',
+        ]);
+    }
+
+    public function test_todo_timezone_is_preserved_when_omitted_and_clears_marker_when_changed(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'due_timezone' => 'Asia/Tokyo',
+            'reminded_at' => now(),
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'title' => 'title only',
+            ])
+            ->assertOk()
+            ->assertJsonPath('todo.due_timezone', 'Asia/Tokyo');
+
+        $this->assertNotNull($todo->fresh()->reminded_at);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'due_timezone' => 'America/Los_Angeles',
+            ])
+            ->assertOk()
+            ->assertJsonPath('todo.due_timezone', 'America/Los_Angeles');
+
+        $this->assertNull($todo->fresh()->reminded_at);
+    }
+
+    public function test_todo_assignee_must_belong_to_the_server(): void
+    {
+        $this->actingAs($this->member)
+            ->postJson(route('servers.channels.todos.store', [$this->server, $this->channel]), [
+                'title' => 'private assignment',
+                'assignee_id' => $this->outsider->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('assignee_id');
+
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'assignee_id' => $this->member->id,
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'assignee_id' => $this->outsider->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('assignee_id');
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'assignee_id' => $this->member->id,
+        ]);
+    }
+
+    public function test_todo_create_rechecks_assignee_membership_after_validation(): void
+    {
+        $membershipQueryObserved = false;
+        $memberRemoved = false;
+        $serverId = $this->server->id;
+        $memberId = $this->member->id;
+
+        DB::listen(function (QueryExecuted $query) use (&$membershipQueryObserved, &$memberRemoved, $serverId, $memberId): void {
+            if ($memberRemoved || ! str_contains(strtolower($query->sql), 'server_user') || ! str_contains(strtolower($query->sql), 'count')) {
+                return;
+            }
+
+            $membershipQueryObserved = true;
+            $memberRemoved = true;
+
+            DB::table('server_user')
+                ->where('server_id', $serverId)
+                ->where('user_id', $memberId)
+                ->delete();
+        });
+
+        $response = $this->actingAs($this->member)
+            ->postJson(route('servers.channels.todos.store', [$this->server, $this->channel]), [
+                'title' => 'racing assignment',
+                'assignee_id' => $this->member->id,
+            ]);
+
+        $this->assertTrue($membershipQueryObserved);
+        $this->assertTrue($memberRemoved);
+        $response->assertUnprocessable()->assertJsonValidationErrors('assignee_id');
+        $this->assertDatabaseMissing('todos', ['title' => 'racing assignment']);
+    }
+
+    public function test_todo_update_rechecks_submitted_assignee_membership_after_validation(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'assignee_id' => $this->owner->id,
+        ]);
+        $membershipQueryObserved = false;
+        $memberRemoved = false;
+        $serverId = $this->server->id;
+        $memberId = $this->member->id;
+
+        DB::listen(function (QueryExecuted $query) use (&$membershipQueryObserved, &$memberRemoved, $serverId, $memberId): void {
+            if ($memberRemoved || ! str_contains(strtolower($query->sql), 'server_user') || ! str_contains(strtolower($query->sql), 'count')) {
+                return;
+            }
+
+            $membershipQueryObserved = true;
+            $memberRemoved = true;
+
+            DB::table('server_user')
+                ->where('server_id', $serverId)
+                ->where('user_id', $memberId)
+                ->delete();
+        });
+
+        $response = $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'assignee_id' => $this->member->id,
+            ]);
+
+        $this->assertTrue($membershipQueryObserved);
+        $this->assertTrue($memberRemoved);
+        $response->assertUnprocessable()->assertJsonValidationErrors('assignee_id');
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'assignee_id' => $this->owner->id,
+        ]);
+    }
+
     public function test_todo_due_datetime_cannot_be_before_its_start_datetime(): void
     {
         $this->actingAs($this->member)
@@ -138,6 +663,100 @@ class GroupwareMutationAuthorizationTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('due_at');
+    }
+
+    public function test_todo_partial_update_cannot_create_an_invalid_schedule(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'starts_at' => '2026-08-03 12:00:00',
+            'due_at' => '2026-08-03 13:00:00',
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'due_at' => '2026-08-03T11:00:00Z',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('due_at');
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'starts_at' => '2026-08-03T14:00:00Z',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('due_at');
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'starts_at' => '2026-08-03 12:00:00',
+            'due_at' => '2026-08-03 13:00:00',
+        ]);
+    }
+
+    public function test_todo_partial_start_update_persists_an_explicit_offset_as_the_same_instant(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'starts_at' => '2026-08-03 10:00:00',
+            'due_at' => '2026-08-03 10:00:00',
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'starts_at' => '2026-08-03T19:00:00+09:00',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'starts_at' => '2026-08-03 10:00:00',
+            'due_at' => '2026-08-03 10:00:00',
+        ]);
+    }
+
+    public function test_todo_partial_due_update_preserves_marker_for_the_same_explicit_offset_instant(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'starts_at' => '2026-08-03 09:00:00',
+            'due_at' => '2026-08-03 10:00:00',
+            'reminded_at' => now(),
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'due_at' => '2026-08-03T19:00:00+09:00',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'due_at' => '2026-08-03 10:00:00',
+        ]);
+        $this->assertNotNull($todo->fresh()->reminded_at);
+    }
+
+    public function test_todo_partial_due_update_clears_marker_for_an_explicit_offset_instant_change(): void
+    {
+        $todo = Todo::factory()->create([
+            'channel_id' => $this->channel->id,
+            'starts_at' => '2026-08-03 09:00:00',
+            'due_at' => '2026-08-03 10:00:00',
+            'reminded_at' => now(),
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.channels.todos.update', [$this->server, $this->channel, $todo]), [
+                'due_at' => '2026-08-03T20:00:00+09:00',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            'due_at' => '2026-08-03 11:00:00',
+        ]);
+        $this->assertNull($todo->fresh()->reminded_at);
     }
 
     public function test_outsider_cannot_create_channel_message_or_todo(): void

@@ -9,4 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Send due-date reminders for channels and todos every hour.
-Schedule::command('reminders:send-due --days-ahead=0')->hourly();
+Schedule::command('reminders:send-due --days-ahead=0')->hourly()->withoutOverlapping()->onOneServer();

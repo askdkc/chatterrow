@@ -25,6 +25,18 @@ describe('gantt date calculations', () => {
         ).toContain('日');
     });
 
+    it('projects absolute todo timestamps onto the browser-local calendar day', () => {
+        const localInstant = new Date(2026, 7, 3, 0, 30).toISOString();
+
+        expect(epochDay(localInstant)).toBe(epochDay('2026-08-03'));
+        expect(
+            formatDateOnly(localInstant, {
+                month: 'numeric',
+                day: 'numeric',
+            }),
+        ).toBe('8/3');
+    });
+
     it('spans the full task date range after the task label column', () => {
         const rangeStart = epochDay('2026-08-02');
 

@@ -15,10 +15,13 @@
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
+    import { formatDate, formatDateTime } from '@/lib/dates';
+    import { priorityLabel } from '@/lib/todos';
     import type {
         ServerResource,
         ChannelResource,
         TodoResource,
+        TodoWithChannelSummaryResource,
         UserResource,
     } from '@/types';
 
@@ -30,7 +33,7 @@
     }: {
         server: ServerResource;
         channels: ChannelResource[];
-        todos: (TodoResource & { channel: { id: number; name: string } })[];
+        todos: TodoWithChannelSummaryResource[];
         members: UserResource[];
     } = $props();
 
@@ -50,8 +53,6 @@
     function onBrowse() {
         window.location.href = '/servers';
     }
-
-    function onAddChannel() {}
 
     function updateTodo(updated: TodoResource) {
         todos = todos.map((todo) =>
@@ -79,37 +80,6 @@
             editingTodo = todo;
         }
     }
-
-    function formatDue(iso: string | null): string {
-        if (!iso) {
-            return '未設定';
-        }
-
-        return new Date(iso).toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    }
-
-    function formatDateTime(iso: string): string {
-        return new Date(iso).toLocaleString('ja-JP', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    function priorityLabel(priority: TodoResource['priority']): string {
-        return {
-            low: '低',
-            normal: '通常',
-            high: '高',
-            urgent: '緊急',
-        }[priority];
-    }
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
@@ -125,7 +95,6 @@
         {channels}
         {members}
         activeChannelId={null}
-        {onAddChannel}
         onManageMembers={() => (showMemberDialog = true)}
     />
 
@@ -191,10 +160,10 @@
                                         <span class="flex items-center gap-1">
                                             <CalendarDays class="h-3.5 w-3.5" />
                                             {channel.starts_on
-                                                ? formatDue(channel.starts_on)
+                                                ? formatDate(channel.starts_on)
                                                 : '開始未定'} 〜
                                             {channel.ends_on
-                                                ? formatDue(channel.ends_on)
+                                                ? formatDate(channel.ends_on)
                                                 : '期限未定'}
                                         </span>
                                         <span class="flex items-center gap-1">
@@ -264,7 +233,7 @@
                                                         )}
                                                     </span>
                                                 {/if}
-                                                {#if todo.due_at || todo.due_on}
+                                                {#if todo.due_at}
                                                     <span
                                                         class="flex items-center gap-1 rounded-md bg-white/60 px-2 py-1 dark:bg-white/10"
                                                     >
@@ -275,13 +244,9 @@
                                                             class="text-xs text-[#6a6f78] dark:text-[#949ba4]"
                                                             >期限</span
                                                         >
-                                                        {todo.due_at
-                                                            ? formatDateTime(
-                                                                  todo.due_at,
-                                                              )
-                                                            : formatDue(
-                                                                  todo.due_on,
-                                                              )}
+                                                        {formatDateTime(
+                                                            todo.due_at,
+                                                        )}
                                                     </span>
                                                 {/if}
                                                 <span

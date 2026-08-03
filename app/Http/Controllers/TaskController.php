@@ -31,7 +31,6 @@ class TaskController extends Controller
             ->whereIn('channel_id', $channels->pluck('id'))
             ->orderBy('completed_at')
             ->orderBy('due_at')
-            ->orderBy('due_on')
             ->get();
 
         return Inertia::render('servers/Tasks', [
@@ -55,7 +54,6 @@ class TaskController extends Controller
             ->where('channel_id', $channel->id)
             ->orderBy('completed_at')
             ->orderBy('due_at')
-            ->orderBy('due_on')
             ->get();
 
         return response()->json([
@@ -80,29 +78,18 @@ class TaskController extends Controller
         $todos = Todo::query()
             ->with(['channel:id,name'])
             ->whereIn('channel_id', $channels->pluck('id'))
-            ->where(fn ($query) => $query->whereNotNull('due_at')->orWhereNotNull('due_on'))
+            ->whereNotNull('due_at')
             ->orderBy('due_at')
-            ->orderBy('due_on')
             ->get();
 
-        $tasks = $channels->map(fn (Channel $channel) => [
-            'id' => "channel-{$channel->id}",
-            'type' => 'channel',
-            'title' => $channel->name,
-            'start' => $channel->starts_on?->toDateString(),
-            'end' => $channel->ends_on?->toDateString(),
-            'channel_id' => $channel->id,
-            'channel_name' => $channel->name,
-        ])->concat($todos->map(fn (Todo $todo) => [
-            'id' => "todo-{$todo->id}",
-            'type' => 'todo',
-            'title' => $todo->title,
-            'start' => ($todo->starts_at ?? $todo->due_at ?? $todo->due_on)?->toDateString(),
-            'end' => ($todo->due_at ?? $todo->due_on)?->toDateString(),
-            'channel_id' => $todo->channel_id,
-            'channel_name' => $todo->channel->name,
-            'completed' => $todo->completed_at !== null,
-        ]))->values();
+        $tasks = $channels
+            ->map(fn (Channel $channel) => $this->channelGanttTask($channel))
+            ->concat(
+                $todos->map(
+                    fn (Todo $todo) => $this->todoGanttTask($todo, $todo->channel),
+                ),
+            )
+            ->values();
 
         return Inertia::render('servers/Gantt', [
             'server' => $server,
@@ -122,31 +109,17 @@ class TaskController extends Controller
 
         $todos = Todo::query()
             ->where('channel_id', $channel->id)
-            ->where(fn ($query) => $query->whereNotNull('due_at')->orWhereNotNull('due_on'))
+            ->whereNotNull('due_at')
             ->orderBy('due_at')
-            ->orderBy('due_on')
             ->get();
 
-        $tasks = collect([
-            [
-                'id' => "channel-{$channel->id}",
-                'type' => 'channel',
-                'title' => $channel->name,
-                'start' => $channel->starts_on?->toDateString(),
-                'end' => $channel->ends_on?->toDateString(),
-                'channel_id' => $channel->id,
-                'channel_name' => $channel->name,
-            ],
-        ])->concat($todos->map(fn (Todo $todo) => [
-            'id' => "todo-{$todo->id}",
-            'type' => 'todo',
-            'title' => $todo->title,
-            'start' => ($todo->starts_at ?? $todo->due_at ?? $todo->due_on)?->toDateString(),
-            'end' => ($todo->due_at ?? $todo->due_on)?->toDateString(),
-            'channel_id' => $channel->id,
-            'channel_name' => $channel->name,
-            'completed' => $todo->completed_at !== null,
-        ]))->values();
+        $tasks = collect([$this->channelGanttTask($channel)])
+            ->concat(
+                $todos->map(
+                    fn (Todo $todo) => $this->todoGanttTask($todo, $channel),
+                ),
+            )
+            ->values();
 
         return Inertia::render('servers/Gantt', [
             'server' => $server,
@@ -154,5 +127,38 @@ class TaskController extends Controller
             'members' => $server->members()->get(['users.id', 'users.name', 'users.email']),
             'tasks' => $tasks,
         ]);
+    }
+
+    /**
+     * @return array{id: string, type: string, title: string, start: string|null, end: string|null, channel_id: int, channel_name: string}
+     */
+    private function channelGanttTask(Channel $channel): array
+    {
+        return [
+            'id' => "channel-{$channel->id}",
+            'type' => 'channel',
+            'title' => $channel->name,
+            'start' => $channel->starts_on?->toDateString(),
+            'end' => $channel->ends_on?->toDateString(),
+            'channel_id' => $channel->id,
+            'channel_name' => $channel->name,
+        ];
+    }
+
+    /**
+     * @return array{id: string, type: string, title: string, start: string|null, end: string|null, channel_id: int, channel_name: string, completed: bool}
+     */
+    private function todoGanttTask(Todo $todo, Channel $channel): array
+    {
+        return [
+            'id' => "todo-{$todo->id}",
+            'type' => 'todo',
+            'title' => $todo->title,
+            'start' => ($todo->starts_at ?? $todo->due_at)?->toISOString(),
+            'end' => $todo->due_at?->toISOString(),
+            'channel_id' => $channel->id,
+            'channel_name' => $channel->name,
+            'completed' => $todo->completed_at !== null,
+        ];
     }
 }

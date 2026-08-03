@@ -16,7 +16,9 @@
         User,
     } from 'lucide-svelte';
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
+    import { formatDateTime } from '@/lib/dates';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
+    import { priorityLabel } from '@/lib/todos';
     import type { TodoResource, UserResource } from '@/types';
 
     let {
@@ -105,39 +107,6 @@
             error =
                 e instanceof HttpError ? e.messageText() : '削除に失敗しました';
         }
-    }
-
-    function formatDateTime(iso: string | null): string {
-        if (!iso) {
-            return '';
-        }
-
-        return new Date(iso).toLocaleString('ja-JP', {
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    function formatDateValue(date: string | null): string {
-        if (!date) {
-            return '';
-        }
-
-        return new Date(`${date}T00:00:00`).toLocaleDateString('ja-JP', {
-            month: 'numeric',
-            day: 'numeric',
-        });
-    }
-
-    function priorityLabel(priority: TodoResource['priority']): string {
-        return {
-            low: '低',
-            normal: '通常',
-            high: '高',
-            urgent: '緊急',
-        }[priority];
     }
 
     function assigneeName(id: number | null): string {
@@ -309,7 +278,10 @@
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
                                     >
                                         {todo.starts_at
-                                            ? formatDateTime(todo.starts_at)
+                                            ? formatDateTime(todo.starts_at, {
+                                                  year: false,
+                                                  month: 'numeric',
+                                              })
                                             : '未設定'}
                                     </span>
                                 </div>
@@ -326,10 +298,11 @@
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
                                     >
                                         {todo.due_at
-                                            ? formatDateTime(todo.due_at)
-                                            : todo.due_on
-                                              ? formatDateValue(todo.due_on)
-                                              : '未設定'}
+                                            ? formatDateTime(todo.due_at, {
+                                                  year: false,
+                                                  month: 'numeric',
+                                              })
+                                            : '未設定'}
                                     </span>
                                 </div>
                                 <div

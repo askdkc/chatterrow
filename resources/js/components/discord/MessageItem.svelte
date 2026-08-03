@@ -13,6 +13,7 @@
     import StoredFilePreviewDialog, {
         canPreviewStoredFile,
     } from '@/components/files/StoredFilePreviewDialog.svelte';
+    import { formatDate, formatTime } from '@/lib/dates';
     import { HttpError } from '@/lib/http';
     import {
         renderHighlightedMessageMarkdown,
@@ -129,33 +130,6 @@
         }
     }
 
-    function formatTime(iso: string | undefined): string {
-        if (!iso) {
-            return '';
-        }
-
-        const d = new Date(iso);
-
-        return d.toLocaleTimeString('ja-JP', {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    function formatDate(iso: string | undefined): string {
-        if (!iso) {
-            return '';
-        }
-
-        const d = new Date(iso);
-
-        return d.toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    }
-
     function isImage(file: StoredFileResource): boolean {
         return (file.mime_type ?? '').startsWith('image/');
     }
@@ -225,7 +199,7 @@
                 >{message.user?.name ?? '不明'}</span
             >
             <span class="text-xs text-[#80848e]"
-                >{formatDate(message.created_at)}
+                >{formatDate(message.created_at, { month: 'long' })}
                 {formatTime(message.created_at)}</span
             >
         </div>

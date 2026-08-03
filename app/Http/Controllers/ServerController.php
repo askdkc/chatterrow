@@ -7,7 +7,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -34,8 +36,8 @@ class ServerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:255'],
-            'starts_on' => ['nullable', 'date'],
-            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
+            'starts_on' => ['nullable', 'date_format:Y-m-d'],
+            'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
         ]);
 
         /** @var User $user */
@@ -73,9 +75,21 @@ class ServerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:255'],
-            'starts_on' => ['nullable', 'date'],
-            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
+            'starts_on' => ['nullable', 'date_format:Y-m-d'],
+            'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
         ]);
+
+        Validator::make([
+            'starts_on' => array_key_exists('starts_on', $request->all())
+                ? $request->input('starts_on')
+                : $server->starts_on?->toDateString(),
+            'ends_on' => array_key_exists('ends_on', $request->all())
+                ? $request->input('ends_on')
+                : $server->ends_on?->toDateString(),
+        ], [
+            'starts_on' => ['nullable', 'date_format:Y-m-d'],
+            'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+        ])->validate();
 
         $server->update($validated);
 
@@ -117,7 +131,31 @@ class ServerController extends Controller
         Gate::authorize('manageMembers', $server);
 
         if ($server->created_by !== $user->id) {
-            $server->members()->detach($user->id);
+            $detached = DB::transaction(function () use ($server, $user): bool {
+                $membership = DB::table('server_user')
+                    ->where('server_id', $server->id)
+                    ->where('user_id', $user->id)
+                    ->lockForUpdate()
+                    ->first(['id']);
+
+                if ($membership === null) {
+                    return true;
+                }
+
+                if ($server->todos()->where('assignee_id', $user->id)->exists()) {
+                    return false;
+                }
+
+                DB::table('server_user')->where('id', $membership->id)->delete();
+
+                return true;
+            });
+
+            if (! $detached) {
+                return response()->json([
+                    'message' => 'The member cannot leave while assigned todos remain in this server.',
+                ], 409);
+            }
         }
 
         return response()->json(['ok' => true]);

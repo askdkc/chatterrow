@@ -1,5 +1,6 @@
 <script lang="ts">
     import { X, Loader2 } from 'lucide-svelte';
+    import { dateValue } from '@/lib/dates';
     import { apiJson, HttpError } from '@/lib/http';
     import type { ChannelResource, ServerResource } from '@/types';
 
@@ -16,11 +17,6 @@
     } = $props();
 
     const isEditing = $derived(channel !== null);
-    function dateValue(value: Date): string {
-        const pad = (part: number) => String(part).padStart(2, '0');
-
-        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
-    }
 
     function defaultStartDate(): string {
         const today = dateValue(new Date());

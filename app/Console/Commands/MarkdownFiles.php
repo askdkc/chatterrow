@@ -28,6 +28,7 @@ class MarkdownFiles extends Command
         }
 
         $files = $query->get(['id', 'path', 'original_name']);
+        $queued = 0;
 
         foreach ($files as $file) {
             if (! MarkdownedDocGenerator::supports($file->original_name)) {
@@ -39,10 +40,11 @@ class MarkdownFiles extends Command
                 ->update(['markdown_status' => 'pending', 'markdown_path' => null]);
 
             GenerateMarkdownedDoc::dispatch($file->id, $file->path);
+            $queued++;
             $this->line("Queued #{$file->id} {$file->original_name}");
         }
 
-        $this->info("Queued {$files->count()} files for markdown conversion.");
+        $this->info("Queued {$queued} files for markdown conversion.");
 
         return self::SUCCESS;
     }

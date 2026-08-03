@@ -36,7 +36,7 @@
         activeChannelId: number | null;
         threads?: MessageResource[];
         activeThreadId?: number | null;
-        onAddChannel: () => void;
+        onAddChannel?: () => void;
         onEditChannel?: (channel: ChannelResource) => void;
         onManageMembers: () => void;
         onOpenThread?: (message: MessageResource) => void;
@@ -78,14 +78,16 @@
                 <ChevronDown class="h-3 w-3" />
                 チャンネル
             </span>
-            <button
-                type="button"
-                class="rounded p-1 transition hover:bg-white/10 hover:text-white"
-                onclick={onAddChannel}
-                title="チャンネルを作成"
-            >
-                <Plus class="h-4 w-4" />
-            </button>
+            {#if onAddChannel}
+                <button
+                    type="button"
+                    class="rounded p-1 transition hover:bg-white/10 hover:text-white"
+                    onclick={onAddChannel}
+                    title="チャンネルを作成"
+                >
+                    <Plus class="h-4 w-4" />
+                </button>
+            {/if}
         </div>
 
         {#each channels as channel (channel.id)}

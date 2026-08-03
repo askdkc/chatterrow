@@ -11,6 +11,10 @@ import TodoDialog from './TodoDialog.svelte';
 
 afterEach(cleanup);
 
+function browserTimezone(): string {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
 describe('TodoDialog', () => {
     beforeEach(() => {
         document.cookie = 'XSRF-TOKEN=token-123; Path=/; Max-Age=3600';
@@ -141,10 +145,10 @@ describe('TodoDialog', () => {
             created_by: 1,
             title: 'old title',
             details: 'old details',
-            starts_at: '2026-08-06T10:00:00.000000Z',
-            due_at: '2026-08-06T10:30:00.000000Z',
+            starts_at: '2026-08-06T10:00:45.000000Z',
+            due_at: '2026-08-06T10:30:45.000000Z',
+            due_timezone: 'Asia/Tokyo',
             priority: 'normal',
-            due_on: null,
             completed_at: null,
             completed_by: null,
             position: 0,
@@ -186,8 +190,57 @@ describe('TodoDialog', () => {
         expect(JSON.parse(init.body)).toMatchObject({
             title: 'new title',
             details: 'new details',
+            starts_at: todo.starts_at,
+            due_at: todo.due_at,
+            due_timezone: 'Asia/Tokyo',
         });
         expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('uses the browser timezone when the deadline changes during editing', async () => {
+        const todo = {
+            id: 8,
+            channel_id: 2,
+            assignee_id: null,
+            created_by: 1,
+            title: 'deadline task',
+            details: null,
+            starts_at: '2026-08-06T10:00:00.000000Z',
+            due_at: '2026-08-06T10:30:00.000000Z',
+            due_timezone: 'America/Los_Angeles',
+            priority: 'normal',
+            completed_at: null,
+            completed_by: null,
+            position: 0,
+        } as TodoResource;
+        const updated = { ...todo, due_timezone: browserTimezone() };
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ todo: updated }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        render(TodoDialog, {
+            props: {
+                serverId: 1,
+                channelId: 2,
+                todo,
+                onUpdated: vi.fn(),
+                onClose: vi.fn(),
+            },
+        });
+
+        await fireEvent.input(screen.getByLabelText('終了日'), {
+            target: { value: '2026-08-07' },
+        });
+        await fireEvent.click(screen.getByRole('button', { name: '保存' }));
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+            due_timezone: browserTimezone(),
+        });
     });
 
     it('creates a task with all dialog fields', async () => {
@@ -240,8 +293,9 @@ describe('TodoDialog', () => {
         expect(url).toBe('/servers/1/channels/2/todos');
         expect(JSON.parse(init.body)).toEqual({
             title: 'new task',
-            starts_at: '2026-08-02T09:00',
-            due_at: '2026-08-02T17:30',
+            starts_at: new Date(2026, 7, 2, 9, 0).toISOString(),
+            due_at: new Date(2026, 7, 2, 17, 30).toISOString(),
+            due_timezone: browserTimezone(),
             priority: 'high',
             details: 'memo',
         });

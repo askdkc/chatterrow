@@ -3,34 +3,37 @@
 namespace App\Support;
 
 use App\Jobs\GenerateStoredFilePreview;
-use App\Models\StoredFile;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
-final class StoredFilePreviewDispatcher
+final class StoredFilePreviewDispatcher extends AbstractStoredFileDispatcher
 {
-    public function dispatchAfterCommit(int $storedFileId, string $sourcePath): void
+    protected function dispatchJob(int $storedFileId, string $sourcePath): void
     {
-        DB::afterCommit(static function () use ($sourcePath, $storedFileId): void {
-            try {
-                GenerateStoredFilePreview::dispatch($storedFileId, $sourcePath);
-            } catch (Throwable $exception) {
-                StoredFile::query()
-                    ->whereKey($storedFileId)
-                    ->where('path', $sourcePath)
-                    ->whereIn('preview_status', ['pending', 'processing'])
-                    ->update([
-                        'preview_path' => null,
-                        'preview_status' => 'failed',
-                    ]);
+        GenerateStoredFilePreview::dispatch($storedFileId, $sourcePath);
+    }
 
-                Log::error('Stored file preview could not be queued.', [
-                    'stored_file_id' => $storedFileId,
-                    'source_hash' => StoredFilePreviewGenerator::sourceHash($sourcePath),
-                    'exception' => $exception,
-                ]);
-            }
-        });
+    protected function statusColumn(): string
+    {
+        return 'preview_status';
+    }
+
+    protected function pathColumn(): string
+    {
+        return 'preview_path';
+    }
+
+    protected function failureLogMessage(): string
+    {
+        return 'Stored file preview could not be queued.';
+    }
+
+    /** @return array<string, mixed> */
+    protected function failureLogContext(int $storedFileId, string $sourcePath, Throwable $exception): array
+    {
+        return [
+            'stored_file_id' => $storedFileId,
+            'source_hash' => StoredFilePreviewGenerator::sourceHash($sourcePath),
+            'exception' => $exception,
+        ];
     }
 }

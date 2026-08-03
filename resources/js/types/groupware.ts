@@ -26,6 +26,8 @@ export interface ChannelResource {
     todos?: TodoResource[];
 }
 
+export type ChannelSummaryResource = Pick<ChannelResource, 'id' | 'name'>;
+
 export interface UserResource {
     id: number;
     name: string;
@@ -73,16 +75,20 @@ export interface TodoResource {
     details: string | null;
     starts_at: string | null;
     due_at: string | null;
+    due_timezone: string;
     priority: 'low' | 'normal' | 'high' | 'urgent';
-    due_on: string | null;
     completed_at: string | null;
     completed_by: number | null;
     position: number;
     created_at?: string;
     assignee?: UserResource | null;
     creator?: UserResource | null;
-    channel?: ChannelResource | null;
+    channel?: ChannelResource | ChannelSummaryResource | null;
 }
+
+export type TodoWithChannelSummaryResource = Omit<TodoResource, 'channel'> & {
+    channel: ChannelSummaryResource;
+};
 
 export interface GanttTask {
     id: string;
@@ -91,6 +97,6 @@ export interface GanttTask {
     start: string | null;
     end: string | null;
     channel_id: number;
-    channel_name: string | null;
+    channel_name: string;
     completed?: boolean;
 }

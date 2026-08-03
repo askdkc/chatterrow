@@ -59,6 +59,33 @@ class MarkdownedDocTest extends TestCase
         $this->assertNull($file->markdown_status);
     }
 
+    public function test_markdown_command_reports_only_files_actually_queued(): void
+    {
+        Queue::fake();
+
+        $supported = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.docx',
+            'path' => 'uploads/1/report.docx',
+        ]);
+        StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'image.png',
+            'path' => 'uploads/1/image.png',
+        ]);
+        $supported->update(['markdown_status' => 'failed']);
+
+        Queue::fake();
+
+        $this->artisan('files:markdown')
+            ->expectsOutput('Queued 1 files for markdown conversion.')
+            ->assertSuccessful();
+
+        Queue::assertPushed(GenerateMarkdownedDoc::class, 1);
+    }
+
     public function test_generator_converts_a_pdf_and_indexes_the_content(): void
     {
         Storage::fake('local');
@@ -84,6 +111,47 @@ class MarkdownedDocTest extends TestCase
         $row = DB::table('markdown_docs')->where('rowid', $file->id)->first();
         $this->assertNotNull($row);
         $this->assertStringContainsString('全文検索', $row->content);
+    }
+
+    public function test_generator_uses_the_source_basename_for_legacy_office_conversion(): void
+    {
+        Storage::fake('local');
+        Storage::fake('markdowned');
+
+        Process::fake(function ($process) {
+            $command = $process->command;
+
+            if (is_array($command) && in_array('--convert-to', $command, true)) {
+                $outdirIndex = array_search('--outdir', $command, true);
+                $outdir = $command[$outdirIndex + 1];
+                file_put_contents($outdir.'/abc123.docx', 'converted document');
+
+                return Process::result();
+            }
+
+            return Process::result(output: '# Converted legacy document');
+        });
+
+        $file = StoredFile::withoutEvents(fn (): StoredFile => StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'original_name' => 'report.doc',
+            'path' => 'uploads/1/abc123.doc',
+            'mime_type' => 'application/msword',
+        ]));
+
+        Storage::disk('local')->put($file->path, 'legacy office document');
+
+        $path = app(MarkdownedDocGenerator::class)->generate($file);
+
+        $expectedContent = "# Converted legacy document\n";
+
+        Storage::disk('markdowned')->assertExists($path);
+        $this->assertSame($expectedContent, Storage::disk('markdowned')->get($path));
+
+        $row = DB::table('markdown_docs')->where('rowid', $file->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame($expectedContent, $row->content);
     }
 
     public function test_generator_throws_when_markitdown_fails(): void

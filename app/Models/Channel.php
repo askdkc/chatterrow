@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $description
  * @property Carbon|null $starts_on
  * @property Carbon|null $ends_on
+ * @property Carbon|null $reminded_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Server $server
@@ -62,6 +63,7 @@ class Channel extends Model
         return [
             'starts_on' => 'date:Y-m-d',
             'ends_on' => 'date:Y-m-d',
+            'reminded_at' => 'datetime',
         ];
     }
 }

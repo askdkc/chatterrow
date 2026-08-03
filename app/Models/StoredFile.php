@@ -85,6 +85,14 @@ class StoredFile extends Model
         });
 
         static::deleting(function (StoredFile $storedFile): void {
+            StoredFilePreviewGenerator::cleanup(
+                Storage::disk($storedFile->disk),
+                $storedFile->id,
+                $storedFile->path,
+                $storedFile->preview_path,
+                includeLegacy: true,
+            );
+
             if ($storedFile->markdown_path !== null) {
                 Storage::disk('markdowned')->delete($storedFile->markdown_path);
             }
