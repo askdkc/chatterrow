@@ -18,7 +18,15 @@ async function readDirectoryEntries(
     }
 }
 
+function isHiddenEntry(name: string): boolean {
+    return name.startsWith('.');
+}
+
 async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
+    if (isHiddenEntry(entry.name)) {
+        return [];
+    }
+
     if (entry.isFile) {
         return new Promise<File[]>((resolve, reject) => {
             (entry as FileSystemFileEntry).file(
@@ -48,7 +56,9 @@ export async function filesFromDrop(
         .filter((entry): entry is FileSystemEntry => entry !== null);
 
     if (entries.length === 0) {
-        return Array.from(dataTransfer.files);
+        return Array.from(dataTransfer.files).filter(
+            (file) => !isHiddenEntry(file.name),
+        );
     }
 
     const files = await Promise.all(entries.map(filesFromEntry));

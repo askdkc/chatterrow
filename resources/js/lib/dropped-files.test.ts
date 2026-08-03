@@ -9,28 +9,31 @@ function fileEntry(file: File): FileSystemFileEntry {
         fullPath: `/${file.name}`,
         filesystem: {} as FileSystem,
         getParent: vi.fn(),
-        file: (resolve) => resolve(file),
+        file: vi.fn((resolve) => resolve(file)),
     };
 }
 
-function directoryEntry(entries: FileSystemEntry[]): FileSystemDirectoryEntry {
+function directoryEntry(
+    entries: FileSystemEntry[],
+    name = 'folder',
+): FileSystemDirectoryEntry {
     let read = false;
 
     return {
         isFile: false,
         isDirectory: true,
-        name: 'folder',
-        fullPath: '/folder',
+        name,
+        fullPath: `/${name}`,
         filesystem: {} as FileSystem,
         getParent: vi.fn(),
         getDirectory: vi.fn(),
         getFile: vi.fn(),
-        createReader: () => ({
-            readEntries: (resolve) => {
+        createReader: vi.fn(() => ({
+            readEntries: (resolve: FileSystemEntriesCallback) => {
                 resolve(read ? [] : entries);
                 read = true;
             },
-        }),
+        })),
     };
 }
 
@@ -51,6 +54,76 @@ describe('filesFromDrop', () => {
             first,
             second,
         ]);
+    });
+
+    it('excludes hidden files from dropped folders', async () => {
+        const visible = new File(['visible'], 'visible.txt');
+        const hiddenEntries = [
+            fileEntry(new File(['metadata'], '.DS_Store')),
+            fileEntry(new File(['environment'], '.env')),
+            fileEntry(new File(['ignore'], '.gitignore')),
+            fileEntry(new File(['resource'], '._resource')),
+        ];
+        const root = directoryEntry([fileEntry(visible), ...hiddenEntries]);
+        const dataTransfer = {
+            items: [{ webkitGetAsEntry: () => root }],
+            files: [],
+        } as unknown as DataTransfer;
+
+        await expect(filesFromDrop(dataTransfer)).resolves.toEqual([visible]);
+
+        for (const entry of hiddenEntries) {
+            expect(entry.file).not.toHaveBeenCalled();
+        }
+    });
+
+    it('skips hidden directories without reading their contents', async () => {
+        const visible = new File(['visible'], 'visible.txt');
+        const hiddenDirectory = directoryEntry(
+            [fileEntry(new File(['secret'], 'secret.txt'))],
+            '.config',
+        );
+        const root = directoryEntry([
+            hiddenDirectory,
+            directoryEntry([fileEntry(visible)], 'documents'),
+        ]);
+        const dataTransfer = {
+            items: [{ webkitGetAsEntry: () => root }],
+            files: [],
+        } as unknown as DataTransfer;
+
+        await expect(filesFromDrop(dataTransfer)).resolves.toEqual([visible]);
+        expect(hiddenDirectory.createReader).not.toHaveBeenCalled();
+    });
+
+    it('filters hidden files from the regular file list fallback', async () => {
+        const visible = new File(['file'], 'file.txt');
+        const dataTransfer = {
+            items: [],
+            files: [
+                new File(['metadata'], '.DS_Store'),
+                new File(['environment'], '.env'),
+                visible,
+            ],
+        } as unknown as DataTransfer;
+
+        await expect(filesFromDrop(dataTransfer)).resolves.toEqual([visible]);
+    });
+
+    it('returns an empty list when a drop contains only hidden entries', async () => {
+        const root = directoryEntry([
+            fileEntry(new File(['metadata'], '.DS_Store')),
+            directoryEntry(
+                [fileEntry(new File(['config'], 'settings.json'))],
+                '.config',
+            ),
+        ]);
+        const dataTransfer = {
+            items: [{ webkitGetAsEntry: () => root }],
+            files: [],
+        } as unknown as DataTransfer;
+
+        await expect(filesFromDrop(dataTransfer)).resolves.toEqual([]);
     });
 
     it('falls back to the regular file list', async () => {

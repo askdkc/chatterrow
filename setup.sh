@@ -52,26 +52,327 @@ valid_local_hostname() {
     valid_hostname "$1" || [[ "$1" == "localhost" ]] || [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]
 }
 
+valid_ipv4() {
+    local address="$1" octet
+    local -a octets
+
+    IFS=. read -r -a octets <<< "$address"
+    [[ "${#octets[@]}" -eq 4 ]] || return 1
+
+    for octet in "${octets[@]}"; do
+        [[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+        (( 10#$octet <= 255 )) || return 1
+    done
+}
+
+endpoint_returns_ok() {
+    local response
+
+    response="$(curl -fsS --max-time 3 "${1%/}/up" 2>/dev/null)" || return 1
+    [[ "$response" == "ok" || "$response" == "OK" ]]
+}
+
+setup_onlyoffice_japanese_fonts() {
+    local container_name="$1"
+    local app_dir="$2"
+    local font_dir="/var/www/onlyoffice/Data/custom-fonts"
+    local catalog_patcher="$app_dir/scripts/patch-onlyoffice-font-catalog.php"
+    local font_tmp_dir="" catalog_tmp_dir="" actual_sha256 installed_sha256 fonts_changed font_index
+    local -a font_names=(
+        "SourceHanSansJP-Light.otf"
+        "SourceHanSansJP-Regular.otf"
+        "SourceHanSansJP-Bold.otf"
+        "NotoSerifCJKjp-Regular.otf"
+        "NotoSerifCJKjp-Bold.otf"
+    )
+    local -a font_urls=(
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Light.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Regular.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Bold.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Regular.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Bold.otf"
+    )
+    local -a font_sha256=(
+        "add5669f3ebb69ce21cff87a8a4c28388406fb07bd81b23d06c23d6461454988"
+        "40d1b760d1135539f6b6e0ee2b9f415de6d97576f7676840b06306c7c190c074"
+        "3a2722f94c97a53b172579a10ef8fc34b3fa8a6bb4f7947a2ec709ab647fb755"
+        "d9854c7a8ef170b5a7932558856fd64eb8de0b007cd823fed6f9f514ad2803d3"
+        "861a2b2c0e24b23745c262be8c3fdef63f12628f0492fb120ee51aa55c503af8"
+    )
+
+    fonts_changed=0
+
+    command -v shasum >/dev/null || die "shasum is required to verify OnlyOffice fonts"
+    command -v php >/dev/null || die "PHP is required to patch the OnlyOffice font catalog"
+    [[ -f "$catalog_patcher" ]] || die "Could not find $catalog_patcher"
+    container exec "$container_name" mkdir -p "$font_dir" \
+        || die "Could not create the OnlyOffice custom font directory"
+
+    for font_index in "${!font_names[@]}"; do
+        installed_sha256="$(container exec "$container_name" sha256sum \
+            "$font_dir/${font_names[$font_index]}" 2>/dev/null \
+            | awk '{print $1}' || true)"
+        [[ "$installed_sha256" != "${font_sha256[$font_index]}" ]] || continue
+
+        if [[ -z "$font_tmp_dir" ]]; then
+            log "Downloading verified Source Han Sans JP and Noto Serif CJK JP fonts for OnlyOffice..."
+            font_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-onlyoffice-fonts.XXXXXX")" \
+                || die "Could not create a temporary font directory"
+        fi
+
+        if ! curl -fL --retry 3 --retry-delay 2 \
+            --output "$font_tmp_dir/${font_names[$font_index]}" \
+            "${font_urls[$font_index]}"; then
+            rm -f "$font_tmp_dir"/*
+            rmdir "$font_tmp_dir" 2>/dev/null || true
+            die "Could not download ${font_names[$font_index]}"
+        fi
+
+        actual_sha256="$(shasum -a 256 "$font_tmp_dir/${font_names[$font_index]}" | awk '{print $1}')"
+        if [[ "$actual_sha256" != "${font_sha256[$font_index]}" ]]; then
+            rm -f "$font_tmp_dir"/*
+            rmdir "$font_tmp_dir" 2>/dev/null || true
+            die "${font_names[$font_index]} checksum mismatch"
+        fi
+
+        if ! container copy "$font_tmp_dir/${font_names[$font_index]}" \
+            "${container_name}:/tmp/chatterrow-${font_names[$font_index]}" \
+            || ! container exec "$container_name" sh -c \
+                "cp '/tmp/chatterrow-${font_names[$font_index]}' '$font_dir/${font_names[$font_index]}' \
+                    && rm -f '/tmp/chatterrow-${font_names[$font_index]}'"; then
+            rm -f "$font_tmp_dir"/*
+            rmdir "$font_tmp_dir" 2>/dev/null || true
+            die "Could not copy ${font_names[$font_index]} into $container_name"
+        fi
+
+        installed_sha256="$(container exec "$container_name" sha256sum \
+            "$font_dir/${font_names[$font_index]}" 2>/dev/null \
+            | awk '{print $1}' || true)"
+        [[ "$installed_sha256" == "${font_sha256[$font_index]}" ]] \
+            || die "${font_names[$font_index]} verification failed inside $container_name"
+        fonts_changed=1
+    done
+
+    if [[ -n "$font_tmp_dir" ]]; then
+        rm -f "$font_tmp_dir"/*
+        rmdir "$font_tmp_dir"
+    fi
+
+    if [[ $fonts_changed -eq 0 ]]; then
+        log "Verified Japanese fonts are already installed in OnlyOffice"
+    fi
+
+    container exec "$container_name" sh -lc '
+        set -eu
+
+        font_dir=/var/www/onlyoffice/Data/custom-fonts
+        config_file="$font_dir/chatterrow-japanese-fonts.conf"
+        config_tmp="$font_dir/.chatterrow-japanese-fonts.conf.tmp"
+
+        cat > "$config_tmp" <<EOF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <dir>/var/www/onlyoffice/Data/custom-fonts</dir>
+  <match target="pattern">
+    <test name="family" qual="any" compare="eq"><string>游ゴシック Light</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Source Han Sans JP</string></edit>
+    <edit name="weight" mode="assign" binding="same"><const>light</const></edit>
+  </match>
+  <match target="pattern">
+    <test name="family" qual="any" compare="eq"><string>Yu Gothic Light</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Source Han Sans JP</string></edit>
+    <edit name="weight" mode="assign" binding="same"><const>light</const></edit>
+  </match>
+  <alias binding="same">
+    <family>游明朝</family>
+    <prefer><family>Noto Serif CJK JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>Yu Mincho</family>
+    <prefer><family>Noto Serif CJK JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>游ゴシック</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>游ゴシック Light</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>Yu Gothic</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>Yu Gothic Light</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>Meiryo</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>MS Gothic</family>
+    <prefer><family>Source Han Sans JP</family></prefer>
+  </alias>
+  <alias binding="same">
+    <family>MS Mincho</family>
+    <prefer><family>Noto Serif CJK JP</family></prefer>
+  </alias>
+</fontconfig>
+EOF
+        if ! cmp -s "$config_tmp" "$config_file"; then
+            mv -f "$config_tmp" "$config_file"
+        else
+            rm -f "$config_tmp"
+        fi
+
+        config_link=/etc/fonts/conf.d/65-chatterrow-japanese-fonts.conf
+        current_link="$(readlink "$config_link" 2>/dev/null || true)"
+        if [ "$current_link" != "$config_file" ]; then
+            ln -sfn "$config_file" "$config_link"
+        fi
+
+        for legacy_font in \
+            "$font_dir/NotoSansJP-VF.otf" \
+            "$font_dir/NotoSerifJP-VF.otf" \
+            "$font_dir/NotoSansJP-Light.otf" \
+            "$font_dir/NotoSansJP-Regular.otf" \
+            "$font_dir/NotoSansJP-Bold.otf" \
+            "$font_dir/NotoSerifJP-Regular.otf" \
+            "$font_dir/NotoSerifJP-Bold.otf"; do
+            if [ -f "$legacy_font" ]; then
+                rm -f "$legacy_font"
+            fi
+        done
+
+        chmod 0644 "$font_dir"/SourceHanSansJP-Light.otf \
+            "$font_dir"/SourceHanSansJP-Regular.otf \
+            "$font_dir"/SourceHanSansJP-Bold.otf \
+            "$font_dir"/NotoSerifCJKjp-Regular.otf \
+            "$font_dir"/NotoSerifCJKjp-Bold.otf
+
+        fc-cache -f
+        fc-match "游明朝:lang=ja" | grep -q "NotoSerifCJKjp-Regular.otf"
+        fc-match "游ゴシック Light:lang=ja" | grep -q "SourceHanSansJP-Light.otf"
+
+        document_root=/var/www/onlyoffice/documentserver
+        all_fonts=/var/www/onlyoffice/documentserver/server/FileConverter/bin/AllFonts.js
+        font_selection=/var/www/onlyoffice/documentserver/server/FileConverter/bin/font_selection.bin
+        all_fonts_web="$document_root/sdkjs/common/AllFonts.js"
+        log_prefix="[chatterrow]"
+        printf "%s Generating OnlyOffice font catalog...\n" "$log_prefix"
+        export LD_LIBRARY_PATH="$document_root/server/FileConverter/bin:${LD_LIBRARY_PATH:-}"
+
+        # macOS setup recreates the container on every run. The catalog files
+        # live in that recreated filesystem, while custom fonts live in a named
+        # volume, so the catalog must also be rebuilt on every run. allfontsgen
+        # otherwise reuses existing outputs and silently skips new fonts.
+        rm -f "$all_fonts" "$font_selection" "$all_fonts_web"
+        "$document_root/server/tools/allfontsgen" \
+            --input="$document_root/core-fonts" \
+            --input="$document_root/../Data/custom-fonts" \
+            --allfonts-web="$all_fonts_web" \
+            --allfonts="$all_fonts" \
+            --images="$document_root/sdkjs/common/Images" \
+            --selection="$font_selection" \
+            --output-web="$document_root/fonts" \
+            --use-system="true" \
+            --use-system-user-fonts="false"
+
+        grep -q "Source Han Sans JP" "$all_fonts"
+        grep -q "Noto Serif CJK JP" "$all_fonts"
+        grep -a -q "SourceHanSansJP-Regular.otf" "$font_selection"
+        grep -a -q "NotoSerifCJKjp-Regular.otf" "$font_selection"
+    ' || die "Could not register Japanese fonts in $container_name"
+
+    catalog_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-onlyoffice-catalog.XXXXXX")" \
+        || die "Could not create a temporary OnlyOffice catalog directory"
+    if ! container copy \
+        "${container_name}:/var/www/onlyoffice/documentserver/server/FileConverter/bin/font_selection.bin" \
+        "$catalog_tmp_dir/font_selection.bin" \
+        || ! container copy \
+            "${container_name}:/var/www/onlyoffice/documentserver/server/FileConverter/bin/AllFonts.js" \
+            "$catalog_tmp_dir/AllFonts.server.js" \
+        || ! container copy \
+            "${container_name}:/var/www/onlyoffice/documentserver/sdkjs/common/AllFonts.js" \
+            "$catalog_tmp_dir/AllFonts.web.js"; then
+        rm -f "$catalog_tmp_dir"/*
+        rmdir "$catalog_tmp_dir" 2>/dev/null || true
+        die "Could not copy the generated OnlyOffice font catalog out of $container_name"
+    fi
+
+    if ! php "$catalog_patcher" \
+        --selection="$catalog_tmp_dir/font_selection.bin" \
+        --all-fonts="$catalog_tmp_dir/AllFonts.server.js" \
+        --all-fonts-web="$catalog_tmp_dir/AllFonts.web.js" \
+        || ! container copy "$catalog_tmp_dir/font_selection.bin" \
+            "${container_name}:/tmp/chatterrow-font_selection.bin" \
+        || ! container copy "$catalog_tmp_dir/AllFonts.server.js" \
+            "${container_name}:/tmp/chatterrow-AllFonts.server.js" \
+        || ! container copy "$catalog_tmp_dir/AllFonts.web.js" \
+            "${container_name}:/tmp/chatterrow-AllFonts.web.js"; then
+        rm -f "$catalog_tmp_dir"/*
+        rmdir "$catalog_tmp_dir" 2>/dev/null || true
+        die "Could not patch the OnlyOffice Japanese font catalog"
+    fi
+
+    rm -f "$catalog_tmp_dir"/*
+    rmdir "$catalog_tmp_dir"
+
+    container exec "$container_name" sh -lc '
+        set -eu
+
+        document_root=/var/www/onlyoffice/documentserver
+        converter_bin="$document_root/server/FileConverter/bin"
+        all_fonts="$converter_bin/AllFonts.js"
+        all_fonts_web="$document_root/sdkjs/common/AllFonts.js"
+        font_selection="$converter_bin/font_selection.bin"
+        font_dir=/var/www/onlyoffice/Data/custom-fonts
+
+        cp /tmp/chatterrow-font_selection.bin "$font_selection"
+        cp /tmp/chatterrow-AllFonts.server.js "$all_fonts"
+        cp /tmp/chatterrow-AllFonts.web.js "$all_fonts_web"
+        rm -f /tmp/chatterrow-font_selection.bin \
+            /tmp/chatterrow-AllFonts.server.js \
+            /tmp/chatterrow-AllFonts.web.js
+
+        export LD_LIBRARY_PATH="$converter_bin:${LD_LIBRARY_PATH:-}"
+        "$converter_bin/x2t" -create-js-cache
+
+        grep -q "Yu Gothic" "$all_fonts"
+        grep -q "Yu Mincho" "$all_fonts"
+        grep -a -q "$font_dir/SourceHanSansJP-Regular.otf" "$font_selection"
+        grep -a -q "$font_dir/NotoSerifCJKjp-Regular.otf" "$font_selection"
+
+        chown -R ds:ds "$document_root/sdkjs" \
+            "$converter_bin" \
+            "$document_root/fonts"
+        rm -f "$document_root"/fonts/*.gz \
+            "$document_root/sdkjs/common/AllFonts.js.gz" \
+            "$document_root"/sdkjs/common/Images/*.gz \
+            "$document_root/sdkjs/slide/themes/themes.js.gz"
+        printf "%s\n" source-han-sans-jp-2.005r-noto-serif-cjk-jp-2.003-v1 \
+            > "$font_dir/.chatterrow-font-catalog-version"
+
+        if pgrep -x supervisord >/dev/null; then
+            supervisorctl restart ds:docservice
+            supervisorctl restart ds:converter
+        fi
+        documentserver-flush-cache.sh
+    ' || die "Could not activate the OnlyOffice Japanese font catalog in $container_name"
+}
+
 setup_macos_onlyoffice() {
     [[ "$(uname -m)" == "arm64" ]] || die "Apple Container requires an Apple silicon Mac"
     command -v container >/dev/null || die "Apple Container is required; install it from https://github.com/apple/container"
     command -v curl >/dev/null || die "curl is required"
 
-    # Source Han fonts for system-wide Japanese rendering on macOS. The PDF
-    # export uses the bundled font, so a failure here is not fatal.
-    if command -v brew >/dev/null; then
-        if ! brew list --cask font-source-han-code-jp >/dev/null 2>&1; then
-            log "Installing Source Han Code JP font via Homebrew..."
-            brew install --cask font-source-han-code-jp || \
-                warn "Homebrew font install failed; the bundled PDF font still works"
-        else
-            log "Source Han Code JP font is already installed"
-        fi
-    else
-        warn "Homebrew is missing; run 'brew install --cask font-source-han-code-jp' manually"
-    fi
-
-    local macos_major app_dir env_file jwt_secret
+    local macos_major app_dir env_file jwt_secret app_url app_scheme app_authority app_host app_port
+    local app_port_explicit app_base_url app_server detected_server app_internal_url container_route_host
+    local valet_available herd_available manager_url_ready artisan_url_ready artisan_port
+    local -a container_run_args
     macos_major="$(sw_vers -productVersion | cut -d. -f1)"
     [[ "$macos_major" =~ ^[0-9]+$ && "$macos_major" -ge 26 ]] || die "Apple Container requires macOS 26 or newer"
 
@@ -84,44 +385,253 @@ setup_macos_onlyoffice() {
         cp "$app_dir/.env.example" "$env_file"
     }
 
+    app_url="$(sed -n 's/^[[:space:]]*APP_URL=//p' "$env_file" | sed -n '1p')"
+    app_url="${app_url#\"}"
+    app_url="${app_url%\"}"
+    case "$app_url" in
+        http://*|https://*) ;;
+        '') app_url="http://${MACOS_APP_HOST:-${DOMAIN:-$(basename "$app_dir").test}}" ;;
+        *) die "APP_URL must use http or https for the macOS container setup: $app_url" ;;
+    esac
+
+    app_scheme="${app_url%%://*}"
+    app_authority="${app_url#*://}"
+    app_authority="${app_authority%%/*}"
+    [[ -n "$app_authority" && "$app_authority" != *"@"* ]] || die "Invalid APP_URL authority: $app_url"
+
+    app_port_explicit=0
+    if [[ "$app_authority" =~ ^([^:]+):([0-9]+)$ ]]; then
+        app_host="${BASH_REMATCH[1]}"
+        app_port="${BASH_REMATCH[2]}"
+        app_port_explicit=1
+    elif [[ "$app_authority" != *":"* ]]; then
+        app_host="$app_authority"
+        [[ "$app_scheme" == "https" ]] && app_port=443 || app_port=80
+    else
+        die "IPv6 APP_URL values are not supported by the macOS container setup: $app_url"
+    fi
+
+    if [[ -n "$MACOS_APP_HOST" ]]; then
+        app_host="$MACOS_APP_HOST"
+        app_authority="$app_host"
+        if [[ $app_port_explicit -eq 1 ]]; then
+            app_authority="${app_host}:${app_port}"
+        fi
+    fi
+
+    if ! valid_hostname "$app_host" && [[ "$app_host" != "localhost" ]] && ! valid_ipv4 "$app_host"; then
+        die "Invalid macOS application hostname: $app_host"
+    fi
+    [[ "$app_port" =~ ^[0-9]+$ ]] && (( app_port >= 1 && app_port <= 65535 )) \
+        || die "Invalid APP_URL port: $app_port"
+    valid_ipv4 "$MACOS_HOST_REDIRECT_IP" || die "Invalid macOS host redirect IP: $MACOS_HOST_REDIRECT_IP"
+    valid_hostname "$MACOS_HOST_DNS_NAME" || die "Invalid macOS host DNS name: $MACOS_HOST_DNS_NAME"
+    valid_ipv4 "$MACOS_CONTAINER_DNS" || die "Invalid macOS container DNS server: $MACOS_CONTAINER_DNS"
+    [[ "$MACOS_ONLYOFFICE_PORT" =~ ^[0-9]+$ ]] \
+        && (( MACOS_ONLYOFFICE_PORT >= 1 && MACOS_ONLYOFFICE_PORT <= 65535 )) \
+        || die "Invalid macOS OnlyOffice port: $MACOS_ONLYOFFICE_PORT"
+    if [[ -n "$MACOS_ARTISAN_PORT" ]]; then
+        [[ "$MACOS_ARTISAN_PORT" =~ ^[0-9]+$ ]] \
+            && (( MACOS_ARTISAN_PORT >= 1 && MACOS_ARTISAN_PORT <= 65535 )) \
+            || die "Invalid macOS artisan serve port: $MACOS_ARTISAN_PORT"
+    fi
+
+    case "$MACOS_APP_SERVER" in
+        auto|valet|herd|artisan) ;;
+        *) die "Invalid MACOS_APP_SERVER: $MACOS_APP_SERVER (use auto, valet, herd, or artisan)" ;;
+    esac
+
+    log "Starting Apple Container system service..."
+    container system start
+
+    # Apple Container redirects this documentation-range IP to the host's
+    # loopback interface. Remove the old application-domain record first: it
+    # overrides Valet/Herd resolution on macOS and would also break detection.
+    if valid_hostname "$app_host" && [[ "$app_host" != "$MACOS_HOST_DNS_NAME" ]]; then
+        sudo container system dns delete "$app_host" >/dev/null 2>&1 || true
+    fi
+    sudo container system dns delete "$MACOS_HOST_DNS_NAME" >/dev/null 2>&1 || true
+    sudo container system dns create \
+        "$MACOS_HOST_DNS_NAME" \
+        --localhost "$MACOS_HOST_REDIRECT_IP" >/dev/null \
+        || die "Could not configure Apple Container host redirection"
+
+    app_base_url="${app_scheme}://${app_authority}"
+    valet_available=0
+    herd_available=0
+    manager_url_ready=0
+    artisan_url_ready=0
+    if command -v valet >/dev/null 2>&1; then
+        valet_available=1
+    fi
+    if command -v herd >/dev/null 2>&1; then
+        herd_available=1
+    fi
+
+    if valid_hostname "$app_host" && endpoint_returns_ok "$app_base_url"; then
+        manager_url_ready=1
+    fi
+
+    artisan_port=8000
+    [[ $app_port_explicit -eq 0 ]] || artisan_port="$app_port"
+    [[ -z "$MACOS_ARTISAN_PORT" ]] || artisan_port="$MACOS_ARTISAN_PORT"
+    if endpoint_returns_ok "http://127.0.0.1:${artisan_port}"; then
+        artisan_url_ready=1
+    fi
+
+    app_server="$MACOS_APP_SERVER"
+    if [[ "$app_server" == "auto" ]]; then
+        if [[ $manager_url_ready -eq 1 && $herd_available -eq 1 ]]; then
+            app_server="herd"
+        elif [[ $manager_url_ready -eq 1 && $valet_available -eq 1 ]]; then
+            app_server="valet"
+        elif [[ $manager_url_ready -eq 1 ]]; then
+            app_server="router"
+        elif [[ $artisan_url_ready -eq 1 ]]; then
+            app_server="artisan"
+        elif valid_hostname "$app_host" && [[ $herd_available -eq 1 ]]; then
+            app_server="herd"
+        elif valid_hostname "$app_host" && [[ $valet_available -eq 1 ]]; then
+            app_server="valet"
+        else
+            app_server="artisan"
+        fi
+    fi
+
+    case "$app_server" in
+        valet)
+            [[ $valet_available -eq 1 ]] || die "MACOS_APP_SERVER=valet but the valet command is unavailable"
+            valid_hostname "$app_host" || die "Valet mode requires a hostname in APP_URL: $app_url"
+            detected_server="Laravel Valet"
+            container_route_host="$app_host"
+            app_internal_url="$app_base_url"
+            ;;
+        herd)
+            [[ $herd_available -eq 1 ]] || die "MACOS_APP_SERVER=herd but the herd command is unavailable"
+            valid_hostname "$app_host" || die "Herd mode requires a hostname in APP_URL: $app_url"
+            detected_server="Laravel Herd"
+            container_route_host="$app_host"
+            app_internal_url="$app_base_url"
+            ;;
+        router)
+            detected_server="local domain web server"
+            container_route_host="$app_host"
+            app_internal_url="$app_base_url"
+            ;;
+        artisan)
+            detected_server="php artisan serve"
+            container_route_host="$MACOS_HOST_DNS_NAME"
+            app_internal_url="http://${MACOS_HOST_DNS_NAME}:${artisan_port}"
+            ;;
+        *) die "Could not detect the macOS application server" ;;
+    esac
+
+    app_internal_url="${app_internal_url%/}"
+    log "Detected macOS application server: $detected_server"
+    log "OnlyOffice will reach the application at $app_internal_url"
+    if [[ "$app_server" == "artisan" && $artisan_url_ready -eq 0 ]]; then
+        warn "No response from 127.0.0.1:${artisan_port}; start 'php artisan serve --host=127.0.0.1 --port=${artisan_port}' before opening a preview"
+    elif [[ "$app_server" != "artisan" && $manager_url_ready -eq 0 ]]; then
+        warn "$detected_server was detected, but $app_base_url/up is not responding"
+    fi
+
     jwt_secret="$(sed -n 's/^[[:space:]]*ONLYOFFICE_JWT_SECRET=//p' "$env_file" | sed -n '1p')"
     jwt_secret="${jwt_secret#\"}"
     jwt_secret="${jwt_secret%\"}"
     [[ "${#jwt_secret}" -ge 32 ]] || jwt_secret="$(openssl rand -hex 32)"
 
-    log "Starting Apple Container system service..."
-    container system start
+    container_run_args=(
+        --detach
+        --name "$ONLYOFFICE_CONTAINER_NAME"
+        --arch arm64
+        --cpus "$MACOS_ONLYOFFICE_CPUS"
+        --memory "$MACOS_ONLYOFFICE_MEMORY"
+        --shm-size "$MACOS_ONLYOFFICE_SHM_SIZE"
+        --dns "$MACOS_CONTAINER_DNS"
+        --publish "127.0.0.1:${MACOS_ONLYOFFICE_PORT}:80"
+        --volume "${ONLYOFFICE_DATA_VOLUME}:/var/www/onlyoffice/Data"
+        --volume "${ONLYOFFICE_LOGS_VOLUME}:/var/log/onlyoffice"
+        --volume "${ONLYOFFICE_CACHE_VOLUME}:/var/lib/onlyoffice"
+        --volume "${ONLYOFFICE_POSTGRES_VOLUME}:/var/lib/postgresql"
+        --env "JWT_ENABLED=true"
+        --env JWT_SECRET
+        --env "JWT_HEADER=AuthorizationJwt"
+        --env "JWT_IN_BODY=true"
+        # setup_onlyoffice_japanese_fonts generates only the font catalog.
+        # The image default also regenerates presentation themes, which can
+        # stall indefinitely under Apple Container on arm64.
+        --env "GENERATE_FONTS=false"
+        --env "CHATTERROW_APP_HOST=${container_route_host}"
+        --env "CHATTERROW_HOST_REDIRECT_IP=${MACOS_HOST_REDIRECT_IP}"
+        --env "CHATTERROW_APP_INTERNAL_URL=${app_internal_url}"
+        --env "CHATTERROW_CONTAINER_DNS=${MACOS_CONTAINER_DNS}"
+        --entrypoint /bin/bash
+    )
 
-    # OnlyOffice must reach the app's signed download route from inside its VM.
-    sudo container system dns create host.container.internal --localhost 192.0.2.113 >/dev/null 2>&1 || \
-        warn "host.container.internal already exists; verify it points to 192.0.2.113"
+    log "Pulling the current $ONLYOFFICE_IMAGE image..."
+    container image pull "$ONLYOFFICE_IMAGE" >/dev/null \
+        || die "Could not pull $ONLYOFFICE_IMAGE"
 
     if container inspect "$ONLYOFFICE_CONTAINER_NAME" >/dev/null 2>&1; then
-        log "OnlyOffice container already exists; starting it"
-        container start "$ONLYOFFICE_CONTAINER_NAME" >/dev/null || die "Could not start $ONLYOFFICE_CONTAINER_NAME"
-    else
-        log "Pulling and starting OnlyOffice DocumentServer with Apple Container..."
-        container run \
-            --detach \
-            --name "$ONLYOFFICE_CONTAINER_NAME" \
-            --arch amd64 \
-            --publish "127.0.0.1:${ONLYOFFICE_PORT}:80" \
-            --env "JWT_ENABLED=true" \
-            --env "JWT_SECRET=${jwt_secret}" \
-            --env "JWT_HEADER=AuthorizationJwt" \
-            --env "JWT_IN_BODY=true" \
-            "$ONLYOFFICE_IMAGE" >/dev/null || die "Could not start OnlyOffice DocumentServer"
+        warn "Recreating the macOS OnlyOffice container; named volumes will be preserved"
+        # A stuck font/theme generator can prevent both exec and graceful stop.
+        # Force-removing the container does not remove its named volumes.
+        container delete --force "$ONLYOFFICE_CONTAINER_NAME" >/dev/null \
+            || die "Could not remove $ONLYOFFICE_CONTAINER_NAME"
     fi
 
+    log "Starting OnlyOffice DocumentServer with Apple Container..."
+    JWT_SECRET="$jwt_secret" container run \
+        "${container_run_args[@]}" \
+        "$ONLYOFFICE_IMAGE" \
+        -lc 'sed -i "/[[:space:]]${CHATTERROW_APP_HOST}\\([[:space:]]\\|$\\)/d" /etc/hosts; printf "%s %s\n" "$CHATTERROW_HOST_REDIRECT_IP" "$CHATTERROW_APP_HOST" >> /etc/hosts; exec /bin/bash /app/ds/run-document-server.sh' \
+        >/dev/null || die "Could not start OnlyOffice DocumentServer"
+
+    # Apply the mapping immediately as well as from the startup wrapper. This
+    # repairs a running container whose generated /etc/hosts was replaced.
+    container exec "$ONLYOFFICE_CONTAINER_NAME" sh -lc \
+        'sed -i "/[[:space:]]${CHATTERROW_APP_HOST}\\([[:space:]]\\|$\\)/d" /etc/hosts; printf "%s %s\n" "$CHATTERROW_HOST_REDIRECT_IP" "$CHATTERROW_APP_HOST" >> /etc/hosts' \
+        || die "Could not map $container_route_host inside the OnlyOffice container"
+    container exec "$ONLYOFFICE_CONTAINER_NAME" getent hosts "$container_route_host" \
+        | grep -Eq "^${MACOS_HOST_REDIRECT_IP}[[:space:]]" \
+        || die "OnlyOffice did not resolve $container_route_host to $MACOS_HOST_REDIRECT_IP"
+    container exec "$ONLYOFFICE_CONTAINER_NAME" awk -v "dns=$MACOS_CONTAINER_DNS" \
+        '$1 == "nameserver" && $2 == dns { found = 1 } END { exit !found }' \
+        /etc/resolv.conf \
+        || die "OnlyOffice is not using DNS server $MACOS_CONTAINER_DNS"
+
     set_env ONLYOFFICE_ENABLED true "$env_file"
-    set_env ONLYOFFICE_DOCUMENT_SERVER_URL "http://127.0.0.1:${ONLYOFFICE_PORT}" "$env_file"
-    set_env ONLYOFFICE_PUBLIC_URL "http://127.0.0.1:${ONLYOFFICE_PORT}" "$env_file"
-    set_env APP_ONLYOFFICE_INTERNAL_URL "http://host.container.internal:${APP_INTERNAL_PORT}" "$env_file"
+    set_env ONLYOFFICE_DOCUMENT_SERVER_URL "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}" "$env_file"
+    set_env ONLYOFFICE_PUBLIC_URL "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}" "$env_file"
+    set_env APP_ONLYOFFICE_INTERNAL_URL "$app_internal_url" "$env_file"
     set_env ONLYOFFICE_JWT_SECRET "$jwt_secret" "$env_file"
+    set_env ONLYOFFICE_ALLOW_DOWNLOAD false "$env_file"
+    set_env ONLYOFFICE_ALLOW_PRINT false "$env_file"
 
     for _ in {1..60}; do
-        if curl -fsS "http://127.0.0.1:${ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -Eq 'true|ok'; then
-            log "OnlyOffice DocumentServer is ready on http://127.0.0.1:${ONLYOFFICE_PORT}"
+        if curl -fsS "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -Eq 'true|ok'; then
+            setup_onlyoffice_japanese_fonts "$ONLYOFFICE_CONTAINER_NAME" "$app_dir"
+
+            # Font catalog generation restarts the document and converter
+            # services. Wait for DocumentServer to become ready again.
+            for _ in {1..60}; do
+                if curl -fsS "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -Eq 'true|ok'; then
+                    break
+                fi
+                sleep 2
+            done
+            curl -fsS "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}/healthcheck" 2>/dev/null \
+                | grep -Eq 'true|ok' \
+                || die "OnlyOffice did not recover after Japanese font generation"
+
+            log "OnlyOffice DocumentServer is ready on http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}"
+
+            if container exec "$ONLYOFFICE_CONTAINER_NAME" \
+                curl -fsS --max-time 5 "${app_internal_url}/up" >/dev/null; then
+                log "OnlyOffice can reach the application at $app_internal_url"
+            else
+                warn "OnlyOffice cannot reach ${app_internal_url}/up; verify $detected_server is running"
+            fi
 
             if [[ -f "$app_dir/artisan" ]] && command -v php >/dev/null; then
                 (cd "$app_dir" && php artisan optimize:clear >/dev/null)
@@ -134,7 +644,7 @@ setup_macos_onlyoffice() {
     done
 
     container logs "$ONLYOFFICE_CONTAINER_NAME" || true
-    die "OnlyOffice health check failed on 127.0.0.1:${ONLYOFFICE_PORT}"
+    die "OnlyOffice health check failed on 127.0.0.1:${MACOS_ONLYOFFICE_PORT}"
 }
 
 prompt_required() {
@@ -157,10 +667,24 @@ DB_USER="${DB_USER:-chatterrow}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 NO_SSL=0
 REVERB_SERVER_PORT=8081
-ONLYOFFICE_PORT=8080
+ONLYOFFICE_PORT="${ONLYOFFICE_PORT:-8080}"
 APP_INTERNAL_PORT=8090
 ONLYOFFICE_IMAGE="${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}"
-ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatterrow-onlyoffice}"
+ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatterrow-onlyoffice-documentserver}"
+MACOS_ONLYOFFICE_PORT="${MACOS_ONLYOFFICE_PORT:-8086}"
+MACOS_ONLYOFFICE_CPUS="${MACOS_ONLYOFFICE_CPUS:-4}"
+MACOS_ONLYOFFICE_MEMORY="${MACOS_ONLYOFFICE_MEMORY:-4G}"
+MACOS_ONLYOFFICE_SHM_SIZE="${MACOS_ONLYOFFICE_SHM_SIZE:-2G}"
+MACOS_APP_HOST="${MACOS_APP_HOST:-}"
+MACOS_APP_SERVER="${MACOS_APP_SERVER:-auto}"
+MACOS_ARTISAN_PORT="${MACOS_ARTISAN_PORT:-}"
+MACOS_HOST_REDIRECT_IP="${MACOS_HOST_REDIRECT_IP:-203.0.113.150}"
+MACOS_HOST_DNS_NAME="${MACOS_HOST_DNS_NAME:-chatter-host.container.internal}"
+MACOS_CONTAINER_DNS="${MACOS_CONTAINER_DNS:-1.1.1.1}"
+ONLYOFFICE_DATA_VOLUME="${ONLYOFFICE_DATA_VOLUME:-chatterrow-onlyoffice-data}"
+ONLYOFFICE_LOGS_VOLUME="${ONLYOFFICE_LOGS_VOLUME:-chatterrow-onlyoffice-logs}"
+ONLYOFFICE_CACHE_VOLUME="${ONLYOFFICE_CACHE_VOLUME:-chatterrow-onlyoffice-cache}"
+ONLYOFFICE_POSTGRES_VOLUME="${ONLYOFFICE_POSTGRES_VOLUME:-chatterrow-onlyoffice-postgresql}"
 
 usage() {
     cat <<'EOF'
@@ -176,13 +700,25 @@ Options:
   --db-password <password>   PostgreSQL password (default: securely generated)
   --app-dir <path>           App install path (default: /var/www/chatterrow)
   --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrowrow.git)
-  --onlyoffice-image <image> OnlyOffice image for macOS Container (default: onlyoffice/documentserver:latest)
+  --onlyoffice-image <image> OnlyOffice image pulled on each macOS run (default: onlyoffice/documentserver:latest)
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
 
 All options can also be supplied through same-named uppercase environment
 variables, except --no-ssl. Non-interactive runs require --domain and
 --database (or DOMAIN and DATABASE).
+
+macOS Apple Container overrides:
+  MACOS_APP_HOST              Application hostname override (default: APP_URL host)
+  MACOS_APP_SERVER            auto, valet, herd, or artisan (default: auto)
+  MACOS_ARTISAN_PORT          php artisan serve port (default: APP_URL port or 8000)
+  MACOS_ONLYOFFICE_PORT       DocumentServer host port (default: 8086)
+  MACOS_HOST_REDIRECT_IP      Container-to-host loopback IP (default: 203.0.113.150)
+  MACOS_HOST_DNS_NAME         Private redirect record (default: chatter-host.container.internal)
+  MACOS_CONTAINER_DNS         Container DNS server (default: 1.1.1.1)
+  MACOS_ONLYOFFICE_CPUS       Container CPU count (default: 4)
+  MACOS_ONLYOFFICE_MEMORY     Container memory limit (default: 4G)
+  MACOS_ONLYOFFICE_SHM_SIZE   Container shared memory size (default: 2G)
 EOF
 }
 

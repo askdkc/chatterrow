@@ -6,7 +6,9 @@ use App\Models\StoredFile;
 
 class OnlyOfficeDocumentVersion
 {
-    private const NAMESPACE = 'chatter-onlyoffice-document-v1';
+    // Invalidate DocumentServer conversions generated before the Source Han /
+    // Noto CJK catalog and Office fallback mappings were introduced.
+    private const NAMESPACE = 'chatter-onlyoffice-document-v3-source-han-noto-cjk';
 
     public function key(StoredFile $storedFile): string
     {

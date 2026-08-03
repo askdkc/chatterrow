@@ -48,9 +48,9 @@ office.chat.example.com  A/AAAA -> サーバー
 
 ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポートは外部公開しないでください。クラウドファイアウォールやホスト側ファイアウォールでは、SSH用ポートと80/443だけを許可します。
 
-## 自動セットアップ
+## Ubuntu自動セットアップ
 
-リポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。
+Ubuntuではリポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。
 
 ```bash
 git clone git@github.com:askdkc/chatterrow.git
@@ -69,54 +69,6 @@ PostgreSQL password (leave blank to generate):
 
 ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になります。上の例では`office.chat.example.com`です。
 
-## macOSローカルOnlyOffice
-
-macOSではLinux用のOnlyOfficeパッケージをインストールせず、Appleの`container`でDocumentServerを起動できます。Apple siliconとmacOS 26以降が必要です。
-
-1. [Apple Container](https://github.com/apple/container)をインストールします。
-2. `container`のシステムサービスを起動できることを確認します。
-3. リポジトリのルートでセットアップを実行します。
-
-```bash
-cd /path/to/chatterrow
-./setup.sh --onlyoffice-image onlyoffice/documentserver:latest
-```
-
-セットアップは以下を行います。
-
-- `container system start`でApple Containerを起動
-- `onlyoffice/documentserver:latest`をamd64（Rosetta）で起動
-- OnlyOfficeを`127.0.0.1:8080`へ公開
-- JWTを有効化し、`.env`へ共有秘密鍵を設定
-- OnlyOfficeコンテナからホスト上のアプリへアクセスする`host.container.internal`を設定
-- `ONLYOFFICE_DOCUMENT_SERVER_URL`、`ONLYOFFICE_PUBLIC_URL`、`APP_ONLYOFFICE_INTERNAL_URL`を更新
-
-アプリ側はOnlyOfficeから取得できるよう、ホストの`127.0.0.1:8090`で動作させてください。別ポートを使う場合は、`.env`の`APP_ONLYOFFICE_INTERNAL_URL`を次の形式で変更します。
-
-```dotenv
-APP_ONLYOFFICE_INTERNAL_URL=http://host.container.internal:<アプリのポート>
-```
-
-コンテナの確認・停止:
-
-```bash
-container list
-container logs chatterrow-onlyoffice
-container stop chatterrow-onlyoffice
-```
-
-### 日本語フォント（macOS）
-
-PDF出力はリポジトリ同梱のSource Han Sans JP（`public/fonts/SourceHanSansJP-Regular.ttf`）を使用するため必須ではありませんが、システム全体で日本語表示を整える場合はHomebrewでインストールできます。
-
-```bash
-brew install --cask font-source-han-code-jp
-```
-
-`setup.sh`はmacOSでHomebrewが利用可能な場合、このフォントのインストールを自動で試みます。インストール済みの場合はスキップされます。
-
-macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューのままです。DocumentServerの変換APIを利用する場合も、このReadOnly設定とは独立して使用できます。
-
 セットアップは以下を自動実行します。
 
 1. nginx公式署名済みリポジトリ、PHP 8.4+、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
@@ -129,9 +81,173 @@ macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューの
 8. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
 9. PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
 
+## macOSローカルOnlyOffice
+
+macOSではLinux用のOnlyOfficeパッケージをインストールせず、Appleの`container`でDocumentServerを起動します。Apple siliconとmacOS 26以降が必要です。
+
+1. [Apple Container](https://github.com/apple/container)をインストールします。
+2. Laravelアプリの`.env`を用意します。存在しない場合、`setup.sh`は`.env.example`をコピーします。
+3. `APP_URL`を実際のローカルURLに合わせます。
+4. リポジトリのルートでセットアップを実行します。macOSでは`--domain`と`--database`は不要です。
+
+```bash
+cd /path/to/chatterrow
+./setup.sh
+```
+
+既存の`.env`全体を上書きすることはありません。更新対象は次のONLYOFFICE設定だけです。
+
+```dotenv
+ONLYOFFICE_ENABLED
+ONLYOFFICE_DOCUMENT_SERVER_URL
+ONLYOFFICE_PUBLIC_URL
+APP_ONLYOFFICE_INTERNAL_URL
+ONLYOFFICE_JWT_SECRET
+ONLYOFFICE_ALLOW_DOWNLOAD
+ONLYOFFICE_ALLOW_PRINT
+```
+
+### Valet・Herd・artisan serveの自動判定
+
+`setup.sh`は`valet`と`herd`コマンドの有無、`APP_URL/up`、`127.0.0.1:<ポート>/up`の応答を確認して接続方法を選択します。Valet/Herd側とartisan serve側の両方が応答する場合は、`APP_URL`のValet/Herd側を優先します。
+
+| 開発サーバー | `.env`の`APP_URL`例 | 自動設定される`APP_ONLYOFFICE_INTERNAL_URL` |
+|---|---|---|
+| Laravel Valet | `http://chatterrow.test` | `http://chatterrow.test` |
+| Laravel Herd | `http://chatterrow.test` | `http://chatterrow.test` |
+| `php artisan serve` | `http://localhost:8000` | `http://chatter-host.container.internal:8000` |
+
+artisan serveを使う場合は、セットアップ前またはプレビューを開く前に起動します。
+
+```bash
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+自動判定を上書きする場合:
+
+```bash
+MACOS_APP_SERVER=artisan ./setup.sh
+MACOS_APP_SERVER=artisan MACOS_ARTISAN_PORT=9000 ./setup.sh
+MACOS_APP_SERVER=valet ./setup.sh
+MACOS_APP_SERVER=herd ./setup.sh
+```
+
+セットアップは以下を行います。
+
+- `container system start`でApple Containerを起動
+- `onlyoffice/documentserver:latest`を毎回pullし、arm64で起動
+- OnlyOfficeを`127.0.0.1:8086`へ公開
+- CPU 4、メモリ4 GB、共有メモリ2 GBを割り当て
+- コンテナのDNSサーバーを`1.1.1.1`へ固定
+- JWTを有効化し、`.env`へ共有秘密鍵を設定
+- macOSで`setup.sh`を実行するたび、名前付きボリュームを残してOnlyOfficeコンテナを再作成
+- `chatter-host.container.internal`を`203.0.113.150`経由でmacOSのloopbackへ接続
+- Valet/Herdではアプリのホスト名をコンテナ内だけ`203.0.113.150`へ割り当て
+- Source Han Sans JP／Noto Serif CJK JPを取得・検証し、OnlyOfficeのフォント一覧を再生成
+- `ONLYOFFICE_DOCUMENT_SERVER_URL`、`ONLYOFFICE_PUBLIC_URL`、`APP_ONLYOFFICE_INTERNAL_URL`を更新
+- DocumentServerとLaravelの`/up`をヘルスチェック
+
+DNSサーバーを上書きする場合は環境変数を指定します。値はIPv4アドレスで指定してください。
+
+```bash
+MACOS_CONTAINER_DNS=8.8.8.8 ./setup.sh
+```
+
+永続データには次の名前付きボリュームを使用します。
+
+```text
+chatterrow-onlyoffice-data
+chatterrow-onlyoffice-logs
+chatterrow-onlyoffice-cache
+chatterrow-onlyoffice-postgresql
+```
+
+コンテナの確認・停止:
+
+```bash
+container list
+container logs chatterrow-onlyoffice-documentserver
+container stop chatterrow-onlyoffice-documentserver
+```
+
+ヘルスチェック:
+
+```bash
+curl -fsS http://127.0.0.1:8086/healthcheck
+container exec chatterrow-onlyoffice-documentserver \
+    curl -fsS --max-time 5 "$(sed -n 's/^APP_ONLYOFFICE_INTERNAL_URL=//p' .env)/up"
+```
+
+### コンテナとボリュームの完全初期化テスト
+
+次の操作はOnlyOffice内部のPostgreSQL、設定、キャッシュ、ログを削除します。必要なデータがある場合は実行しないでください。
+
+```bash
+container stop chatterrow-onlyoffice-documentserver
+container delete chatterrow-onlyoffice-documentserver
+container volume delete \
+    chatterrow-onlyoffice-data \
+    chatterrow-onlyoffice-logs \
+    chatterrow-onlyoffice-cache \
+    chatterrow-onlyoffice-postgresql
+./setup.sh
+```
+
+[Apple Containerの名前付きボリューム](https://github.com/apple/container/blob/main/docs/command-reference.md#volume-management)は`container run --volume <名前>:<パス>`で存在しない場合に暗黙に作成されるため、上記手順でボリューム作成を含む初期構築を確認できます。
+
+### 日本語フォント（macOS）
+
+macOSホストへフォントをインストールしても、隔離されたOnlyOfficeコンテナからは使用できません。`setup.sh`は次の固定ウェイトフォントを公式リポジトリから固定バージョンでダウンロードし、SHA-256を検証してからOnlyOfficeへ登録します。
+
+- [Source Han Sans JP](https://github.com/adobe-fonts/source-han-sans) Light / Regular / Bold（2.005R、JP subset OTF）
+- [Noto Serif CJK JP](https://github.com/notofonts/noto-cjk) Regular / Bold（Serif2.003、Japanese OTF）
+
+フォントは`chatterrow-onlyoffice-data`ボリューム内の`/var/www/onlyoffice/Data/custom-fonts`へ保存されます。セットアップを再実行した場合はコンテナ内ファイルのSHA-256を確認し、一致していれば再ダウンロードしません。
+
+固定ウェイト版の登録後、`setup.sh`は既存の`AllFonts.js`と`font_selection.bin`を削除してから`allfontsgen`を実行します。既存ファイルを残すと`allfontsgen`がカタログを再利用し、新しいフォントを登録しない場合があるためです。
+
+OnlyOffice 9.4のconverterは、Microsoft Officeの日本語テーマフォントを`NanumGothic`や`Droid Sans Fallback`へ置換する場合があります。fontconfigのaliasだけではこの変換経路に効きません。そのため[scripts/patch-onlyoffice-font-catalog.php](scripts/patch-onlyoffice-font-catalog.php)が、サーバー側`font_selection.bin`とブラウザ側2個の`AllFonts.js`へ次の補正を適用します。
+
+- 游ゴシック、Yu Gothic、Meiryo、MS Gothic系の別名をSource Han Sans JPへ登録
+- 游明朝、Yu Mincho、MS Mincho系の別名をNoto Serif CJK JPへ登録
+- converterが選択した`NanumGothic`の実フォント参照をSource Han Sans JPへ変更
+- converterが選択した`Droid Sans Fallback`の実フォント参照をNoto Serif CJK JPへ変更
+
+このカタログはDOCX、XLSX、PPTXの変換とブラウザ表示で共用されます。補正後にJSキャッシュを生成し、docserviceとconverterを再起動してからDocumentServerのキャッシュを消去します。カタログ形式や必須フォント名が将来の`latest`で変わった場合は、誤ったカタログを使わずセットアップをエラー終了します。
+
+標準の`documentserver-generate-allfonts.sh`は不要なプレゼンテーションテーマも再生成し、Apple Container環境ではその工程が終了しない場合があるため呼び出しません。
+
+フォントカタログ更新時はOnlyOfficeの文書キャッシュ世代も変わるため、既に開いたDOCXも古い`Editor.bin`を再利用せず再変換されます。
+
+既存コンテナが`Generating presentation themes`で応答しなくなっている場合も、そのまま`./setup.sh`を再実行してください。macOSでは実行のたびに`onlyoffice/documentserver:latest`をpullし、既存のOnlyOfficeコンテナを強制的に作り直します。上記4個の名前付きボリュームは削除しないため、OnlyOfficeの永続データは保持されます。
+
+Microsoftの游明朝／游ゴシックは同梱・再配布しません。OnlyOfficeコンテナ内では次の代替設定を使用します。
+
+| Office指定フォント（DOCX / XLSX / PPTX） | 代替フォント |
+|---|---|
+| 游明朝 / Yu Mincho / MS Mincho | Noto Serif CJK JP |
+| 游ゴシック / Yu Gothic / Meiryo / MS Gothic | Source Han Sans JP |
+
+文字欠けと不適切な欧文フォントへの置換は解消しますが、游フォントとの字幅差があるため改行位置やページ数まで完全一致する保証はありません。完全一致が必要なら、利用許諾を確認した游フォント実体をOnlyOfficeのカスタムフォント領域へ別途配置してください。
+
+登録状態の確認:
+
+```bash
+container exec chatterrow-onlyoffice-documentserver \
+    awk '$1 == "nameserver" { print $2 }' /etc/resolv.conf
+container exec chatterrow-onlyoffice-documentserver \
+    fc-match '游明朝:lang=ja'
+container exec chatterrow-onlyoffice-documentserver \
+    fc-match '游ゴシック Light:lang=ja'
+```
+
+期待値は順に`1.1.1.1`、`NotoSerifCJKjp-Regular.otf`、`SourceHanSansJP-Light.otf`です。
+
+macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューのままです。DocumentServerの変換APIを利用する場合も、このReadOnly設定とは独立して使用できます。
+
 ## 非対話セットアップ
 
-自動化環境では`--domain`と`--database`が必須です。
+Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOSローカルOnlyOfficeセットアップでは不要です。
 
 ```bash
 ./setup.sh \
@@ -154,6 +270,7 @@ macOSではOnlyOfficeの編集権限は付与せず、ReadOnlyプレビューの
 | `--db-password <password>` | 自動生成           | アプリ用PostgreSQLパスワード      |
 | `--app-dir <path>`         | `/var/www/chatterrow` | `/var/www`配下の配備先            |
 | `--repo <url>`             | GitHub SSH URL     | 配備するGitリポジトリ             |
+| `--onlyoffice-image <image>` | `onlyoffice/documentserver:latest` | macOSで毎回pullして使用するDocumentServerイメージ |
 | `--no-ssl`                 | off                | Certbotを省略しHTTPで構成         |
 
 同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`。
@@ -190,6 +307,8 @@ PostgreSQLはONLYOFFICEでも必要なため、アプリでSQLiteを選んだ場
 
 ## ポート構成
 
+Ubuntu本番環境:
+
 | ポート   | 用途                                 | 公開範囲           |
 |----------|--------------------------------------|--------------------|
 | 80 / 443 | nginx、Certbot、公開Web              | インターネット     |
@@ -197,6 +316,15 @@ PostgreSQLはONLYOFFICEでも必要なため、アプリでSQLiteを選んだ場
 | 8081     | Laravel Reverb                       | localhost向け      |
 | 8090     | ONLYOFFICEから署名済みファイルを取得 | 127.0.0.1のみ      |
 | 5432     | PostgreSQL                           | ローカル接続を推奨 |
+
+macOSローカル環境:
+
+| ポート | 用途 | 公開範囲 |
+|---|---|---|
+| 8086 | Apple Container上のONLYOFFICE Document Server | `127.0.0.1`のみ |
+| 8000 | `php artisan serve`の既定ポート | `127.0.0.1`のみ |
+
+Valet/Herd使用時、Laravelアプリは`APP_URL`のホスト名と通常のHTTP/HTTPSポートで動作します。artisan serveのポートは`APP_URL`または`MACOS_ARTISAN_PORT`から決定します。
 
 ## SSLと自動更新
 
@@ -267,7 +395,8 @@ sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
 | 502 Bad Gateway              | `sudo systemctl status php*-fpm`、`sudo nginx -t`                        |
 | リアルタイム更新されない     | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続 |
 | 添付プレビューが生成されない | `/var/log/chatterrow-queue-error.log`、LibreOffice/Poppler/ImageMagick      |
-| Officeプレビューが開かない   | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL       |
+| Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL |
+| Officeプレビューが開かない（macOS） | `curl http://127.0.0.1:8086/healthcheck`、JWT秘密鍵、`APP_ONLYOFFICE_INTERNAL_URL`、コンテナ内から`/up`への到達性 |
 | PostgreSQLへ接続できない     | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`  |
 | 証明書を発行できない         | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                  |
 
