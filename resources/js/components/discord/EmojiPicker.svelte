@@ -1,9 +1,21 @@
 <script lang="ts">
-    import { Ellipsis, Smile } from 'lucide-svelte';
-    import { onMount } from 'svelte';
+    import { Ellipsis, Smile, SmilePlus } from 'lucide-svelte';
+    import { onMount, tick } from 'svelte';
+    import StampReaction from '@/components/discord/StampReaction.svelte';
     import { Button } from '@/components/ui/button';
+    import { Checkbox } from '@/components/ui/checkbox';
+    import * as Field from '@/components/ui/field';
     import { Input } from '@/components/ui/input';
+    import * as InputGroup from '@/components/ui/input-group';
     import * as Popover from '@/components/ui/popover';
+    import {
+        createStampReaction,
+        DEFAULT_STAMP_TEXTS,
+        isStampReaction,
+        MAX_STAMP_TEXT_LENGTH,
+        normalizeStampReaction,
+        stampReactionText,
+    } from '@/lib/reactions';
     import { cn } from '@/lib/utils';
 
     type EmojiCategory = {
@@ -18,15 +30,22 @@
         open = $bindable(false),
         align = 'center',
         alignOffset = 0,
+        mode = 'insert',
         onselect,
     }: {
         open?: boolean;
         align?: 'start' | 'center' | 'end';
         alignOffset?: number;
+        mode?: 'insert' | 'reaction';
         onselect: (emoji: string) => void;
     } = $props();
 
     const RECENT_EMOJI_STORAGE_KEY = 'chatterrow.recent-emojis';
+    const REGISTERED_STAMP_STORAGE_KEY =
+        'chatterrow.registered-stamp-reactions';
+    const REGISTERED_STAMP_CHANGE_EVENT =
+        'chatterrow:registered-stamp-reactions-change';
+    const TEXT_STAMP_TRIGGER_EMOJI = '💬';
     const DEFAULT_QUICK_EMOJIS = [
         '💬',
         '👍',
@@ -38,6 +57,16 @@
         '🎉',
     ];
     const MAX_RECENT_EMOJIS = 16;
+    const MAX_REGISTERED_STAMPS = 100;
+    const DEFAULT_STAMP_REACTIONS = DEFAULT_STAMP_TEXTS.map((text) =>
+        createStampReaction(text),
+    ).filter((value): value is string => value !== null);
+    const triggerLabel = $derived(
+        mode === 'reaction' ? 'リアクションを追加' : '絵文字を選ぶ',
+    );
+    const selectionAction = $derived(
+        mode === 'reaction' ? 'リアクションに追加' : '挿入',
+    );
 
     const categories: EmojiCategory[] = [
         {
@@ -147,15 +176,39 @@
     };
 
     let fullPickerOpen = $state(false);
+    let stampPickerOpen = $state(false);
+    let stampText = $state('');
+    let stampTextColor = $state('#111827');
+    let stampBackgroundColor = $state('#ffffff');
+    let stampBackgroundTransparent = $state(false);
+    let stampInput: HTMLInputElement | null = $state(null);
     let searchQuery = $state('');
     let activeCategoryId = $state(categories[0].id);
     let previewEmoji = $state('👋');
     let recentEmojis = $state([...DEFAULT_QUICK_EMOJIS]);
+    let registeredStampReactions = $state<string[]>([]);
 
     const quickEmojis = $derived(
-        [...recentEmojis, ...DEFAULT_QUICK_EMOJIS]
+        [
+            ...(mode === 'reaction' ? [TEXT_STAMP_TRIGGER_EMOJI] : []),
+            ...recentEmojis,
+            ...DEFAULT_QUICK_EMOJIS,
+        ]
             .filter((emoji, index, all) => all.indexOf(emoji) === index)
             .slice(0, 8),
+    );
+    const customStampReaction = $derived(
+        createStampReaction(stampText, {
+            textColor: stampTextColor,
+            backgroundColor: stampBackgroundTransparent
+                ? null
+                : stampBackgroundColor,
+        }),
+    );
+    const availableStampReactions = $derived(
+        [...registeredStampReactions, ...DEFAULT_STAMP_REACTIONS].filter(
+            (reaction, index, all) => all.indexOf(reaction) === index,
+        ),
     );
     const visibleEmojis = $derived.by(() => {
         const query = searchQuery.trim().toLocaleLowerCase();
@@ -183,6 +236,34 @@
         });
     });
 
+    function normalizeRegisteredStampReactions(values: unknown): string[] {
+        if (!Array.isArray(values)) {
+            return [];
+        }
+
+        return values
+            .map((value) =>
+                typeof value === 'string'
+                    ? normalizeStampReaction(value)
+                    : null,
+            )
+            .filter((value): value is string => value !== null)
+            .filter((reaction, index, all) => all.indexOf(reaction) === index)
+            .slice(0, MAX_REGISTERED_STAMPS);
+    }
+
+    function readRegisteredStampReactions(): string[] {
+        try {
+            return normalizeRegisteredStampReactions(
+                JSON.parse(
+                    localStorage.getItem(REGISTERED_STAMP_STORAGE_KEY) ?? '[]',
+                ),
+            );
+        } catch {
+            return [];
+        }
+    }
+
     onMount(() => {
         try {
             const stored = JSON.parse(
@@ -202,10 +283,44 @@
         } catch {
             // Invalid local data should not prevent the picker from opening.
         }
+
+        registeredStampReactions = readRegisteredStampReactions();
+
+        const syncRegisteredStamps = (event: Event) => {
+            if (event instanceof CustomEvent) {
+                registeredStampReactions = normalizeRegisteredStampReactions(
+                    event.detail,
+                );
+            }
+        };
+        const syncRegisteredStampsFromStorage = (event: StorageEvent) => {
+            if (event.key === REGISTERED_STAMP_STORAGE_KEY) {
+                registeredStampReactions = readRegisteredStampReactions();
+            }
+        };
+
+        window.addEventListener(
+            REGISTERED_STAMP_CHANGE_EVENT,
+            syncRegisteredStamps,
+        );
+        window.addEventListener('storage', syncRegisteredStampsFromStorage);
+
+        return () => {
+            window.removeEventListener(
+                REGISTERED_STAMP_CHANGE_EVENT,
+                syncRegisteredStamps,
+            );
+            window.removeEventListener(
+                'storage',
+                syncRegisteredStampsFromStorage,
+            );
+        };
     });
 
     function resetPicker() {
         fullPickerOpen = false;
+        stampPickerOpen = false;
+        stampText = '';
         searchQuery = '';
     }
 
@@ -216,7 +331,15 @@
     }
 
     function expandPicker() {
+        stampPickerOpen = false;
         fullPickerOpen = true;
+    }
+
+    async function openStampPicker() {
+        fullPickerOpen = false;
+        stampPickerOpen = true;
+        await tick();
+        stampInput?.focus();
     }
 
     function chooseCategory(category: EmojiCategory) {
@@ -225,35 +348,85 @@
         searchQuery = '';
     }
 
-    function selectEmoji(emoji: string) {
-        recentEmojis = [
-            emoji,
-            ...recentEmojis.filter((item) => item !== emoji),
-        ].slice(0, MAX_RECENT_EMOJIS);
+    function registerStampReaction(value: string) {
+        const normalizedValue = normalizeStampReaction(value);
+
+        if (!normalizedValue) {
+            return;
+        }
+
+        registeredStampReactions = [
+            normalizedValue,
+            ...registeredStampReactions.filter(
+                (reaction) => reaction !== normalizedValue,
+            ),
+        ].slice(0, MAX_REGISTERED_STAMPS);
 
         try {
             localStorage.setItem(
-                RECENT_EMOJI_STORAGE_KEY,
-                JSON.stringify(recentEmojis),
+                REGISTERED_STAMP_STORAGE_KEY,
+                JSON.stringify(registeredStampReactions),
+            );
+            window.dispatchEvent(
+                new CustomEvent(REGISTERED_STAMP_CHANGE_EVENT, {
+                    detail: registeredStampReactions,
+                }),
             );
         } catch {
-            // Storage can be unavailable in private browsing; insertion still works.
+            // Storage can be unavailable; the stamp can still be used now.
+        }
+    }
+
+    function selectValue(value: string) {
+        if (isStampReaction(value)) {
+            registerStampReaction(value);
+        } else {
+            recentEmojis = [
+                value,
+                ...recentEmojis.filter((item) => item !== value),
+            ].slice(0, MAX_RECENT_EMOJIS);
+
+            try {
+                localStorage.setItem(
+                    RECENT_EMOJI_STORAGE_KEY,
+                    JSON.stringify(recentEmojis),
+                );
+            } catch {
+                // Storage can be unavailable in private browsing; insertion still works.
+            }
         }
 
-        onselect(emoji);
+        onselect(value);
         resetPicker();
         open = false;
+    }
+
+    function submitStamp(event: SubmitEvent) {
+        event.preventDefault();
+
+        if (customStampReaction) {
+            selectValue(customStampReaction);
+        }
     }
 </script>
 
 <Popover.Root bind:open onOpenChange={handleOpenChange}>
     <Popover.Trigger
         type="button"
-        class="rounded p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="絵文字を選ぶ"
-        title="絵文字を選ぶ"
+        class={cn(
+            'transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            mode === 'reaction'
+                ? 'flex size-7 items-center justify-center rounded-full border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground'
+                : 'rounded p-1.5 text-[#b5bac1] hover:bg-white/10 hover:text-white',
+        )}
+        aria-label={triggerLabel}
+        title={triggerLabel}
     >
-        <Smile class="h-4 w-4" />
+        {#if mode === 'reaction'}
+            <SmilePlus class="size-5" />
+        {:else}
+            <Smile class="size-4" />
+        {/if}
     </Popover.Trigger>
     <Popover.Content
         side="top"
@@ -265,9 +438,122 @@
             'gap-2.5 bg-transparent p-0 shadow-none ring-0',
             fullPickerOpen
                 ? 'w-[min(34rem,calc(100vw-1rem))]'
-                : 'w-max max-w-[calc(100vw-1rem)]',
+                : stampPickerOpen
+                  ? 'w-[min(20rem,calc(100vw-1rem))]'
+                  : 'w-max max-w-[calc(100vw-1rem)]',
         )}
     >
+        {#if stampPickerOpen && mode === 'reaction'}
+            <section
+                class="animate-in fade-in-0 slide-in-from-bottom-2 flex flex-col gap-2 rounded-2xl border bg-popover p-2 text-popover-foreground shadow-xl duration-150"
+                aria-label="文字ハンコ"
+            >
+                <form onsubmit={submitStamp}>
+                    <Field.FieldGroup class="gap-2">
+                        <Field.Field>
+                            <Field.FieldLabel
+                                for="stamp-reaction-text"
+                                class="sr-only"
+                            >
+                                ハンコにする文字
+                            </Field.FieldLabel>
+                            <InputGroup.Root>
+                                <InputGroup.Input
+                                    bind:ref={stampInput}
+                                    id="stamp-reaction-text"
+                                    bind:value={stampText}
+                                    maxlength={MAX_STAMP_TEXT_LENGTH}
+                                    autocomplete="off"
+                                    placeholder="文字を入力（4文字まで）"
+                                />
+                                <InputGroup.Addon align="inline-end">
+                                    {#if customStampReaction}
+                                        <StampReaction
+                                            value={customStampReaction}
+                                            size="chip"
+                                        />
+                                    {/if}
+                                    <InputGroup.Button
+                                        type="submit"
+                                        disabled={!customStampReaction}
+                                    >
+                                        追加
+                                    </InputGroup.Button>
+                                </InputGroup.Addon>
+                            </InputGroup.Root>
+                        </Field.Field>
+
+                        <Field.FieldSet>
+                            <Field.FieldLegend class="sr-only">
+                                文字スタンプの色
+                            </Field.FieldLegend>
+                            <div class="grid grid-cols-2 gap-2">
+                                <Field.Field orientation="horizontal">
+                                    <Field.FieldLabel for="stamp-text-color">
+                                        文字色
+                                    </Field.FieldLabel>
+                                    <Input
+                                        id="stamp-text-color"
+                                        type="color"
+                                        class="size-8 shrink-0 p-1"
+                                        bind:value={stampTextColor}
+                                    />
+                                </Field.Field>
+                                <Field.Field
+                                    orientation="horizontal"
+                                    data-disabled={stampBackgroundTransparent}
+                                >
+                                    <Field.FieldLabel
+                                        for="stamp-background-color"
+                                    >
+                                        背景色
+                                    </Field.FieldLabel>
+                                    <Input
+                                        id="stamp-background-color"
+                                        type="color"
+                                        class="size-8 shrink-0 p-1"
+                                        bind:value={stampBackgroundColor}
+                                        disabled={stampBackgroundTransparent}
+                                    />
+                                </Field.Field>
+                            </div>
+                            <Field.Field orientation="horizontal">
+                                <Checkbox
+                                    id="stamp-background-transparent"
+                                    bind:checked={stampBackgroundTransparent}
+                                />
+                                <Field.FieldLabel
+                                    for="stamp-background-transparent"
+                                >
+                                    背景なし
+                                </Field.FieldLabel>
+                            </Field.Field>
+                        </Field.FieldSet>
+                    </Field.FieldGroup>
+                </form>
+
+                <div
+                    class="grid max-h-48 grid-cols-4 gap-1 overflow-y-auto"
+                    aria-label="登録済みの文字スタンプ"
+                >
+                    {#each availableStampReactions as stampReaction (stampReaction)}
+                        {@const text = stampReactionText(stampReaction)}
+                        {#if text}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                class="size-14 rounded-xl"
+                                aria-label={`ハンコ「${text}」をリアクションに追加`}
+                                onclick={() => selectValue(stampReaction)}
+                            >
+                                <StampReaction value={stampReaction} />
+                            </Button>
+                        {/if}
+                    {/each}
+                </div>
+            </section>
+        {/if}
+
         {#if fullPickerOpen}
             <section
                 class="animate-in fade-in-0 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-popover text-popover-foreground shadow-xl duration-150"
@@ -326,8 +612,8 @@
                                     variant="ghost"
                                     size="icon"
                                     class="rounded-xl text-2xl"
-                                    aria-label={`${emoji}を挿入`}
-                                    onclick={() => selectEmoji(emoji)}
+                                    aria-label={`${emoji}を${selectionAction}`}
+                                    onclick={() => selectValue(emoji)}
                                     onpointerenter={() =>
                                         (previewEmoji = emoji)}
                                 >
@@ -353,8 +639,8 @@
                             variant="ghost"
                             size="icon"
                             class="shrink-0 rounded-xl text-2xl"
-                            aria-label={`最近使った${emoji}を挿入`}
-                            onclick={() => selectEmoji(emoji)}
+                            aria-label={`最近使った${emoji}を${selectionAction}`}
+                            onclick={() => selectValue(emoji)}
                             onpointerenter={() => (previewEmoji = emoji)}
                         >
                             <span aria-hidden="true">{emoji}</span>
@@ -369,16 +655,33 @@
             aria-label="クイック絵文字"
         >
             {#each quickEmojis as emoji (emoji)}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-full text-xl"
-                    aria-label={`${emoji}を挿入`}
-                    onclick={() => selectEmoji(emoji)}
-                    onpointerenter={() => (previewEmoji = emoji)}
-                >
-                    <span aria-hidden="true">{emoji}</span>
-                </Button>
+                {#if mode === 'reaction' && emoji === TEXT_STAMP_TRIGGER_EMOJI}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class={cn(
+                            'size-8 shrink-0 rounded-full text-[22px]',
+                            stampPickerOpen &&
+                                'ring-2 ring-primary ring-offset-2',
+                        )}
+                        aria-label="文字ハンコを作る"
+                        aria-expanded={stampPickerOpen}
+                        onclick={openStampPicker}
+                    >
+                        <span aria-hidden="true">{emoji}</span>
+                    </Button>
+                {:else}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="size-8 shrink-0 rounded-full text-[22px]"
+                        aria-label={`${emoji}を${selectionAction}`}
+                        onclick={() => selectValue(emoji)}
+                        onpointerenter={() => (previewEmoji = emoji)}
+                    >
+                        <span aria-hidden="true">{emoji}</span>
+                    </Button>
+                {/if}
             {/each}
             <Button
                 variant="ghost"

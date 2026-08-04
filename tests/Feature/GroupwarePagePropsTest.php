@@ -50,9 +50,33 @@ class GroupwarePagePropsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('servers/Index')
-                ->has('servers')
+                ->has('servers.0.members', 2)
                 ->has('auth.servers', 1)
                 ->where('auth.user.id', $this->member->id));
+    }
+
+    public function test_archived_project_moves_to_the_archived_index_and_leaves_the_active_rail(): void
+    {
+        $this->server->update(['archived_at' => now()]);
+
+        $this->actingAs($this->owner)
+            ->get(route('servers.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('servers/Index')
+                ->has('servers', 0)
+                ->where('archivedCount', 1)
+                ->has('auth.servers', 0));
+
+        $this->actingAs($this->owner)
+            ->get(route('servers.archived'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('servers/Archived')
+                ->where('servers.0.id', $this->server->id)
+                ->where('servers.0.archived_at', fn ($value) => is_string($value) && $value !== '')
+                ->has('servers.0.members', 2)
+                ->has('auth.servers', 0));
     }
 
     public function test_server_show_has_server_channels_members_and_shared_rail(): void

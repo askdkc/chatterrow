@@ -20,7 +20,7 @@ class StoredFileController extends Controller
 {
     public function store(Request $request, Server $server): JsonResponse
     {
-        Gate::authorize('view', $server);
+        Gate::authorize('mutateContent', $server);
 
         $request->validate([
             'files' => ['required', 'array', 'max:10'],
@@ -53,6 +53,9 @@ class StoredFileController extends Controller
                 'size' => $file->size,
                 'preview_status' => $file->preview_status,
                 'markdown_status' => $file->markdown_status,
+                'stream_url' => $file->stream_url,
+                'download_url' => $file->download_url,
+                'thumbnail_url' => $file->thumbnail_url,
             ]),
         ], 201);
     }
@@ -178,7 +181,7 @@ class StoredFileController extends Controller
     public function destroy(Server $server, StoredFile $storedFile): JsonResponse
     {
         abort_unless($storedFile->server_id === $server->id, 404);
-        Gate::authorize('view', $server);
+        Gate::authorize('mutateContent', $server);
 
         $markedForDeletion = StoredFile::query()
             ->whereKey($storedFile->id)

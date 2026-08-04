@@ -11,8 +11,10 @@ use App\Models\Todo;
 use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\Fluent\AssertableJson;
 use RuntimeException;
 use Tests\TestCase;
@@ -40,7 +42,10 @@ class GroupwareMutationAuthorizationTest extends TestCase
         $this->outsider = User::factory()->create();
 
         $this->server = Server::factory()->create(['created_by' => $this->owner->id]);
-        $this->server->members()->attach([$this->owner->id, $this->member->id]);
+        $this->server->members()->attach([
+            $this->owner->id => ['role' => Server::ROLE_ADMIN],
+            $this->member->id => ['role' => Server::ROLE_MEMBER],
+        ]);
         $this->channel = Channel::factory()->create([
             'server_id' => $this->server->id,
             'created_by' => $this->owner->id,
@@ -90,6 +95,217 @@ class GroupwareMutationAuthorizationTest extends TestCase
             'starts_on' => '2026-08-01',
             'ends_on' => '2026-08-31',
         ]);
+    }
+
+    public function test_owner_can_invite_a_registered_user_without_immediate_membership(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson(route('servers.invitations.store', $this->server), [
+                'email' => $this->outsider->email,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('invitation.user.id', $this->outsider->id)
+            ->assertJsonPath('invitation.status', 'pending')
+            ->assertJsonPath('delivery', 'in_app');
+
+        $this->assertDatabaseHas('server_invitations', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->outsider->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->outsider->id,
+        ]);
+    }
+
+    public function test_non_owner_cannot_add_or_remove_project_members(): void
+    {
+        $this->actingAs($this->member)
+            ->postJson(route('servers.invitations.store', $this->server), [
+                'email' => $this->outsider->email,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->member)
+            ->deleteJson(route('servers.members.destroy', [$this->server, $this->owner]))
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->outsider->id,
+        ]);
+    }
+
+    public function test_owner_can_promote_a_member_to_project_administrator(): void
+    {
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.members.role.update', [
+                $this->server,
+                $this->member,
+            ]), [
+                'role' => Server::ROLE_ADMIN,
+            ])
+            ->assertOk()
+            ->assertJsonPath('user.id', $this->member->id)
+            ->assertJsonPath('user.pivot.role', Server::ROLE_ADMIN);
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->member->id,
+            'role' => Server::ROLE_ADMIN,
+        ]);
+    }
+
+    public function test_regular_member_cannot_change_project_roles(): void
+    {
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.members.role.update', [
+                $this->server,
+                $this->member,
+            ]), [
+                'role' => Server::ROLE_ADMIN,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->member->id,
+            'role' => Server::ROLE_MEMBER,
+        ]);
+    }
+
+    public function test_project_creator_cannot_be_demoted_or_removed(): void
+    {
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.members.role.update', [
+                $this->server,
+                $this->owner,
+            ]), [
+                'role' => Server::ROLE_MEMBER,
+            ])
+            ->assertUnprocessable();
+
+        $this->actingAs($this->owner)
+            ->deleteJson(route('servers.members.destroy', [
+                $this->server,
+                $this->owner,
+            ]))
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->owner->id,
+            'role' => Server::ROLE_ADMIN,
+        ]);
+    }
+
+    public function test_additional_administrator_has_full_project_management_permissions(): void
+    {
+        $this->server->members()->updateExistingPivot($this->member->id, [
+            'role' => Server::ROLE_ADMIN,
+        ]);
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => 'Managed by second admin',
+            ])
+            ->assertOk()
+            ->assertJsonPath('server.name', 'Managed by second admin');
+
+        $this->actingAs($this->member)
+            ->postJson(route('servers.invitations.store', $this->server), [
+                'email' => $this->outsider->email,
+            ])
+            ->assertCreated();
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.archive', $this->server))
+            ->assertOk();
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.restore', $this->server))
+            ->assertOk();
+
+        $this->actingAs($this->member)
+            ->deleteJson(route('servers.destroy', $this->server))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('servers', ['id' => $this->server->id]);
+    }
+
+    public function test_owner_cannot_remove_the_project_owner_membership(): void
+    {
+        $this->actingAs($this->owner)
+            ->deleteJson(route('servers.members.destroy', [$this->server, $this->owner]))
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $this->server->id,
+            'user_id' => $this->owner->id,
+        ]);
+    }
+
+    public function test_owner_can_archive_and_restore_a_project_while_members_cannot(): void
+    {
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.archive', $this->server))
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.archive', $this->server))
+            ->assertOk()
+            ->assertJsonPath('server.id', $this->server->id);
+
+        $this->assertNotNull($this->server->fresh()->archived_at);
+
+        $this->actingAs($this->member)
+            ->postJson(route('servers.channels.store', $this->server), [
+                'name' => 'archived-project-channel',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.update', $this->server), [
+                'name' => 'Cannot update while archived',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->member)
+            ->patchJson(route('servers.restore', $this->server))
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)
+            ->patchJson(route('servers.restore', $this->server))
+            ->assertOk();
+
+        $this->assertNull($this->server->fresh()->archived_at);
+    }
+
+    public function test_owner_can_permanently_delete_a_project_as_json(): void
+    {
+        Storage::fake('local');
+        $file = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->owner->id,
+            'path' => "uploads/{$this->server->id}/project-data.bin",
+            'original_name' => 'project-data.bin',
+        ]);
+        Storage::disk('local')->put($file->path, 'project data');
+
+        $this->actingAs($this->member)
+            ->deleteJson(route('servers.destroy', $this->server))
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)
+            ->deleteJson(route('servers.destroy', $this->server))
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertDatabaseMissing('servers', ['id' => $this->server->id]);
+        $this->assertDatabaseMissing('channels', ['id' => $this->channel->id]);
+        $this->assertDatabaseMissing('stored_files', ['id' => $file->id]);
+        Storage::disk('local')->assertMissing($file->path);
     }
 
     public function test_owner_cannot_remove_a_member_assigned_to_a_todo_in_the_server(): void
@@ -342,6 +558,22 @@ class GroupwareMutationAuthorizationTest extends TestCase
 
         $this->assertDatabaseMissing('servers', [
             'name' => 'offset-start-server',
+        ]);
+    }
+
+    public function test_server_creator_is_attached_as_an_administrator(): void
+    {
+        $serverId = $this->actingAs($this->owner)
+            ->postJson(route('servers.store'), [
+                'name' => 'New managed project',
+            ])
+            ->assertCreated()
+            ->json('server.id');
+
+        $this->assertDatabaseHas('server_user', [
+            'server_id' => $serverId,
+            'user_id' => $this->owner->id,
+            'role' => Server::ROLE_ADMIN,
         ]);
     }
 
@@ -906,6 +1138,24 @@ class GroupwareMutationAuthorizationTest extends TestCase
             ->assertJsonPath('messages.0.attachments.0.stream_url', route('servers.files.stream', [$this->server, $file]))
             ->assertJsonPath('messages.0.attachments.0.download_url', route('servers.files.download', [$this->server, $file]))
             ->assertJsonPath('messages.0.attachments.0.thumbnail_url', route('servers.files.thumbnail', [$this->server, $file]));
+    }
+
+    public function test_uploaded_file_response_includes_urls_for_composer_preview(): void
+    {
+        Storage::fake('local');
+
+        $response = $this->actingAs($this->member)
+            ->post(route('servers.files.store', $this->server), [
+                'files' => [UploadedFile::fake()->image('clipboard.png', 640, 480)],
+            ])
+            ->assertCreated();
+
+        $file = StoredFile::query()->findOrFail($response->json('files.0.id'));
+
+        $response
+            ->assertJsonPath('files.0.stream_url', route('servers.files.stream', [$this->server, $file]))
+            ->assertJsonPath('files.0.download_url', route('servers.files.download', [$this->server, $file]))
+            ->assertJsonPath('files.0.thumbnail_url', null);
     }
 
     public function test_replies_cannot_create_nested_threads(): void

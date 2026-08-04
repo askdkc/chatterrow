@@ -3,14 +3,16 @@
     import { cn } from '@/lib/utils';
 
     let {
+        ref = $bindable(null),
         class: className = '',
         type = 'text',
         value = $bindable(),
         ...rest
-    }: HTMLInputAttributes = $props();
+    }: HTMLInputAttributes & { ref?: HTMLInputElement | null } = $props();
 </script>
 
 <input
+    bind:this={ref}
     {type}
     bind:value
     class={cn(

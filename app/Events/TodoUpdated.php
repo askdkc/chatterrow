@@ -24,6 +24,11 @@ class TodoUpdated implements ShouldBroadcast
         ];
     }
 
+    public function broadcastAs(): string
+    {
+        return 'TodoUpdated';
+    }
+
     /** @return array<string, mixed> */
     public function broadcastWith(): array
     {

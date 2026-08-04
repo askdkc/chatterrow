@@ -2,6 +2,9 @@
     import {
         Check,
         Download,
+        Eye,
+        FileSpreadsheet,
+        FileText,
         FileType2,
         Loader2,
         MessageSquare,
@@ -10,17 +13,31 @@
         Trash2,
         X,
     } from 'lucide-svelte';
+    import EmojiPicker from '@/components/discord/EmojiPicker.svelte';
+    import MessageMarkdown from '@/components/discord/MessageMarkdown.svelte';
+    import StampReaction from '@/components/discord/StampReaction.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog, {
         canPreviewStoredFile,
     } from '@/components/files/StoredFilePreviewDialog.svelte';
+    import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+    import { Badge } from '@/components/ui/badge';
+    import { Button } from '@/components/ui/button';
     import { formatDate, formatTime } from '@/lib/dates';
     import { HttpError } from '@/lib/http';
     import {
-        renderHighlightedMessageMarkdown,
-        renderMessageMarkdown,
-    } from '@/lib/markdown';
-    import type { MessageResource, StoredFileResource } from '@/types';
+        restoreDraftMentions,
+        serializeDraftMentions,
+        updateMentionAnchors,
+    } from '@/lib/mentions';
+    import type { MentionAnchor } from '@/lib/mentions';
+    import { isStampReaction, reactionDisplayLabel } from '@/lib/reactions';
+    import { cn } from '@/lib/utils';
+    import type {
+        MessageReactionResource,
+        MessageResource,
+        StoredFileResource,
+    } from '@/types';
 
     const officeExtensions = new Set([
         'doc',
@@ -34,6 +51,7 @@
         'ods',
         'odp',
     ]);
+    const avatarToneCount = 8;
 
     let {
         message,
@@ -42,6 +60,9 @@
         canDelete = false,
         onEdit,
         onDelete,
+        onSetReaction,
+        currentUserId,
+        highlighted = false,
     }: {
         message: MessageResource;
         onOpenThread?: () => void;
@@ -49,43 +70,55 @@
         canDelete?: boolean;
         onEdit?: (body: string) => Promise<void>;
         onDelete?: () => Promise<void>;
+        onSetReaction?: (emoji: string, reacted: boolean) => Promise<void>;
+        currentUserId?: number | null;
+        highlighted?: boolean;
     } = $props();
 
     let editing = $state(false);
     let editBody = $state('');
+    let editPreviousBody = '';
+    let editMentionAnchors = $state<MentionAnchor[]>([]);
     let saving = $state(false);
     let deleting = $state(false);
     let actionError = $state('');
     let previewFile = $state<StoredFileResource | null>(null);
     let onlyofficeFile = $state<StoredFileResource | null>(null);
-    let highlightedBody = $state<{ source: string; html: string } | null>(null);
-    let renderGeneration = 0;
-    const renderedBody = $derived(
-        highlightedBody?.source === message.body
-            ? highlightedBody.html
-            : renderMessageMarkdown(message.body),
-    );
-
-    $effect(() => {
-        const body = message.body;
-        const generation = ++renderGeneration;
-        highlightedBody = null;
-
-        void renderHighlightedMessageMarkdown(body).then((html) => {
-            if (generation === renderGeneration) {
-                highlightedBody = { source: body, html };
-            }
-        });
-    });
+    let reactingEmojis = $state<string[]>([]);
+    const authorName = $derived(message.user?.name?.trim() || '不明');
+    const authorInitial = $derived(getAuthorInitial(authorName));
+    const authorAvatarTone = $derived(getAvatarTone(authorInitial));
 
     function startEditing() {
-        editBody = message.body;
+        const restored = restoreDraftMentions(
+            message.body,
+            message.mentions ?? [],
+        );
+
+        editBody = restored.value;
+        editPreviousBody = restored.value;
+        editMentionAnchors = restored.anchors;
         actionError = '';
         editing = true;
     }
 
+    function handleEditInput(event: Event) {
+        const nextBody = (event.currentTarget as HTMLTextAreaElement).value;
+
+        editMentionAnchors = updateMentionAnchors(
+            editPreviousBody,
+            nextBody,
+            editMentionAnchors,
+        );
+        editPreviousBody = nextBody;
+        editBody = nextBody;
+    }
+
     async function saveEdit() {
-        const body = editBody.trim();
+        const body = serializeDraftMentions(
+            editBody,
+            editMentionAnchors,
+        ).trim();
 
         if (!onEdit || saving || !body) {
             return;
@@ -151,6 +184,42 @@
         return (extension?.toUpperCase() ?? 'FILE').slice(0, 8);
     }
 
+    function fileTypeIcon(
+        file: StoredFileResource,
+    ): 'pdf' | 'spreadsheet' | 'document' | 'generic' {
+        const extension =
+            file.original_name.split('.').pop()?.toLocaleLowerCase('en-US') ??
+            '';
+
+        if (extension === 'pdf' || file.mime_type === 'application/pdf') {
+            return 'pdf';
+        }
+
+        if (['xls', 'xlsx', 'xlsm', 'ods', 'csv'].includes(extension)) {
+            return 'spreadsheet';
+        }
+
+        if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(extension)) {
+            return 'document';
+        }
+
+        return 'generic';
+    }
+
+    function getAuthorInitial(name: string): string {
+        return (Array.from(name)[0] ?? '?').toLocaleUpperCase();
+    }
+
+    function getAvatarTone(initial: string): string {
+        const hash = Array.from(initial).reduce(
+            (value, character) =>
+                (value * 31 + (character.codePointAt(0) ?? 0)) >>> 0,
+            0,
+        );
+
+        return String(hash % avatarToneCount);
+    }
+
     function openPreview(file: StoredFileResource) {
         if (isOffice(file)) {
             onlyofficeFile = file;
@@ -158,10 +227,57 @@
             previewFile = file;
         }
     }
+
+    function reactedByCurrentUser(reaction: MessageReactionResource): boolean {
+        return currentUserId !== null && currentUserId !== undefined
+            ? reaction.user_ids.includes(currentUserId)
+            : false;
+    }
+
+    function reactionTitle(reaction: MessageReactionResource): string {
+        const names = reaction.user_names.join('、');
+        const label = reactionDisplayLabel(reaction.emoji);
+
+        return names
+            ? `${names}が${label}でリアクション`
+            : `${label}リアクション`;
+    }
+
+    async function setReaction(emoji: string, reacted: boolean) {
+        if (!onSetReaction || reactingEmojis.includes(emoji)) {
+            return;
+        }
+
+        const existing = message.reactions?.find(
+            (reaction) => reaction.emoji === emoji,
+        );
+
+        if (reacted && existing && reactedByCurrentUser(existing)) {
+            return;
+        }
+
+        reactingEmojis = [...reactingEmojis, emoji];
+        actionError = '';
+
+        try {
+            await onSetReaction(emoji, reacted);
+        } catch (error) {
+            actionError =
+                error instanceof HttpError
+                    ? error.messageText()
+                    : 'リアクションの更新に失敗しました';
+        } finally {
+            reactingEmojis = reactingEmojis.filter((item) => item !== emoji);
+        }
+    }
 </script>
 
 <div
-    class="group relative flex gap-4 rounded-md px-2 py-2 transition hover:bg-white/5"
+    data-message-id={message.id}
+    class={cn(
+        'group relative flex w-full gap-3 rounded-md px-2 py-1.5 transition hover:bg-accent/40',
+        highlighted && 'bg-brand/20 ring-1 ring-brand/60',
+    )}
 >
     {#if (canEdit && onEdit) || (canDelete && onDelete)}
         <div
@@ -195,27 +311,36 @@
         </div>
     {/if}
 
-    <div
-        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5865f2] text-sm font-bold text-white"
+    <Avatar
+        data-message-avatar
+        data-avatar-tone={authorAvatarTone}
+        aria-label={`${authorName}のアイコン`}
+        class="size-9"
     >
-        {message.user?.name?.slice(0, 1).toUpperCase() ?? '?'}
-    </div>
-    <div class="min-w-0 flex-1">
+        <AvatarFallback data-message-avatar-fallback>
+            {authorInitial}
+        </AvatarFallback>
+    </Avatar>
+    <div data-message-content class="min-w-0 flex-1">
         <div class="flex items-baseline gap-2">
-            <span class="text-[15px] font-semibold text-[#dbdee1]"
-                >{message.user?.name ?? '不明'}</span
+            <span class="text-sm font-semibold text-foreground"
+                >{authorName}</span
             >
-            <span class="text-xs text-[#80848e]"
+            <time
+                datetime={message.created_at}
+                title={`${formatDate(message.created_at, { month: 'long' })} ${formatTime(message.created_at)}`}
+                class="text-xs text-muted-foreground"
                 >{formatDate(message.created_at, { month: 'long' })}
-                {formatTime(message.created_at)}</span
+                {formatTime(message.created_at)}</time
             >
         </div>
         {#if editing}
-            <div class="mt-1">
+            <div class="mt-1 w-full">
                 <textarea
                     bind:value={editBody}
                     rows={3}
                     class="max-h-48 min-h-20 w-full resize-y rounded-md bg-[#383a40] px-3 py-2 text-[15px] text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
+                    oninput={handleEditInput}
                     onkeydown={(event) => {
                         if (event.key === 'Escape') {
                             event.stopPropagation();
@@ -257,10 +382,14 @@
         {:else}
             <!-- Markdown escapes user input; Shiki only replaces fenced code blocks. -->
             <div
-                class="break-words text-[15px] text-[#dbdee1] [&_a]:text-[#00a8fc] [&_a]:underline [&_blockquote]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-[#4e5058] [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-[#1e1f22] [&_code]:px-1 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-[#1e1f22] [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-6"
+                data-message-body
+                class="break-words text-sm leading-5 text-foreground [&_.mention]:rounded [&_.mention]:px-1 [&_.mention]:font-medium [&_.mention-direct]:bg-mention-direct-background [&_.mention-direct]:text-mention-direct-foreground [&_.mention-everyone]:bg-mention-everyone-background [&_.mention-everyone]:text-mention-everyone-foreground [&_.mention-self]:ring-1 [&_.mention-self]:ring-brand-accent [&_a]:text-brand-accent [&_a]:underline [&_blockquote]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-current/30 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_pre]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-none [&_pre]:border-0 [&_pre]:bg-code-block [&_pre]:p-2 [&_pre]:text-[13px] [&_pre]:leading-[1.45] [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-6"
             >
-                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                {@html renderedBody}
+                <MessageMarkdown
+                    value={message.body}
+                    mentions={message.mentions ?? []}
+                    {currentUserId}
+                />
             </div>
         {/if}
 
@@ -271,8 +400,12 @@
         {/if}
 
         {#if message.attachments && message.attachments.length > 0}
-            <div class="mt-2 flex flex-wrap gap-2">
+            <div
+                data-attachment-list
+                class="mt-2 flex flex-wrap items-start gap-2"
+            >
                 {#each message.attachments as file (file.id)}
+                    {@const typeIcon = fileTypeIcon(file)}
                     {#if isImage(file)}
                         <button
                             type="button"
@@ -297,13 +430,13 @@
                         ></video>
                     {:else if file.thumbnail_url || canPreviewStoredFile(file.original_name)}
                         <div
-                            class="relative w-72 overflow-hidden rounded-lg bg-[#383a40]"
+                            class="relative w-72 overflow-hidden rounded-lg border border-border bg-card text-card-foreground"
                         >
                             <button
                                 type="button"
                                 aria-label={`${file.original_name}をプレビュー`}
                                 onclick={() => openPreview(file)}
-                                class="block w-full text-left transition hover:bg-[#404249]"
+                                class="group/preview block w-full text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                             >
                                 {#if file.thumbnail_url}
                                     <img
@@ -317,30 +450,53 @@
                                     class="flex items-center gap-2 px-3 py-2 pr-10 text-sm"
                                 >
                                     <Paperclip class="h-4 w-4 shrink-0" />
-                                    <span class="truncate"
+                                    <span class="min-w-0 flex-1 truncate"
                                         >{file.original_name}</span
                                     >
+                                    <span
+                                        data-preview-hint
+                                        class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-accent"
+                                    >
+                                        <Eye
+                                            class="size-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        プレビュー
+                                    </span>
                                 </span>
                             </button>
                             <a
                                 href={file.download_url ?? '#'}
                                 aria-label={`${file.original_name}をダウンロード`}
-                                class="absolute bottom-1.5 right-1.5 rounded p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
+                                class="absolute bottom-1.5 right-1.5 rounded p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
                             >
                                 <Download class="h-3.5 w-3.5" />
                             </a>
-                            <span
+                            <Badge
                                 title={`${fileTypeLabel(file)}ファイル`}
-                                class="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/15 bg-[#2b2d31]/90 px-1.5 py-1 text-[10px] font-bold tracking-wide text-[#dbdee1] shadow-lg backdrop-blur-sm"
+                                data-file-kind={typeIcon}
+                                class="pointer-events-none absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-bold tracking-wide shadow-md"
                             >
-                                <FileType2
-                                    class="h-3.5 w-3.5 text-[#5865f2]"
-                                    aria-hidden="true"
-                                />
+                                {#if typeIcon === 'pdf' || typeIcon === 'document'}
+                                    <FileText
+                                        data-file-type-icon={typeIcon}
+                                        aria-hidden="true"
+                                    />
+                                {:else if typeIcon === 'spreadsheet'}
+                                    <FileSpreadsheet
+                                        data-file-type-icon="spreadsheet"
+                                        aria-hidden="true"
+                                    />
+                                {:else}
+                                    <FileType2
+                                        data-file-type-icon="generic"
+                                        aria-hidden="true"
+                                    />
+                                {/if}
                                 <span class="max-w-24 truncate"
                                     >{fileTypeLabel(file)}</span
                                 >
-                            </span>
+                            </Badge>
                         </div>
                     {:else}
                         <a
@@ -355,6 +511,48 @@
                         </a>
                     {/if}
                 {/each}
+            </div>
+        {/if}
+
+        {#if onSetReaction}
+            <div
+                class="mt-2 flex min-h-7 flex-wrap items-center gap-1.5"
+                data-message-reactions
+                aria-label="メッセージのリアクション"
+            >
+                {#each message.reactions ?? [] as reaction (reaction.emoji)}
+                    {@const reacted = reactedByCurrentUser(reaction)}
+                    <Button
+                        variant={reacted ? 'secondary' : 'outline'}
+                        size="sm"
+                        class="h-7 gap-1.5 rounded-full px-2.5 text-sm"
+                        aria-label={`${reactionDisplayLabel(reaction.emoji)}リアクション ${reaction.count}件${reacted ? '、自分が追加済み' : ''}`}
+                        aria-pressed={reacted}
+                        title={reactionTitle(reaction)}
+                        disabled={reactingEmojis.includes(reaction.emoji)}
+                        onclick={() => setReaction(reaction.emoji, !reacted)}
+                    >
+                        {#if isStampReaction(reaction.emoji)}
+                            <StampReaction
+                                value={reaction.emoji}
+                                size="reaction"
+                            />
+                        {:else}
+                            <span
+                                class="text-base leading-none"
+                                aria-hidden="true">{reaction.emoji}</span
+                            >
+                        {/if}
+                        <span class="min-w-2 text-center text-sm tabular-nums"
+                            >{reaction.count}</span
+                        >
+                    </Button>
+                {/each}
+                <EmojiPicker
+                    mode="reaction"
+                    align="start"
+                    onselect={(emoji) => setReaction(emoji, true)}
+                />
             </div>
         {/if}
 

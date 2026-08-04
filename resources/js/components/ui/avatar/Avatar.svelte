@@ -1,8 +1,15 @@
 <script lang="ts">
     import type { Snippet } from 'svelte';
+    import type { HTMLAttributes } from 'svelte/elements';
     import { cn } from '@/lib/utils';
 
-    let { class: className = '', children, ...rest }: { class?: string; children?: Snippet } = $props();
+    let {
+        class: className = '',
+        children,
+        ...rest
+    }: Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+        children?: Snippet;
+    } = $props();
 </script>
 
 <div

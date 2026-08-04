@@ -28,6 +28,8 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property-read Message|null $parent
  * @property-read Collection<int, Message> $replies
+ * @property-read Collection<int, MessageMention> $mentions
+ * @property-read Collection<int, MessageReaction> $reactions
  * @property-read Collection<int, StoredFile> $attachments
  */
 #[Fillable(['server_id', 'channel_id', 'user_id', 'parent_id', 'body', 'is_reminder', 'reminder_key'])]
@@ -64,6 +66,18 @@ class Message extends Model
     public function replies(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id');
+    }
+
+    /** @return HasMany<MessageMention, $this> */
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(MessageMention::class);
+    }
+
+    /** @return HasMany<MessageReaction, $this> */
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class)->orderBy('id');
     }
 
     /** @return MorphMany<StoredFile, $this> */

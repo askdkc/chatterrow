@@ -80,7 +80,7 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 セットアップは以下を自動実行します。
 
 1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
-2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入
+2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入し、ImageMagickの絶対パスを`.env`へ設定
 3. Python仮想環境`.markitdown/venv`へMarkItDown 0.1.7を構築し、`pip check`とCLIバージョンを検証
 4. PostgreSQLをCPU数と搭載RAMに合わせて調整
 5. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
@@ -95,16 +95,17 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 macOSではLinux用のOnlyOfficeパッケージをインストールせず、Appleの`container`でDocumentServerを起動します。Apple siliconとmacOS 26以降が必要です。
 
 1. [Apple Container](https://github.com/apple/container)をインストールします。
-2. Laravelアプリの`.env`を用意します。存在しない場合、`setup.sh`は`.env.example`をコピーします。
-3. `APP_URL`を実際のローカルURLに合わせます。
-4. リポジトリのルートでセットアップを実行します。macOSでは`--domain`と`--database`は不要です。
+2. `brew install imagemagick`でImageMagickをインストールします。
+3. Laravelアプリの`.env`を用意します。存在しない場合、`setup.sh`は`.env.example`をコピーします。
+4. `APP_URL`を実際のローカルURLに合わせます。
+5. リポジトリのルートでセットアップを実行します。macOSでは`--domain`と`--database`は不要です。
 
 ```bash
 cd /path/to/chatterrow
 ./setup.sh
 ```
 
-既存の`.env`全体を上書きすることはありません。更新対象は次のONLYOFFICE設定だけです。
+既存の`.env`全体を上書きすることはありません。更新対象は次のONLYOFFICE設定と、検出したImageMagickの絶対パスです。
 
 ```dotenv
 ONLYOFFICE_ENABLED
@@ -114,6 +115,7 @@ APP_ONLYOFFICE_INTERNAL_URL
 ONLYOFFICE_JWT_SECRET
 ONLYOFFICE_ALLOW_DOWNLOAD
 ONLYOFFICE_ALLOW_PRINT
+IMAGEMAGICK_PATH
 ```
 
 ### Valet・Herd・artisan serveの自動判定
@@ -413,6 +415,7 @@ sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-do
 | `MARKITDOWN_PATH`                | MarkItDown CLIのパス。未指定時は`.markitdown/venv`内   |
 | `MARKITDOWN_TIMEOUT`             | 1ファイルあたりの変換タイムアウト秒数                  |
 | `MARKITDOWN_PYTHON_MIN_VERSION`  | MarkItDown環境に必要なPythonの最低バージョン（3.10）   |
+| `IMAGEMAGICK_PATH`               | `magick`または`convert`の絶対パス                     |
 | `REVERB_APP_ID/KEY/SECRET`       | Reverb認証情報                                         |
 | `REVERB_HOST/PORT/SCHEME`        | ブラウザとLaravelが接続する公開WebSocket               |
 | `REVERB_SERVER_HOST/PORT`        | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
@@ -428,6 +431,7 @@ sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-do
 | 502 Bad Gateway                      | `sudo systemctl status php*-fpm`、`sudo nginx -t`                                                                 |
 | リアルタイム更新されない             | `sudo supervisorctl status chatterrow-reverb`、ブラウザNetworkの`/app/`接続                                       |
 | 添付プレビューが生成されない         | `/var/log/chatterrow-queue-error_*.log`、ONLYOFFICE/Poppler/ImageMagick                                           |
+| `exec: convert: not found`            | `command -v magick`または`command -v convert`の絶対パスを`IMAGEMAGICK_PATH`へ設定後、`php artisan optimize:clear` |
 | Markdown変換に失敗する               | `storage/logs/laravel.log`、`/var/log/chatterrow-queue-error_*.log`、`php artisan files:markdown`                 |
 | Redisキューが処理されない            | `redis-cli ping`、`php8.5 -m`の`redis`、`sudo supervisorctl status 'chatterrow-queue:*'`                          |
 | Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL、`php artisan files:previews`                  |

@@ -7,7 +7,12 @@ import {
     waitFor,
 } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChannelResource, MessageResource, ServerResource } from '@/types';
+import type {
+    ChannelResource,
+    MessageResource,
+    ServerResource,
+    UserResource,
+} from '@/types';
 import Chat from './Chat.svelte';
 
 const echo = vi.hoisted(() => ({
@@ -74,13 +79,16 @@ const message: MessageResource = {
     user: { id: 1, name: 'Test User', email: 'test@example.com' },
 };
 
-function renderChat(initialMessages: MessageResource[] = []) {
+function renderChat(
+    initialMessages: MessageResource[] = [],
+    members: UserResource[] = [],
+) {
     return render(Chat, {
         props: {
             server,
             channel,
             initialMessages,
-            members: [],
+            members,
         },
     });
 }
@@ -90,6 +98,17 @@ function messagePosts(fetchMock: ReturnType<typeof vi.fn>) {
         ([url, init]) =>
             String(url).endsWith('/messages') && init?.method === 'POST',
     );
+}
+
+function fileUploadPosts(fetchMock: ReturnType<typeof vi.fn>) {
+    return fetchMock.mock.calls.filter(
+        ([url, init]) =>
+            String(url).endsWith('/files') && init?.method === 'POST',
+    );
+}
+
+function jsonResponse(payload: unknown, status = 200): Response {
+    return new Response(JSON.stringify(payload), { status });
 }
 
 async function focusComposer(): Promise<HTMLTextAreaElement> {
@@ -119,11 +138,7 @@ describe('Chat composer', () => {
     it('shows the channel label and date-only period', () => {
         vi.stubGlobal(
             'fetch',
-            vi.fn().mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), {
-                    status: 200,
-                }),
-            ),
+            vi.fn(() => Promise.resolve(jsonResponse({ todos: [] }))),
         );
 
         renderChat();
@@ -135,8 +150,8 @@ describe('Chat composer', () => {
     it('does not send for plain or IME composition Enter', async () => {
         const fetchMock = vi
             .fn()
-            .mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), { status: 200 }),
+            .mockImplementation(() =>
+                Promise.resolve(jsonResponse({ todos: [] })),
             );
         vi.stubGlobal('fetch', fetchMock);
         renderChat();
@@ -203,6 +218,197 @@ describe('Chat composer', () => {
         resolveMessage(
             new Response(JSON.stringify({ message }), { status: 201 }),
         );
+    });
+
+    it('adds a message reaction and updates its grouped count', async () => {
+        const reactedMessage: MessageResource = {
+            ...message,
+            reactions: [
+                {
+                    emoji: '👍',
+                    count: 1,
+                    user_ids: [2],
+                    user_names: ['Other User'],
+                },
+            ],
+        };
+        const updatedMessage: MessageResource = {
+            ...reactedMessage,
+            reactions: [
+                {
+                    emoji: '👍',
+                    count: 2,
+                    user_ids: [2, 1],
+                    user_names: ['Other User', 'Test User'],
+                },
+            ],
+        };
+        const fetchMock = vi
+            .fn()
+            .mockImplementation((url: string, init?: RequestInit) => {
+                if (
+                    String(url).endsWith('/messages/10/reactions') &&
+                    init?.method === 'PUT'
+                ) {
+                    return Promise.resolve(
+                        jsonResponse({ message: updatedMessage }),
+                    );
+                }
+
+                return Promise.resolve(jsonResponse({ todos: [] }));
+            });
+        vi.stubGlobal('fetch', fetchMock);
+        renderChat([reactedMessage]);
+
+        await fireEvent.click(
+            screen.getByRole('button', { name: '👍リアクション 1件' }),
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', {
+                    name: '👍リアクション 2件、自分が追加済み',
+                }),
+            ).toBeTruthy(),
+        );
+
+        const reactionRequest = fetchMock.mock.calls.find(
+            ([url, init]) =>
+                String(url).endsWith('/messages/10/reactions') &&
+                init?.method === 'PUT',
+        );
+        expect(reactionRequest).toBeTruthy();
+        expect(JSON.parse(reactionRequest![1].body as string)).toEqual({
+            emoji: '👍',
+        });
+    });
+
+    it('uploads and previews an image pasted from the clipboard before sending', async () => {
+        const screenshot = new File(['screenshot'], 'Screenshot.png', {
+            type: 'image/png',
+        });
+        const uploadedFile = {
+            id: 42,
+            server_id: server.id,
+            path: 'uploads/1/2026/08/04/screenshot.png',
+            original_name: screenshot.name,
+            mime_type: screenshot.type,
+            size: screenshot.size,
+            preview_status: null,
+            stream_url: '/servers/1/files/42/stream',
+            download_url: '/servers/1/files/42/download',
+            thumbnail_url: null,
+        };
+        const fetchMock = vi
+            .fn()
+            .mockImplementation((url: string, init?: RequestInit) => {
+                if (String(url).endsWith('/files') && init?.method === 'POST') {
+                    return Promise.resolve(
+                        jsonResponse({ files: [uploadedFile] }, 201),
+                    );
+                }
+
+                if (
+                    String(url).endsWith('/messages') &&
+                    init?.method === 'POST'
+                ) {
+                    return Promise.resolve(
+                        jsonResponse(
+                            {
+                                message: {
+                                    ...message,
+                                    body: '',
+                                    attachments: [uploadedFile],
+                                },
+                            },
+                            201,
+                        ),
+                    );
+                }
+
+                return Promise.resolve(jsonResponse({ todos: [] }));
+            });
+        vi.stubGlobal('fetch', fetchMock);
+        renderChat();
+
+        const composer = await focusComposer();
+        const pasteEvent = new Event('paste', {
+            bubbles: true,
+            cancelable: true,
+        });
+        Object.defineProperty(pasteEvent, 'clipboardData', {
+            value: {
+                items: [
+                    {
+                        kind: 'file',
+                        type: screenshot.type,
+                        getAsFile: () => screenshot,
+                    },
+                ],
+                files: [screenshot],
+            },
+        });
+
+        expect(composer.dispatchEvent(pasteEvent)).toBe(false);
+
+        const preview = await screen.findByRole('img', {
+            name: screenshot.name,
+        });
+        expect(preview.getAttribute('src')).toBe(uploadedFile.stream_url);
+        expect(fileUploadPosts(fetchMock)).toHaveLength(1);
+
+        const uploadBody = fileUploadPosts(fetchMock)[0][1].body as FormData;
+        expect(uploadBody.getAll('files[]')).toEqual([screenshot]);
+
+        await fireEvent.click(screen.getByTitle('送信'));
+        await waitFor(() => expect(messagePosts(fetchMock)).toHaveLength(1));
+
+        const messageBody = JSON.parse(
+            messagePosts(fetchMock)[0][1].body as string,
+        );
+        expect(messageBody.body).toBe('');
+        expect(messageBody.attachments).toEqual([
+            {
+                path: uploadedFile.path,
+                original_name: uploadedFile.original_name,
+                mime_type: uploadedFile.mime_type,
+                size: uploadedFile.size,
+            },
+        ]);
+        await waitFor(() =>
+            expect(
+                screen.queryByLabelText('送信予定の添付ファイル'),
+            ).toBeNull(),
+        );
+    });
+
+    it('leaves ordinary clipboard text to the textarea', async () => {
+        const fetchMock = vi.fn(() =>
+            Promise.resolve(jsonResponse({ todos: [] })),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        renderChat();
+
+        const composer = await focusComposer();
+        const pasteEvent = new Event('paste', {
+            bubbles: true,
+            cancelable: true,
+        });
+        Object.defineProperty(pasteEvent, 'clipboardData', {
+            value: {
+                items: [
+                    {
+                        kind: 'string',
+                        type: 'text/plain',
+                        getAsFile: () => null,
+                    },
+                ],
+                files: [],
+            },
+        });
+
+        expect(composer.dispatchEvent(pasteEvent)).toBe(true);
+        expect(fileUploadPosts(fetchMock)).toHaveLength(0);
     });
 
     it('loads and displays only the selected thread replies', async () => {
@@ -305,10 +511,14 @@ describe('Chat composer', () => {
     it('applies composer formatting and toggles the toolbar', async () => {
         vi.stubGlobal(
             'fetch',
-            vi.fn().mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), {
-                    status: 200,
-                }),
+            vi.fn((url: string) =>
+                Promise.resolve(
+                    jsonResponse(
+                        String(url).endsWith('/notifications')
+                            ? { items: [], unread: 0 }
+                            : { todos: [] },
+                    ),
+                ),
             ),
         );
         renderChat();
@@ -333,14 +543,83 @@ describe('Chat composer', () => {
         await waitFor(() => expect(composer.value).toBe('**選択文字**@'));
     });
 
+    it('keeps Safari from blurring the composer when its buttons are pressed', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(() => Promise.resolve(jsonResponse({ todos: [] }))),
+        );
+        renderChat();
+
+        const composer = await focusComposer();
+        composer.focus();
+        const controls = [
+            screen.getByTitle('太字'),
+            screen.getByRole('button', { name: '書式設定を切り替え' }),
+            screen.getByRole('button', { name: '絵文字を選ぶ' }),
+            screen.getByTitle('メンションを挿入'),
+        ];
+
+        for (const control of controls) {
+            const mouseDown = new MouseEvent('mousedown', {
+                bubbles: true,
+                button: 0,
+                cancelable: true,
+            });
+
+            expect(control.dispatchEvent(mouseDown)).toBe(false);
+            expect(mouseDown.defaultPrevented).toBe(true);
+        }
+
+        expect(document.activeElement).toBe(composer);
+        expect(composer.rows).toBe(3);
+    });
+
+    it('filters candidates, replaces the display name, and serializes its anchor', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementation((url: string) =>
+                Promise.resolve(
+                    jsonResponse(
+                        String(url).endsWith('/messages')
+                            ? { message }
+                            : { todos: [] },
+                    ),
+                ),
+            );
+        vi.stubGlobal('fetch', fetchMock);
+        renderChat(
+            [],
+            [
+                { id: 2, name: 'Alice', email: 'alice@example.com' },
+                { id: 3, name: 'Bob', email: 'bob@example.com' },
+            ],
+        );
+
+        const composer = await focusComposer();
+        await fireEvent.input(composer, { target: { value: '@ali' } });
+        composer.setSelectionRange(4, 4);
+        await fireEvent.input(composer);
+
+        expect(
+            screen.getByRole('listbox', { name: 'メンション候補' }),
+        ).toBeTruthy();
+        expect(screen.getByRole('option', { name: /@Alice/ })).toBeTruthy();
+        expect(screen.queryByRole('option', { name: /@Bob/ })).toBeNull();
+
+        await fireEvent.keyDown(composer, { key: 'Enter' });
+        await waitFor(() => expect(composer.value).toBe('@Alice '));
+        await fireEvent.keyDown(composer, { key: 'Enter', metaKey: true });
+
+        await waitFor(() => expect(messagePosts(fetchMock)).toHaveLength(1));
+        expect(JSON.parse(messagePosts(fetchMock)[0][1].body).body).toBe(
+            '<@2>',
+        );
+    });
+
     it('expands the composer for multiline content', async () => {
         vi.stubGlobal(
             'fetch',
-            vi.fn().mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), {
-                    status: 200,
-                }),
-            ),
+            vi.fn(() => Promise.resolve(jsonResponse({ todos: [] }))),
         );
         renderChat();
 
@@ -400,11 +679,7 @@ describe('Chat composer', () => {
     it('keeps keyboard focus when the compact composer expands', async () => {
         vi.stubGlobal(
             'fetch',
-            vi.fn().mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), {
-                    status: 200,
-                }),
-            ),
+            vi.fn(() => Promise.resolve(jsonResponse({ todos: [] }))),
         );
         renderChat();
 
@@ -434,11 +709,7 @@ describe('Chat composer', () => {
     it('inserts a picked emoji at the cursor without collapsing the composer', async () => {
         vi.stubGlobal(
             'fetch',
-            vi.fn().mockResolvedValue(
-                new Response(JSON.stringify({ todos: [] }), {
-                    status: 200,
-                }),
-            ),
+            vi.fn(() => Promise.resolve(jsonResponse({ todos: [] }))),
         );
         renderChat();
 

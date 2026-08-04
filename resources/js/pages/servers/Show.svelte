@@ -11,8 +11,10 @@
     import ChannelDialog from '@/components/discord/ChannelDialog.svelte';
     import ChannelList from '@/components/discord/ChannelList.svelte';
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
+    import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import { isProjectAdministrator } from '@/lib/project-permissions';
     import type {
         ServerResource,
         ChannelResource,
@@ -74,11 +76,7 @@
 
     <main class="flex min-w-0 flex-1 flex-col items-center justify-center p-8">
         <div class="text-center">
-            <div
-                class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#5865f2] text-2xl font-bold text-white"
-            >
-                {server.name.slice(0, 2).toUpperCase()}
-            </div>
+            <ProjectIcon {server} size="hero" class="mx-auto mb-4" />
             <h1 class="text-xl font-bold text-[#dbdee1]">{server.name}</h1>
             {#if server.description}
                 <p class="mt-2 max-w-md text-sm text-[#80848e]">
@@ -157,7 +155,13 @@
     <MemberDialog
         {server}
         {members}
+        canManage={isProjectAdministrator(
+            server,
+            members,
+            page.props.auth?.user?.id,
+        )}
         onUpdated={(updated) => (server = { ...server, ...updated })}
+        onMembersUpdated={(updated) => (members = updated)}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

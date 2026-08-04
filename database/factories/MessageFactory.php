@@ -15,6 +15,19 @@ class MessageFactory extends Factory
 {
     protected $model = Message::class;
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Message $message): void {
+            $serverId = Channel::query()
+                ->whereKey($message->channel_id)
+                ->value('server_id');
+
+            if ($serverId !== null) {
+                $message->server_id = (int) $serverId;
+            }
+        });
+    }
+
     /** @return array<string, mixed> */
     public function definition(): array
     {

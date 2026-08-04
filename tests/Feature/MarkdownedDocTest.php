@@ -122,6 +122,17 @@ class MarkdownedDocTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_markdown_path_uses_a_two_character_hash_shard(): void
+    {
+        $sourcePath = 'uploads/1/document.pdf';
+        $hash = substr(hash('sha256', $sourcePath), 0, 16);
+
+        $this->assertSame(
+            substr($hash, 0, 2)."/42-{$hash}.md",
+            MarkdownedDocGenerator::markdownPath(42, $sourcePath),
+        );
+    }
+
     public function test_generator_converts_a_pdf_and_indexes_the_content(): void
     {
         Storage::fake('local');
@@ -141,6 +152,7 @@ class MarkdownedDocTest extends TestCase
 
         $path = app(MarkdownedDocGenerator::class)->generate($file);
 
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{2}\/\d+-[0-9a-f]{16}\.md$/', $path);
         Storage::disk('markdowned')->assertExists($path);
         $this->assertStringContainsString('日本語本文', Storage::disk('markdowned')->get($path));
 

@@ -36,6 +36,21 @@ set_env() {
     fi
 }
 
+resolve_imagemagick_path() {
+    local binary candidate
+
+    for binary in magick convert; do
+        candidate="$(command -v "$binary" 2>/dev/null || true)"
+
+        if [[ "$candidate" == /* && -x "$candidate" ]]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 dotenv_quote() {
     local value="$1"
     value="${value//\\/\\\\}"
@@ -371,7 +386,7 @@ setup_macos_onlyoffice() {
 
     local macos_major app_dir env_file jwt_secret app_url app_scheme app_authority app_host app_port
     local app_port_explicit app_base_url app_server detected_server app_internal_url container_route_host
-    local valet_available herd_available manager_url_ready artisan_url_ready artisan_port
+    local valet_available herd_available manager_url_ready artisan_url_ready artisan_port imagemagick_path
     local -a container_run_args
     macos_major="$(sw_vers -productVersion | cut -d. -f1)"
     [[ "$macos_major" =~ ^[0-9]+$ && "$macos_major" -ge 26 ]] || die "Apple Container requires macOS 26 or newer"
@@ -384,6 +399,13 @@ setup_macos_onlyoffice() {
         [[ -f "$app_dir/.env.example" ]] || die "Could not find $app_dir/.env.example"
         cp "$app_dir/.env.example" "$env_file"
     }
+
+    imagemagick_path="$(resolve_imagemagick_path)" \
+        || die "ImageMagick is required; install it with 'brew install imagemagick'"
+    "$imagemagick_path" -version >/dev/null 2>&1 \
+        || die "ImageMagick could not be executed: $imagemagick_path"
+    set_env IMAGEMAGICK_PATH "$imagemagick_path" "$env_file"
+    log "ImageMagick executable: $imagemagick_path"
 
     app_url="$(sed -n 's/^[[:space:]]*APP_URL=//p' "$env_file" | sed -n '1p')"
     app_url="${app_url#\"}"
@@ -856,6 +878,12 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     poppler-utils imagemagick ghostscript \
     fonts-dejavu-core fonts-liberation fonts-noto-cjk sqlite3
 
+IMAGEMAGICK_BINARY="$(resolve_imagemagick_path)" \
+    || die "ImageMagick was installed but neither magick nor convert is executable"
+"$IMAGEMAGICK_BINARY" -version >/dev/null 2>&1 \
+    || die "ImageMagick could not be executed: $IMAGEMAGICK_BINARY"
+log "ImageMagick executable: $IMAGEMAGICK_BINARY"
+
 NGINX_VERSION="$(nginx -v 2>&1 | cut -d/ -f2)"
 dpkg --compare-versions "$NGINX_VERSION" ge 1.30 || die "ONLYOFFICE requires nginx 1.30+; installed version is $NGINX_VERSION"
 
@@ -929,10 +957,10 @@ if ! command -v composer >/dev/null; then
 fi
 composer --version
 
-# ---------------------------------------------------------- nodejs 22 ------
-if ! command -v node >/dev/null || ! command -v npm >/dev/null || [[ "$(node -v | tr -d 'v' | cut -d. -f1)" -lt 22 ]]; then
-    log "Installing Node.js 22 from NodeSource..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+# ---------------------------------------------------------- nodejs 24 ------
+if ! command -v node >/dev/null || ! command -v npm >/dev/null || [[ "$(node -v | tr -d 'v' | cut -d. -f1)" -lt 24 ]]; then
+    log "Installing Node.js 24 from NodeSource..."
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 fi
 node --version
@@ -1128,6 +1156,7 @@ set_env QUEUE_CONNECTION redis
 set_env REDIS_QUEUE default
 set_env REDIS_QUEUE_RETRY_AFTER 900
 set_env CACHE_STORE database
+set_env IMAGEMAGICK_PATH "$IMAGEMAGICK_BINARY"
 
 if [[ "$DATABASE" == "sqlite" ]]; then
     set_env DB_CONNECTION sqlite
@@ -1380,10 +1409,11 @@ stdout_logfile=/var/log/chatterrow-schedule.log
 stderr_logfile=/var/log/chatterrow-schedule-error.log
 SUPERVISOR
 
-sudo systemctl enable --now "php${PHP_VER}-fpm" supervisor redis-server rabbitmq-server
+sudo systemctl enable --now "php${PHP_VER}-fpm" redis-server rabbitmq-server
 REDIS_PING="$(redis-cli --raw ping 2>/dev/null || true)"
 [[ "$REDIS_PING" == "PONG" ]] || die "Redis did not respond to redis-cli ping"
 log "Redis is ready"
+sudo systemctl enable --now supervisor
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl restart 'chatterrow-queue:*'

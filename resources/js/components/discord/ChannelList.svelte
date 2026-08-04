@@ -11,6 +11,8 @@
         CornerDownRight,
         Settings,
     } from 'lucide-svelte';
+    import { mentionNotificationsState } from '@/lib/mention-notifications.svelte';
+    import { safeMentionText } from '@/lib/mentions';
     import type {
         ChannelResource,
         MessageResource,
@@ -42,9 +44,13 @@
         onOpenThread?: (message: MessageResource) => void;
     } = $props();
 
+    const notificationState = mentionNotificationsState();
+
     function threadTitle(message: MessageResource): string {
         return (
-            message.body.trim().split('\n')[0] ||
+            safeMentionText(message.body, message.mentions ?? [])
+                .trim()
+                .split('\n')[0] ||
             message.attachments?.[0]?.original_name ||
             '無題のスレッド'
         );
@@ -106,11 +112,25 @@
                 >
                     <Hash class="h-5 w-5 shrink-0 opacity-70" />
                     <span class="truncate">{channel.name}</span>
-                    {#if channel.starts_on || channel.ends_on}
-                        <span
-                            class="ml-auto size-2 shrink-0 rounded-full bg-brand"
-                            title="チャンネル期間設定あり"
-                        ></span>
+                    {#if channel.starts_on || channel.ends_on || notificationState.getChannelUnreadCount(channel.id) > 0}
+                        <span class="ml-auto flex shrink-0 items-center gap-1">
+                            {#if notificationState.getChannelUnreadCount(channel.id) > 0}
+                                <span
+                                    class="inline-flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22]"
+                                    title="未読メンション"
+                                >
+                                    {notificationState.getChannelUnreadCount(
+                                        channel.id,
+                                    )}
+                                </span>
+                            {/if}
+                            {#if channel.starts_on || channel.ends_on}
+                                <span
+                                    class="size-2 shrink-0 rounded-full bg-brand"
+                                    title="チャンネル期間設定あり"
+                                ></span>
+                            {/if}
+                        </span>
                     {/if}
                 </Link>
                 {#if onEditChannel}

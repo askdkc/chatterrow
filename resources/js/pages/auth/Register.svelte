@@ -7,10 +7,12 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
+    import Mail from 'lucide-svelte/icons/mail';
     import AppHead from '@/components/AppHead.svelte';
     import InputError from '@/components/InputError.svelte';
     import PasswordInput from '@/components/PasswordInput.svelte';
     import TextLink from '@/components/TextLink.svelte';
+    import * as Alert from '@/components/ui/alert';
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
@@ -19,10 +21,32 @@
     import { login } from '@/routes';
     import { store } from '@/routes/register';
 
-    let { passwordRules }: { passwordRules: string } = $props();
+    let {
+        passwordRules,
+        invitation = null,
+    }: {
+        passwordRules: string;
+        invitation?: {
+            token: string;
+            email: string;
+            server_name: string;
+        } | null;
+    } = $props();
 </script>
 
 <AppHead title={t('Register')} />
+
+{#if invitation}
+    <Alert.Alert class="mb-6">
+        <Mail />
+        <Alert.AlertTitle>
+            「{invitation.server_name}」へ招待されています
+        </Alert.AlertTitle>
+        <Alert.AlertDescription>
+            アカウント作成後、プロジェクト一覧で参加または辞退を選択してください。
+        </Alert.AlertDescription>
+    </Alert.Alert>
+{/if}
 
 <Form
     {...store.form()}
@@ -30,6 +54,9 @@
     class="flex flex-col gap-6"
 >
     {#snippet children({ errors, processing })}
+        {#if invitation}
+            <input type="hidden" name="invitation" value={invitation.token} />
+        {/if}
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="name">{t('Name')}</Label>
@@ -53,8 +80,11 @@
                     autocomplete="email"
                     name="email"
                     placeholder="email@example.com"
+                    value={invitation?.email ?? ''}
+                    readonly={invitation !== null}
                 />
                 <InputError message={errors.email} />
+                <InputError message={errors.invitation} />
             </div>
 
             <div class="grid gap-2">

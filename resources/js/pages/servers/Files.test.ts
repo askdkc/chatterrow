@@ -53,12 +53,24 @@ const server: ServerResource = {
     channels: [],
 };
 
-function renderFiles() {
+interface FileProps {
+    id: number;
+    original_name: string;
+    mime_type: string | null;
+    size: number | null;
+    preview_status: string | null;
+    created_at: string | null;
+    stream_url: string;
+    download_url: string;
+    thumbnail_url: string | null;
+}
+
+function renderFiles(files: FileProps[] = []) {
     return render(Files, {
         props: {
             server,
             channel: null,
-            files: [],
+            files,
             channels: [],
             members: [],
         },
@@ -88,6 +100,72 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe('Files previews', () => {
+    it('shows file-type badges on document preview cards', () => {
+        renderFiles([
+            {
+                id: 8,
+                original_name: 'report.xlsx',
+                mime_type:
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                size: 1024,
+                preview_status: 'ready',
+                created_at: '2026-08-04T12:00:00+09:00',
+                stream_url: '/servers/1/files/8/stream',
+                download_url: '/servers/1/files/8/download',
+                thumbnail_url: '/servers/1/files/8/thumbnail',
+            },
+            {
+                id: 9,
+                original_name: 'specification.pdf',
+                mime_type: 'application/pdf',
+                size: 2048,
+                preview_status: 'ready',
+                created_at: '2026-08-04T12:00:00+09:00',
+                stream_url: '/servers/1/files/9/stream',
+                download_url: '/servers/1/files/9/download',
+                thumbnail_url: '/servers/1/files/9/thumbnail',
+            },
+        ]);
+
+        expect(screen.getByTitle('XLSXファイル')).toBeTruthy();
+        expect(screen.getByTitle('PDFファイル')).toBeTruthy();
+        expect(
+            document.querySelector('[data-file-type-icon="spreadsheet"]'),
+        ).toBeTruthy();
+        expect(
+            document.querySelector('[data-file-type-icon="pdf"]'),
+        ).toBeTruthy();
+    });
+
+    it('uses the streamed video frame as the file-card thumbnail', () => {
+        renderFiles([
+            {
+                id: 7,
+                original_name: 'clip.mp4',
+                mime_type: 'video/mp4',
+                size: 1024,
+                preview_status: null,
+                created_at: '2026-08-04T12:00:00+09:00',
+                stream_url: '/servers/1/files/7/stream',
+                download_url: '/servers/1/files/7/download',
+                thumbnail_url: null,
+            },
+        ]);
+
+        const previewButton = screen.getByRole('button', {
+            name: 'clip.mp4をプレビュー',
+        });
+        const video = previewButton.querySelector('video');
+
+        expect(video).not.toBeNull();
+        expect(video?.getAttribute('src')).toBe('/servers/1/files/7/stream');
+        expect(video?.preload).toBe('metadata');
+        expect(video?.muted).toBe(true);
+        expect(screen.queryByText('動画')).toBeNull();
+    });
+});
 
 describe('Files drag and drop upload', () => {
     it('shows the drop overlay and uploads files dropped on the list area', async () => {

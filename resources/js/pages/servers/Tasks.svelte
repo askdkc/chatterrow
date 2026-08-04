@@ -16,6 +16,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
     import { formatDate, formatDateTime } from '@/lib/dates';
+    import { isProjectAdministrator } from '@/lib/project-permissions';
     import { priorityLabel } from '@/lib/todos';
     import type {
         ServerResource,
@@ -281,7 +282,13 @@
     <MemberDialog
         {server}
         {members}
+        canManage={isProjectAdministrator(
+            server,
+            members,
+            page.props.auth?.user?.id,
+        )}
         onUpdated={(updated) => (server = { ...server, ...updated })}
+        onMembersUpdated={(updated) => (members = updated)}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

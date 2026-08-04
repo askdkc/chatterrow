@@ -2,8 +2,9 @@
     import { Link, usePage } from '@inertiajs/svelte';
     import {
         ArrowLeft,
+        FileSpreadsheet,
         FileText,
-        Film,
+        FileType2,
         Download,
         Eye,
         Upload,
@@ -15,9 +16,11 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog from '@/components/files/StoredFilePreviewDialog.svelte';
+    import { Badge } from '@/components/ui/badge';
     import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
+    import { isProjectAdministrator } from '@/lib/project-permissions';
     import type {
         ServerResource,
         ChannelResource,
@@ -95,6 +98,34 @@
         officeExtensions.has(
             f.original_name.split('.').pop()?.toLowerCase() ?? '',
         );
+
+    function fileTypeLabel(file: StoredFileResource): string {
+        const extension = file.original_name.match(/\.([^.]+)$/)?.[1];
+
+        return (extension?.toUpperCase() ?? 'FILE').slice(0, 8);
+    }
+
+    function fileTypeIcon(
+        file: StoredFileResource,
+    ): 'pdf' | 'spreadsheet' | 'document' | 'generic' {
+        const extension =
+            file.original_name.split('.').pop()?.toLocaleLowerCase('en-US') ??
+            '';
+
+        if (extension === 'pdf' || file.mime_type === 'application/pdf') {
+            return 'pdf';
+        }
+
+        if (['xls', 'xlsx', 'xlsm', 'ods', 'csv'].includes(extension)) {
+            return 'spreadsheet';
+        }
+
+        if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(extension)) {
+            return 'document';
+        }
+
+        return 'generic';
+    }
 
     function formatSize(bytes: number | null): string {
         if (bytes === null) {
@@ -446,6 +477,7 @@
                         class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                     >
                         {#each files as file (file.id)}
+                            {@const typeIcon = fileTypeIcon(file)}
                             <div
                                 class="group relative overflow-hidden rounded-xl bg-[#2b2d31] transition hover:bg-[#383a40]"
                             >
@@ -455,6 +487,7 @@
                                     class="flex aspect-video w-full items-center justify-center overflow-hidden bg-[#232428]"
                                     onclick={() => openPreview(file)}
                                     title="プレビュー"
+                                    aria-label={`${file.original_name}をプレビュー`}
                                 >
                                     {#if file.thumbnail_url}
                                         <img
@@ -470,13 +503,15 @@
                                             class="h-full w-full object-cover transition group-hover:scale-105"
                                             loading="lazy"
                                         />
-                                    {:else if isVideo(file)}
-                                        <div
-                                            class="flex flex-col items-center gap-2 text-[#80848e]"
-                                        >
-                                            <Film class="h-10 w-10" />
-                                            <span class="text-xs">動画</span>
-                                        </div>
+                                    {:else if isVideo(file) && file.stream_url}
+                                        <video
+                                            src={file.stream_url}
+                                            preload="metadata"
+                                            muted
+                                            playsinline
+                                            aria-hidden="true"
+                                            class="pointer-events-none h-full w-full object-cover transition group-hover:scale-105"
+                                        ></video>
                                     {:else}
                                         <div
                                             class="flex flex-col items-center gap-2 text-[#80848e]"
@@ -491,6 +526,34 @@
                                         </div>
                                     {/if}
                                 </button>
+
+                                {#if !isImage(file) && !isVideo(file)}
+                                    <Badge
+                                        title={`${fileTypeLabel(file)}ファイル`}
+                                        data-file-kind={typeIcon}
+                                        class="pointer-events-none absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-bold tracking-wide shadow-md"
+                                    >
+                                        {#if typeIcon === 'pdf' || typeIcon === 'document'}
+                                            <FileText
+                                                data-file-type-icon={typeIcon}
+                                                aria-hidden="true"
+                                            />
+                                        {:else if typeIcon === 'spreadsheet'}
+                                            <FileSpreadsheet
+                                                data-file-type-icon="spreadsheet"
+                                                aria-hidden="true"
+                                            />
+                                        {:else}
+                                            <FileType2
+                                                data-file-type-icon="generic"
+                                                aria-hidden="true"
+                                            />
+                                        {/if}
+                                        <span class="max-w-24 truncate"
+                                            >{fileTypeLabel(file)}</span
+                                        >
+                                    </Badge>
+                                {/if}
 
                                 <div class="p-3">
                                     <p
@@ -591,7 +654,13 @@
     <MemberDialog
         {server}
         {members}
+        canManage={isProjectAdministrator(
+            server,
+            members,
+            page.props.auth?.user?.id,
+        )}
         onUpdated={(updated) => (server = { ...server, ...updated })}
+        onMembersUpdated={(updated) => (members = updated)}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

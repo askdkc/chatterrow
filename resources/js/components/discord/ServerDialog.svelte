@@ -1,5 +1,12 @@
 <script lang="ts">
-    import { X, Loader2 } from 'lucide-svelte';
+    import X from 'lucide-svelte/icons/x';
+    import ProjectIconDropTarget from '@/components/discord/ProjectIconDropTarget.svelte';
+    import { Button } from '@/components/ui/button';
+    import * as Dialog from '@/components/ui/dialog';
+    import * as Field from '@/components/ui/field';
+    import { Input } from '@/components/ui/input';
+    import { Spinner } from '@/components/ui/spinner';
+    import { Textarea } from '@/components/ui/textarea';
     import { apiJson, HttpError } from '@/lib/http';
     import type { ServerResource } from '@/types';
 
@@ -13,15 +20,120 @@
         onClose: () => void;
     } = $props();
 
-    const isEditing = $derived(server !== null);
-    let name = $derived(server?.name ?? '');
-    let description = $derived(server?.description ?? '');
-    let startsOn = $derived(server?.starts_on ?? '');
-    let endsOn = $derived(server?.ends_on ?? '');
+    let dialogOpen = $state(true);
+    let name = $state('');
+    let description = $state('');
+    let startsOn = $state('');
+    let endsOn = $state('');
+    let iconFile = $state<File | null>(null);
+    let removeIcon = $state(false);
+    let iconPreviewUrl = $state<string | null>(null);
+    let iconInput = $state<HTMLInputElement | null>(null);
+    let localIconPreviewUrl: string | null = null;
     let saving = $state(false);
     let error = $state('');
+    let initialized = false;
 
-    async function save() {
+    const isEditing = $derived(server !== null);
+    const maxIconBytes = 1024 * 1024;
+    const allowedIconTypes = new Set([
+        'image/png',
+        'image/jpeg',
+        'image/gif',
+        'image/webp',
+    ]);
+    const previewServer = $derived({
+        name: name || 'プロジェクト',
+        icon_url: iconPreviewUrl,
+    });
+
+    $effect.pre(() => {
+        if (initialized) {
+            return;
+        }
+
+        name = server?.name ?? '';
+        description = server?.description ?? '';
+        startsOn = server?.starts_on ?? '';
+        endsOn = server?.ends_on ?? '';
+        iconPreviewUrl = server?.icon_url ?? null;
+        initialized = true;
+    });
+
+    function clearLocalIconPreview() {
+        if (localIconPreviewUrl) {
+            URL.revokeObjectURL(localIconPreviewUrl);
+            localIconPreviewUrl = null;
+        }
+    }
+
+    function close() {
+        clearLocalIconPreview();
+        dialogOpen = false;
+        onClose();
+    }
+
+    function handleOpenChange(open: boolean) {
+        dialogOpen = open;
+
+        if (!open) {
+            clearLocalIconPreview();
+            onClose();
+        }
+    }
+
+    function setIconFile(file: File) {
+        if (!allowedIconTypes.has(file.type)) {
+            error = 'PNG、JPEG、GIF、WebP画像を選択してください';
+
+            if (iconInput) {
+                iconInput.value = '';
+            }
+
+            return;
+        }
+
+        if (file.size > maxIconBytes) {
+            error = 'プロジェクトアイコンは1MB以下にしてください';
+
+            if (iconInput) {
+                iconInput.value = '';
+            }
+
+            return;
+        }
+
+        clearLocalIconPreview();
+        localIconPreviewUrl = URL.createObjectURL(file);
+        iconFile = file;
+        iconPreviewUrl = localIconPreviewUrl;
+        removeIcon = false;
+        error = '';
+    }
+
+    function selectIcon(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files?.[0] ?? null;
+
+        if (file) {
+            setIconFile(file);
+        }
+    }
+
+    function clearIcon() {
+        clearLocalIconPreview();
+        iconFile = null;
+        iconPreviewUrl = null;
+        removeIcon = Boolean(server?.icon_url);
+
+        if (iconInput) {
+            iconInput.value = '';
+        }
+    }
+
+    async function save(event?: SubmitEvent) {
+        event?.preventDefault();
+
         if (saving || !name.trim()) {
             return;
         }
@@ -30,29 +142,42 @@
         error = '';
 
         try {
+            const form = new FormData();
+            form.append('name', name.trim());
+            form.append('description', description.trim() || '');
+            form.append('starts_on', startsOn || '');
+            form.append('ends_on', endsOn || '');
+
+            if (iconFile) {
+                form.append('icon', iconFile);
+            }
+
+            if (removeIcon) {
+                form.append('remove_icon', '1');
+            }
+
+            if (server) {
+                form.append('_method', 'PATCH');
+            }
+
             const data = await apiJson<{ server: ServerResource }>(
                 server ? `/servers/${server.id}` : '/servers',
                 {
-                    method: server ? 'PATCH' : 'POST',
-                    body: JSON.stringify({
-                        name: name.trim(),
-                        description: description.trim() || null,
-                        starts_on: startsOn || null,
-                        ends_on: endsOn || null,
-                    }),
+                    method: 'POST',
+                    body: form,
                 },
             );
 
             if (server) {
                 onUpdated?.(data.server);
-                onClose();
+                close();
             } else {
                 window.location.href = `/servers/${data.server.id}`;
             }
-        } catch (e) {
+        } catch (exception) {
             error =
-                e instanceof HttpError
-                    ? e.messageText()
+                exception instanceof HttpError
+                    ? exception.messageText()
                     : isEditing
                       ? '保存に失敗しました'
                       : '作成に失敗しました';
@@ -62,137 +187,170 @@
     }
 
     function handleDialogKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
-            onClose();
-        } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        if (event.key !== 'Enter') {
+            return;
+        }
+
+        if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
-            save();
+            void save();
+        } else if (!(event.target instanceof HTMLTextAreaElement)) {
+            event.preventDefault();
         }
     }
 </script>
 
 <svelte:window onkeydown={handleDialogKeydown} />
 
-<div class="fixed inset-0 z-50 flex items-center justify-center">
-    <button
-        type="button"
-        class="absolute inset-0 bg-black/60"
-        aria-label="背景をクリックして閉じる"
-        onclick={onClose}
-    ></button>
-    <div
-        class="relative z-10 w-full max-w-md rounded-xl bg-[#313338] p-6 shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="server-dialog-title"
+<Dialog.Dialog bind:open={dialogOpen} onOpenChange={handleOpenChange}>
+    <Dialog.DialogContent
+        class="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
     >
-        <div class="mb-4 flex items-center justify-between">
-            <h2
-                id="server-dialog-title"
-                class="text-lg font-bold text-[#dbdee1]"
-            >
-                {isEditing ? 'プロジェクト設定' : 'プロジェクトを作成'}
-            </h2>
-            <button
-                type="button"
-                class="rounded p-1 hover:bg-white/10"
-                onclick={onClose}
-                aria-label="閉じる"
-            >
-                <X class="h-5 w-5 text-[#80848e]" />
-            </button>
-        </div>
-
-        <div class="space-y-3">
-            <div>
-                <label
-                    for="server-name"
-                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >プロジェクト名</label
-                >
-                <input
-                    id="server-name"
-                    bind:value={name}
-                    type="text"
-                    placeholder="例: プロジェクトA"
-                    class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
-                />
-            </div>
-            <div>
-                <label
-                    for="server-description"
-                    class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >内容（任意）</label
-                >
-                <textarea
-                    id="server-description"
-                    bind:value={description}
-                    rows="2"
-                    class="w-full resize-none rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
-                ></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label
-                        for="server-starts-on"
-                        class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                        >開始日</label
-                    >
-                    <input
-                        id="server-starts-on"
-                        bind:value={startsOn}
-                        type="date"
-                        class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
-                    />
+        <form class="flex flex-col gap-6" novalidate onsubmit={save}>
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex flex-col gap-1">
+                    <Dialog.DialogTitle>
+                        {isEditing ? 'プロジェクト設定' : 'プロジェクトを作成'}
+                    </Dialog.DialogTitle>
+                    <Dialog.DialogDescription>
+                        名前、期間、アイコンを設定します。
+                    </Dialog.DialogDescription>
                 </div>
-                <div>
-                    <label
-                        for="server-ends-on"
-                        class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                        >終了日</label
-                    >
-                    <input
-                        id="server-ends-on"
-                        bind:value={endsOn}
-                        type="date"
-                        class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
-                    />
-                </div>
-            </div>
-            <p class="text-xs text-[#80848e]">
-                開始日・終了日はカレンダーとガントチャートに反映されます。
-            </p>
-
-            {#if error}
-                <p
-                    class="text-sm text-red-400"
-                    role="alert"
-                    aria-live="assertive"
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="閉じる"
+                    onclick={close}
                 >
-                    {error}
-                </p>
-            {/if}
-        </div>
+                    <X />
+                </Button>
+            </div>
 
-        <div class="mt-5 flex justify-end gap-2">
-            <button
-                type="button"
-                class="rounded-md px-4 py-2 text-sm font-medium text-[#b5bac1] transition hover:bg-white/10"
-                onclick={onClose}
-            >
-                キャンセル
-            </button>
-            <button
-                type="button"
-                class="flex items-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4] disabled:opacity-50"
-                onclick={save}
-                disabled={saving || !name.trim()}
-            >
-                {#if saving}
-                    <Loader2 class="h-4 w-4 animate-spin" />
+            <Field.FieldGroup>
+                <Field.Field>
+                    <Field.FieldLabel for="server-name">
+                        プロジェクト名
+                    </Field.FieldLabel>
+                    <Input
+                        id="server-name"
+                        bind:value={name}
+                        maxlength={80}
+                        placeholder="例: プロジェクトA"
+                        autofocus
+                    />
+                </Field.Field>
+
+                <Field.FieldSet>
+                    <Field.FieldLegend variant="label">
+                        プロジェクトアイコン
+                    </Field.FieldLegend>
+                    <Field.FieldDescription>
+                        未設定の場合はプロジェクト名の先頭文字を表示します。
+                    </Field.FieldDescription>
+
+                    <div class="flex items-start gap-4">
+                        <div class="flex shrink-0 flex-col items-center gap-1">
+                            <ProjectIconDropTarget
+                                server={previewServer}
+                                onChoose={() => iconInput?.click()}
+                                onFile={setIconFile}
+                            />
+                            <span
+                                class="text-center text-[10px] leading-tight text-muted-foreground"
+                            >
+                                クリックまたは<br />ドロップ
+                            </span>
+                        </div>
+
+                        <Field.FieldGroup class="min-w-0 flex-1">
+                            <Field.Field>
+                                <Field.FieldLabel for="server-icon">
+                                    アイコン画像
+                                </Field.FieldLabel>
+                                <Input
+                                    id="server-icon"
+                                    bind:ref={iconInput}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/gif,image/webp"
+                                    onchange={selectIcon}
+                                />
+                                <Field.FieldDescription>
+                                    PNG・JPEG・GIF・WebP、16〜8192px、最大1MB。512px超は自動縮小
+                                </Field.FieldDescription>
+                                {#if iconPreviewUrl}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onclick={clearIcon}
+                                    >
+                                        アイコンを削除
+                                    </Button>
+                                {/if}
+                            </Field.Field>
+                        </Field.FieldGroup>
+                    </div>
+                </Field.FieldSet>
+
+                <Field.Field>
+                    <Field.FieldLabel for="server-description">
+                        内容（任意）
+                    </Field.FieldLabel>
+                    <Textarea
+                        id="server-description"
+                        bind:value={description}
+                        maxlength={255}
+                        rows={3}
+                    />
+                </Field.Field>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <Field.Field>
+                        <Field.FieldLabel for="server-starts-on">
+                            開始日
+                        </Field.FieldLabel>
+                        <Input
+                            id="server-starts-on"
+                            bind:value={startsOn}
+                            type="date"
+                        />
+                    </Field.Field>
+                    <Field.Field>
+                        <Field.FieldLabel for="server-ends-on">
+                            終了日
+                        </Field.FieldLabel>
+                        <Input
+                            id="server-ends-on"
+                            bind:value={endsOn}
+                            type="date"
+                            min={startsOn || undefined}
+                        />
+                    </Field.Field>
+                </div>
+
+                <Field.FieldDescription>
+                    開始日・終了日はカレンダーとガントチャートに反映されます。
+                </Field.FieldDescription>
+
+                {#if error}
+                    <Field.Field data-invalid>
+                        <Field.FieldError>{error}</Field.FieldError>
+                    </Field.Field>
                 {/if}
-                {isEditing ? '保存' : '作成'}
-            </button>
-        </div>
-    </div>
-</div>
+            </Field.FieldGroup>
+
+            <Dialog.DialogFooter>
+                <Button type="button" variant="outline" onclick={close}>
+                    キャンセル
+                </Button>
+                <Button type="submit" disabled={saving || !name.trim()}>
+                    {#if saving}
+                        <Spinner data-icon="inline-start" />
+                    {/if}
+                    {isEditing ? '保存' : '作成'}
+                </Button>
+            </Dialog.DialogFooter>
+        </form>
+    </Dialog.DialogContent>
+</Dialog.Dialog>

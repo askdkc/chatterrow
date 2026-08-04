@@ -1,4 +1,4 @@
-import type { ServerResource } from '@/types/groupware';
+import type { ProjectFolderResource, ServerResource } from '@/types/groupware';
 
 export type User = {
     id: number;
@@ -15,6 +15,7 @@ export type User = {
 export type Auth = {
     user: User;
     servers: ServerResource[];
+    folders: ProjectFolderResource[];
 };
 
 /* @chisel-passkeys */

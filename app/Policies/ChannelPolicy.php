@@ -15,16 +15,19 @@ class ChannelPolicy
 
     public function create(User $user, Server $server): bool
     {
-        return $server->members()->whereKey($user->id)->exists();
+        return $server->archived_at === null
+            && $server->members()->whereKey($user->id)->exists();
     }
 
     public function update(User $user, Channel $channel): bool
     {
-        return $channel->server->members()->whereKey($user->id)->exists();
+        return $channel->server->archived_at === null
+            && $channel->server->members()->whereKey($user->id)->exists();
     }
 
     public function delete(User $user, Channel $channel): bool
     {
-        return $channel->server->members()->whereKey($user->id)->exists();
+        return $channel->server->archived_at === null
+            && $channel->server->members()->whereKey($user->id)->exists();
     }
 }

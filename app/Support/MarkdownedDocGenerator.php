@@ -28,7 +28,9 @@ class MarkdownedDocGenerator
 
     public static function markdownPath(int $storedFileId, string $sourcePath): string
     {
-        return "{$storedFileId}-".substr(hash('sha256', $sourcePath), 0, 16).'.md';
+        $hash = substr(hash('sha256', $sourcePath), 0, 16);
+
+        return substr($hash, 0, 2)."/{$storedFileId}-{$hash}.md";
     }
 
     /**

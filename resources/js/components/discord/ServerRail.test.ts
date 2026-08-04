@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ServerRail from './ServerRail.svelte';
 
@@ -62,5 +68,154 @@ describe('ServerRail', () => {
         await fireEvent.mouseLeave(screen.getByRole('navigation'));
 
         expect(screen.queryByText('デザインを固める')).toBeNull();
+    });
+
+    it('opens notifications beside the trigger and keeps the rail expanded', async () => {
+        render(ServerRail, {
+            props: {
+                servers: [
+                    {
+                        id: 1,
+                        name: 'デザインを固める',
+                        description: null,
+                        starts_on: null,
+                        ends_on: null,
+                        created_by: 1,
+                    },
+                ],
+                activeServerId: 1,
+                onAddServer: vi.fn(),
+                onBrowse: vi.fn(),
+            },
+        });
+
+        const rail = screen.getByRole('navigation');
+        await fireEvent.mouseEnter(rail);
+        await fireEvent.click(screen.getByRole('button', { name: '通知' }));
+
+        const notificationList = await screen.findByRole('region', {
+            name: '通知一覧',
+        });
+        const popover = notificationList.closest(
+            '[data-slot="popover-content"]',
+        );
+
+        expect(popover?.getAttribute('data-side')).toBe('right');
+        expect(popover?.getAttribute('data-align')).toBe('start');
+
+        await fireEvent.mouseLeave(rail);
+        expect(screen.getByText('デザインを固める')).toBeTruthy();
+
+        await fireEvent.click(
+            screen.getByRole('button', { name: '通知を閉じる' }),
+        );
+        expect(screen.queryByRole('region', { name: '通知一覧' })).toBeNull();
+        expect(screen.queryByText('デザインを固める')).toBeNull();
+    });
+
+    it('opens notifications on hover and stays open while moving into the popover', async () => {
+        render(ServerRail, {
+            props: {
+                servers: [],
+                activeServerId: null,
+                onAddServer: vi.fn(),
+                onBrowse: vi.fn(),
+            },
+        });
+
+        const trigger = screen.getByRole('button', { name: '通知' });
+        await fireEvent.mouseEnter(trigger);
+
+        const notificationList = screen.getByRole('region', {
+            name: '通知一覧',
+        });
+        const hoverSurface = notificationList.closest(
+            '[data-notification-hover-surface]',
+        );
+
+        expect(hoverSurface).toBeTruthy();
+
+        await fireEvent.mouseLeave(trigger);
+        expect(trigger.getAttribute('data-hover-close-pending')).toBe('true');
+        await fireEvent.mouseEnter(hoverSurface as Element);
+        expect(trigger.getAttribute('data-hover-close-pending')).toBe('false');
+
+        expect(screen.getByRole('region', { name: '通知一覧' })).toBeTruthy();
+
+        await fireEvent.mouseLeave(hoverSurface as Element);
+        expect(trigger.getAttribute('data-hover-close-pending')).toBe('true');
+
+        await waitFor(() =>
+            expect(
+                screen.queryByRole('region', { name: '通知一覧' }),
+            ).toBeNull(),
+        );
+    });
+
+    it('groups projects into folders and reveals one folder as a hover accordion', async () => {
+        const { container } = render(ServerRail, {
+            props: {
+                servers: [
+                    {
+                        id: 1,
+                        name: 'Project Alpha',
+                        description: null,
+                        icon_url: '/servers/1/icon?v=rail',
+                        starts_on: null,
+                        ends_on: null,
+                        created_by: 1,
+                        project_folder_id: 10,
+                    },
+                    {
+                        id: 2,
+                        name: 'Project Beta',
+                        description: null,
+                        starts_on: null,
+                        ends_on: null,
+                        created_by: 1,
+                        project_folder_id: null,
+                    },
+                ],
+                folders: [
+                    {
+                        id: 10,
+                        name: 'クライアント案件',
+                        color: '#FF5500',
+                        icon_url: '/project-folders/10/icon',
+                        position: 1,
+                    },
+                ],
+                activeServerId: 1,
+                onAddServer: vi.fn(),
+                onBrowse: vi.fn(),
+            },
+        });
+
+        const rail = screen.getByRole('navigation');
+        await fireEvent.mouseEnter(rail);
+
+        expect(screen.getByText('クライアント案件')).toBeTruthy();
+        expect(screen.getByText('Project Beta')).toBeTruthy();
+        expect(screen.queryByText('Project Alpha')).toBeNull();
+        expect(
+            container.querySelector('img[src="/project-folders/10/icon"]'),
+        ).toBeTruthy();
+
+        const folder = container.querySelector('[data-project-folder="10"]');
+        expect(folder).toBeTruthy();
+        await fireEvent.mouseEnter(folder as Element);
+
+        expect(
+            screen.getByRole('group', {
+                name: 'クライアント案件内のプロジェクト',
+            }),
+        ).toBeTruthy();
+        expect(screen.getByText('Project Alpha')).toBeTruthy();
+        expect(
+            container.querySelector('img[src="/servers/1/icon?v=rail"]'),
+        ).toBeTruthy();
+
+        await fireEvent.mouseLeave(folder as Element);
+        expect(screen.queryByText('Project Alpha')).toBeNull();
     });
 });

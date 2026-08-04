@@ -11,6 +11,7 @@
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import GanttPdfPreviewDialog from '@/components/files/GanttPdfPreviewDialog.svelte';
+    import { Button } from '@/components/ui/button';
     import {
         epochDay,
         exactGanttRange,
@@ -22,6 +23,8 @@
         singleChannelTitle,
     } from '@/lib/gantt';
     import { buildGanttPdf } from '@/lib/gantt-pdf';
+    import { isProjectAdministrator } from '@/lib/project-permissions';
+    import { cn } from '@/lib/utils';
     import type {
         ChannelResource,
         GanttTask,
@@ -141,10 +144,12 @@
 
     const barClass = (t: GanttTask): string => {
         if (t.type === 'todo') {
-            return t.completed ? 'bg-[#23a559]/80' : 'bg-[#f0b232]';
+            return t.completed
+                ? 'bg-gantt-complete text-gantt-complete-foreground'
+                : 'bg-gantt-task text-gantt-task-foreground';
         }
 
-        return 'bg-[#5865f2]';
+        return 'bg-gantt-channel text-gantt-channel-foreground';
     };
 
     function onAddServer() {
@@ -188,7 +193,7 @@
     }
 </script>
 
-<div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
+<div class="flex h-screen w-full overflow-hidden bg-background text-foreground">
     <ServerRail
         servers={authServers}
         activeServerId={server.id}
@@ -206,39 +211,38 @@
 
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header
-            class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b border-black/10 bg-[#313338] px-4 dark:border-black/20"
+            class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-4"
         >
             <Link
                 href={`/servers/${server.id}`}
-                class="rounded p-1 transition hover:bg-white/10"
+                class="rounded p-1 transition hover:bg-accent hover:text-accent-foreground"
+                aria-label="プロジェクトへ戻る"
             >
-                <ArrowLeft class="h-4 w-4" />
+                <ArrowLeft class="size-4" />
             </Link>
-            <CalendarRange class="h-4 w-4 text-[#5865f2]" />
-            <h1 class="text-[15px] font-bold">ガントチャート</h1>
-            <div class="ml-auto flex items-center gap-4 text-xs text-[#80848e]">
-                <button
-                    type="button"
-                    class="flex items-center gap-1.5 rounded-md px-2 py-1.5 font-medium transition hover:bg-white/10 hover:text-[#dbdee1]"
-                    onclick={exportPdf}
-                    title="PDF出力"
-                >
-                    <FileDown class="h-4 w-4" />
+            <CalendarRange class="size-4 text-brand-accent" />
+            <h1 class="text-base font-bold">ガントチャート</h1>
+            <div
+                data-gantt-legend
+                class="ml-auto flex items-center gap-3 text-sm text-muted-foreground"
+            >
+                <Button variant="ghost" onclick={exportPdf} title="PDF出力">
+                    <FileDown data-icon="inline-start" />
                     PDF出力
-                </button>
+                </Button>
                 {#if !channelHeaderTitle}
                     <span class="flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-sm bg-[#5865f2]"
+                        <span class="size-2.5 rounded-sm bg-gantt-channel"
                         ></span>
                         チャンネル
                     </span>
                 {/if}
                 <span class="flex items-center gap-1.5">
-                    <span class="h-2.5 w-2.5 rounded-sm bg-[#f0b232]"></span>
+                    <span class="size-2.5 rounded-sm bg-gantt-task"></span>
                     タスク
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="h-2.5 w-2.5 rounded-sm bg-[#23a559]/80"></span>
+                    <span class="size-2.5 rounded-sm bg-gantt-complete"></span>
                     完了
                 </span>
             </div>
@@ -256,10 +260,10 @@
                     style={`grid-template-columns: 260px repeat(${dayCount}, minmax(24px, 1fr));`}
                     aria-hidden="true"
                 >
-                    <div class="border-r border-black/10"></div>
+                    <div class="border-r border-border/70"></div>
                     {#each Array.from( { length: dayCount } ) as _, dayIndex (dayIndex)}
                         <div
-                            class="border-l border-black/10"
+                            class="border-l border-border/70"
                             style={`grid-column: ${dayIndex + 2};`}
                         ></div>
                     {/each}
@@ -280,12 +284,13 @@
 
                 <!-- Header row: blank + ticks -->
                 <div
-                    class="sticky left-0 top-0 z-20 flex h-12 items-center border-b border-r border-black/10 bg-[#2b2d31] px-3 text-xs font-semibold text-[#80848e]"
+                    data-gantt-grid-header
+                    class="sticky left-0 top-0 z-20 flex h-12 items-center border-b border-r border-border bg-card px-3 text-sm font-semibold text-foreground"
                     style="grid-column: 1; grid-row: 1;"
                 >
                     {#if channelHeaderTitle}
                         <span class="flex items-center gap-1">
-                            <Hash class="h-3.5 w-3.5" />
+                            <Hash class="size-4" />
                             {channelHeaderTitle}
                         </span>
                     {:else}
@@ -294,13 +299,18 @@
                 </div>
                 {#each ticks as day (day)}
                     <div
-                        class={`sticky top-0 z-10 flex h-12 items-center justify-center border-b border-l border-black/10 bg-[#2b2d31] px-1 text-xs font-medium whitespace-nowrap text-[#80848e] ${day === today ? 'bg-[#5865f2]/10 py-1 text-[#5865f2] flex-col gap-0.5' : day % 7 === 0 ? 'bg-[#232428]' : ''}`}
+                        class={cn(
+                            'sticky top-0 z-10 flex h-12 items-center justify-center whitespace-nowrap border-b border-l border-border bg-card px-1 text-sm font-semibold text-muted-foreground',
+                            day === today &&
+                                'flex-col gap-0.5 bg-brand/15 py-1 text-brand-accent',
+                            day !== today && day % 7 === 0 && 'bg-muted/50',
+                        )}
                         style={`grid-column: ${day - rangeStart + 2}; grid-row: 1;`}
                         title={day === today ? '今日' : undefined}
                     >
                         {#if day === today}
                             <span
-                                class="rounded-md border border-[#5865f2] bg-white px-1.5 py-0.5 text-[10px] font-medium leading-none text-[#5865f2] dark:bg-[#313338]"
+                                class="rounded-md border border-brand-accent bg-background px-1.5 py-0.5 text-[11px] font-semibold leading-none text-brand-accent"
                             >
                                 今日
                             </span>
@@ -312,27 +322,29 @@
                 <!-- Task rows -->
                 {#each displayTasks as task, taskIndex (task.id)}
                     <div
-                        class="sticky left-0 z-10 flex min-h-10 items-center gap-2 border-b border-r border-black/10 bg-[#313338] px-3"
+                        class="sticky left-0 z-10 flex min-h-10 items-center gap-2 border-b border-r border-border/70 bg-background px-3"
                         style={`grid-column: 1; grid-row: ${taskIndex + 2};`}
                     >
                         <Link
                             href={`/servers/${server.id}/channels/${task.channel_id}`}
-                            class={`truncate text-xs font-medium hover:underline ${
-                                task.completed ? 'text-[#23a559]' : ''
-                            }`}
+                            data-gantt-task-label
+                            class={cn(
+                                'truncate text-sm font-medium text-foreground hover:underline',
+                                task.completed && 'text-gantt-complete',
+                            )}
                         >
                             {#if channelHeaderTitle && task.type === 'channel'}
                                 <span class="sr-only">{task.title}</span>
                             {:else if task.type === 'channel'}
                                 <span class="flex items-center gap-1">
                                     <Hash
-                                        class="h-3 w-3 shrink-0 text-[#80848e]"
+                                        class="size-4 shrink-0 text-muted-foreground"
                                     />
                                     <span class="truncate">{task.title}</span>
                                 </span>
                             {:else if task.completed}
                                 <span class="flex items-center gap-1">
-                                    <CheckCircle2 class="h-3 w-3 shrink-0" />
+                                    <CheckCircle2 class="size-4 shrink-0" />
                                     <span class="truncate">{task.title}</span>
                                 </span>
                             {:else}
@@ -342,11 +354,16 @@
                     </div>
                     {#if task.start !== null && task.end !== null}
                         <div
-                            class="relative flex min-h-10 items-center border-b border-l border-black/10"
+                            class="relative flex min-h-10 items-center border-b border-l border-border/70"
                             style={`grid-column: ${gridColumn(task.start, task.end, rangeStart, dayCount)}; grid-row: ${taskIndex + 2};`}
                         >
                             <div
-                                class={`mx-0.5 h-4 w-full min-w-0 truncate rounded px-1.5 text-[10px] font-medium leading-4 text-white ${barClass(task)}`}
+                                data-gantt-bar
+                                data-task-type={task.type}
+                                data-task-completed={task.completed
+                                    ? 'true'
+                                    : 'false'}
+                                class={`mx-1 h-6 w-full min-w-0 truncate rounded-md px-2 text-xs font-semibold leading-6 ${barClass(task)}`}
                                 title={`${task.title} (${formatRange(task.start)} 〜 ${formatRange(task.end)})`}
                             >
                                 {task.title}
@@ -354,7 +371,7 @@
                         </div>
                     {:else}
                         <div
-                            class="min-h-10 border-b border-l border-black/10"
+                            class="min-h-10 border-b border-l border-border/70"
                             style={`grid-column: 2 / -1; grid-row: ${taskIndex + 2};`}
                         ></div>
                     {/if}
@@ -368,7 +385,13 @@
     <MemberDialog
         {server}
         {members}
+        canManage={isProjectAdministrator(
+            server,
+            members,
+            page.props.auth?.user?.id,
+        )}
         onUpdated={(updated) => (server = { ...server, ...updated })}
+        onMembersUpdated={(updated) => (members = updated)}
         onClose={() => (showMemberDialog = false)}
     />
 {/if}

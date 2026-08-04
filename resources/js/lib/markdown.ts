@@ -1,3 +1,6 @@
+import { mentionDisplayText, parseMentionTokens } from '@/lib/mentions';
+import type { MentionResource } from '@/types';
+
 function escapeHtml(value: string): string {
     return value
         .replaceAll('&', '&amp;')
@@ -7,7 +10,75 @@ function escapeHtml(value: string): string {
         .replaceAll("'", '&#039;');
 }
 
-function renderInline(value: string): string {
+function mentionMarkup(
+    kind: 'direct' | 'everyone',
+    text: string,
+    self = false,
+): string {
+    const classes = [
+        'mention',
+        kind === 'everyone' ? 'mention-everyone' : 'mention-direct',
+        self ? 'mention-self' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+
+    return `<span class="${classes}">${escapeHtml(text)}</span>`;
+}
+
+function renderMentions(
+    value: string,
+    mentions: readonly MentionResource[],
+    currentUserId: number | null | undefined,
+    preserve: (html: string) => string,
+): string {
+    const resolved = new Map(
+        mentions
+            .filter((mention) => mention.kind === 'direct')
+            .map((mention) => [String(mention.id), mention]),
+    );
+    const tokens = parseMentionTokens(value);
+
+    if (tokens.length === 0) {
+        return value;
+    }
+
+    let rendered = '';
+    let cursor = 0;
+
+    for (const token of tokens) {
+        rendered += value.slice(cursor, token.start);
+
+        if (token.kind === 'everyone') {
+            rendered += preserve(mentionMarkup('everyone', '@everyone'));
+        } else {
+            const mention =
+                token.id === null ? undefined : resolved.get(token.id);
+
+            if (!mention) {
+                rendered += preserve(mentionMarkup('direct', '[deleted user]'));
+            } else {
+                rendered += preserve(
+                    mentionMarkup(
+                        'direct',
+                        mentionDisplayText(mention),
+                        currentUserId === mention.id,
+                    ),
+                );
+            }
+        }
+
+        cursor = token.end;
+    }
+
+    return rendered + value.slice(cursor);
+}
+
+function renderInline(
+    value: string,
+    mentions: readonly MentionResource[],
+    currentUserId: number | null | undefined,
+): string {
     const replacements: string[] = [];
     const preserve = (html: string): string => {
         const index = replacements.push(html) - 1;
@@ -23,9 +94,11 @@ function renderInline(value: string): string {
         /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
         (_, label: string, url: string) =>
             preserve(
-                `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${renderInline(label)}</a>`,
+                `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${renderInline(label, mentions, currentUserId)}</a>`,
             ),
     );
+
+    rendered = renderMentions(rendered, mentions, currentUserId, preserve);
 
     rendered = escapeHtml(rendered)
         .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
@@ -53,6 +126,10 @@ type FencedCodeBlock = {
     token: string;
 };
 
+export type RenderedMessagePart =
+    | { kind: 'html'; html: string }
+    | { kind: 'code'; code: string; html: string; language: string };
+
 function extractFencedCode(value: string): {
     blocks: FencedCodeBlock[];
     markdown: string;
@@ -63,17 +140,27 @@ function extractFencedCode(value: string): {
     let index = 0;
 
     while (index < lines.length) {
-        if (!lines[index].startsWith('```')) {
+        const opening = lines[index].match(/^[ \t]{0,3}(`{3,}|~{3,})([^\r]*)$/);
+
+        if (!opening) {
             markdown.push(lines[index]);
             index += 1;
             continue;
         }
 
-        const language = lines[index].slice(3).trim().split(/\s+/, 1)[0] ?? '';
+        const marker = opening[1] ?? '';
+        const character = marker[0] ?? '`';
+        const markerLength = marker.length;
+        const language = (opening[2] ?? '').trim().split(/\s+/, 1)[0] ?? '';
         const code: string[] = [];
         index += 1;
 
-        while (index < lines.length && !lines[index].startsWith('```')) {
+        while (
+            index < lines.length &&
+            !new RegExp(
+                `^[ \\t]{0,3}${character.repeat(markerLength)}${character}*[ \\t]*$`,
+            ).test(lines[index])
+        ) {
             code.push(lines[index]);
             index += 1;
         }
@@ -119,7 +206,11 @@ function detectedLanguage(code: string): string {
     return '';
 }
 
-export function renderMessageMarkdown(value: string): string {
+function renderMarkdownContent(
+    value: string,
+    mentions: readonly MentionResource[] = [],
+    currentUserId?: number | null,
+): string {
     const lines = value.split('\n');
     const blocks: string[] = [];
     let index = 0;
@@ -127,27 +218,13 @@ export function renderMessageMarkdown(value: string): string {
     while (index < lines.length) {
         const line = lines[index];
 
-        if (line.startsWith('```')) {
-            const code: string[] = [];
-            index += 1;
-
-            while (index < lines.length && !lines[index].startsWith('```')) {
-                code.push(lines[index]);
-                index += 1;
-            }
-
-            index += index < lines.length ? 1 : 0;
-            blocks.push(
-                `<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`,
-            );
-            continue;
-        }
-
         if (line.startsWith('- ')) {
             const items: string[] = [];
 
             while (index < lines.length && lines[index].startsWith('- ')) {
-                items.push(`<li>${renderInline(lines[index].slice(2))}</li>`);
+                items.push(
+                    `<li>${renderInline(lines[index].slice(2), mentions, currentUserId)}</li>`,
+                );
                 index += 1;
             }
 
@@ -160,7 +237,7 @@ export function renderMessageMarkdown(value: string): string {
 
             while (index < lines.length && /^\d+\. /.test(lines[index])) {
                 items.push(
-                    `<li>${renderInline(lines[index].replace(/^\d+\. /, ''))}</li>`,
+                    `<li>${renderInline(lines[index].replace(/^\d+\. /, ''), mentions, currentUserId)}</li>`,
                 );
                 index += 1;
             }
@@ -173,7 +250,13 @@ export function renderMessageMarkdown(value: string): string {
             const quote: string[] = [];
 
             while (index < lines.length && lines[index].startsWith('> ')) {
-                quote.push(renderInline(lines[index].slice(2)));
+                quote.push(
+                    renderInline(
+                        lines[index].slice(2),
+                        mentions,
+                        currentUserId,
+                    ),
+                );
                 index += 1;
             }
 
@@ -194,7 +277,7 @@ export function renderMessageMarkdown(value: string): string {
             lines[index] !== '' &&
             !isBlockStart(lines[index])
         ) {
-            paragraph.push(renderInline(lines[index]));
+            paragraph.push(renderInline(lines[index], mentions, currentUserId));
             index += 1;
         }
 
@@ -204,24 +287,109 @@ export function renderMessageMarkdown(value: string): string {
     return blocks.join('');
 }
 
-export async function renderHighlightedMessageMarkdown(
+function requestedLanguage(block: FencedCodeBlock): string {
+    return (block.language || detectedLanguage(block.code)).toLocaleLowerCase(
+        'en-US',
+    );
+}
+
+function fallbackCodePart(block: FencedCodeBlock): RenderedMessagePart {
+    return {
+        kind: 'code',
+        code: block.code,
+        language: requestedLanguage(block) || 'text',
+        html: `<pre><code>${escapeHtml(block.code)}</code></pre>`,
+    };
+}
+
+function interleaveMessageParts(
+    rendered: string,
+    blocks: readonly FencedCodeBlock[],
+    codeParts: readonly RenderedMessagePart[],
+): RenderedMessagePart[] {
+    const parts: RenderedMessagePart[] = [];
+    let cursor = 0;
+
+    blocks.forEach((block, index) => {
+        const tokenIndex = rendered.indexOf(block.token, cursor);
+
+        if (tokenIndex < 0) {
+            return;
+        }
+
+        if (tokenIndex > cursor) {
+            parts.push({
+                kind: 'html',
+                html: rendered.slice(cursor, tokenIndex),
+            });
+        }
+
+        parts.push(codeParts[index] ?? fallbackCodePart(block));
+        cursor = tokenIndex + block.token.length;
+    });
+
+    if (cursor < rendered.length) {
+        parts.push({ kind: 'html', html: rendered.slice(cursor) });
+    }
+
+    return parts;
+}
+
+function joinMessageParts(parts: readonly RenderedMessagePart[]): string {
+    return parts.map((part) => part.html).join('');
+}
+
+export function renderMessageMarkdownParts(
     value: string,
-): Promise<string> {
+    mentions: readonly MentionResource[] = [],
+    currentUserId?: number | null,
+): RenderedMessagePart[] {
+    const extracted = extractFencedCode(value);
+    const rendered = renderMarkdownContent(
+        extracted.markdown,
+        mentions,
+        currentUserId,
+    );
+
+    return interleaveMessageParts(
+        rendered,
+        extracted.blocks,
+        extracted.blocks.map(fallbackCodePart),
+    );
+}
+
+export function renderMessageMarkdown(
+    value: string,
+    mentions: readonly MentionResource[] = [],
+    currentUserId?: number | null,
+): string {
+    return joinMessageParts(
+        renderMessageMarkdownParts(value, mentions, currentUserId),
+    );
+}
+
+export async function renderHighlightedMessageMarkdownParts(
+    value: string,
+    mentions: readonly MentionResource[] = [],
+    currentUserId?: number | null,
+): Promise<RenderedMessagePart[]> {
     const extracted = extractFencedCode(value);
 
     if (extracted.blocks.length === 0) {
-        return renderMessageMarkdown(value);
+        return renderMessageMarkdownParts(value, mentions, currentUserId);
     }
 
-    const rendered = renderMessageMarkdown(extracted.markdown);
+    const rendered = renderMarkdownContent(
+        extracted.markdown,
+        mentions,
+        currentUserId,
+    );
 
     try {
         const shiki = await import('shiki/bundle/web');
-        const highlighted = await Promise.all(
+        const codeParts = await Promise.all(
             extracted.blocks.map(async (block) => {
-                const requested = (
-                    block.language || detectedLanguage(block.code)
-                ).toLocaleLowerCase('en-US');
+                const requested = requestedLanguage(block);
                 const language = shiki.bundledLanguagesInfo.find(
                     (candidate) =>
                         candidate.id === requested ||
@@ -229,22 +397,40 @@ export async function renderHighlightedMessageMarkdown(
                 );
 
                 if (!language) {
-                    return `<pre><code>${escapeHtml(block.code)}</code></pre>`;
+                    return fallbackCodePart(block);
                 }
 
-                return shiki.codeToHtml(block.code, {
-                    lang: language.id,
-                    theme: 'github-dark',
-                });
+                return {
+                    kind: 'code' as const,
+                    code: block.code,
+                    language: language.id,
+                    html: await shiki.codeToHtml(block.code, {
+                        lang: language.id,
+                        themes: {
+                            light: 'github-light-high-contrast',
+                            dark: 'github-dark-high-contrast',
+                        },
+                    }),
+                };
             }),
         );
 
-        return extracted.blocks.reduce(
-            (html, block, index) =>
-                html.replace(block.token, highlighted[index]),
-            rendered,
-        );
+        return interleaveMessageParts(rendered, extracted.blocks, codeParts);
     } catch {
-        return renderMessageMarkdown(value);
+        return renderMessageMarkdownParts(value, mentions, currentUserId);
     }
+}
+
+export async function renderHighlightedMessageMarkdown(
+    value: string,
+    mentions: readonly MentionResource[] = [],
+    currentUserId?: number | null,
+): Promise<string> {
+    return joinMessageParts(
+        await renderHighlightedMessageMarkdownParts(
+            value,
+            mentions,
+            currentUserId,
+        ),
+    );
 }

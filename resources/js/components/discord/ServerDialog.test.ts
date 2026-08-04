@@ -88,7 +88,52 @@ describe('ServerDialog', () => {
         await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
         const [url, init] = fetchMock.mock.calls[0];
         expect(url).toBe('/servers/1');
-        expect(init.method).toBe('PATCH');
+        expect(init.method).toBe('POST');
+        const form = init.body as FormData;
+        expect(form.get('_method')).toBe('PATCH');
+        expect(form.get('name')).toBe('After');
         expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('creates a project with a custom icon', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ server: { id: 42 } }), {
+                status: 201,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        Object.defineProperty(URL, 'createObjectURL', {
+            configurable: true,
+            value: vi.fn(() => 'blob:project-icon'),
+        });
+        Object.defineProperty(URL, 'revokeObjectURL', {
+            configurable: true,
+            value: vi.fn(),
+        });
+        render(ServerDialog, { props: { onClose: vi.fn() } });
+
+        await fireEvent.input(screen.getByLabelText('プロジェクト名'), {
+            target: { value: 'Icon project' },
+        });
+        const icon = new File(['icon'], 'project.png', {
+            type: 'image/png',
+        });
+        await fireEvent.change(screen.getByLabelText('アイコン画像'), {
+            target: { files: [icon] },
+        });
+
+        expect(
+            document.querySelector('img[src="blob:project-icon"]'),
+        ).toBeTruthy();
+
+        await fireEvent.click(screen.getByRole('button', { name: '作成' }));
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+        const [, init] = fetchMock.mock.calls[0];
+        const form = init.body as FormData;
+        expect(init.method).toBe('POST');
+        expect(form.get('name')).toBe('Icon project');
+        expect(form.get('icon')).toBe(icon);
     });
 });

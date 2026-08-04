@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\MessageMutation;
+use App\Events\MentionNotificationCreated;
 use App\Events\MessageCreated;
 use App\Models\Channel;
 use App\Models\Message;
+use App\Models\MessageMention;
 use App\Models\Server;
-use App\Models\StoredFile;
 use App\Models\User;
 use App\Support\BestEffortBroadcaster;
+use App\Support\MessagePayload;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -16,7 +20,11 @@ use Illuminate\Validation\Rule;
 
 class MessageController extends Controller
 {
-    public function __construct(private BestEffortBroadcaster $broadcaster) {}
+    public function __construct(
+        private BestEffortBroadcaster $broadcaster,
+        private MessageMutation $mutation,
+        private MessagePayload $payload,
+    ) {}
 
     public function index(Server $server, Channel $channel, Request $request): JsonResponse
     {
@@ -26,15 +34,17 @@ class MessageController extends Controller
         $parentId = $request->integer('parent_id') ?: null;
 
         $query = Message::query()
-            ->with(['user:id,name,email', 'attachments'])
+            ->with(['user:id,name,email', 'attachments', 'mentions.user:id,name', 'reactions.user:id,name'])
             ->withCount(['replies as reply_count'])
+            ->where('server_id', $server->id)
             ->where('channel_id', $channel->id)
             ->where('parent_id', $parentId)
             ->latest('id')
             ->limit(min(max($request->integer('limit', 100), 1), 200))
             ->get()
             ->reverse()
-            ->values();
+            ->values()
+            ->map(fn (Message $message): array => $this->payload->make($message));
 
         return response()->json(['messages' => $query]);
     }
@@ -63,36 +73,18 @@ class MessageController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $message = Message::create([
-            'server_id' => $server->id,
-            'channel_id' => $channel->id,
-            'user_id' => $user->id,
-            'parent_id' => $validated['parent_id'] ?? null,
-            'body' => $validated['body'] ?? '',
-        ]);
+        $result = $this->mutation->create(
+            $server,
+            $channel,
+            $user,
+            $validated['body'] ?? '',
+            $validated['parent_id'] ?? null,
+            $validated['attachments'] ?? [],
+        );
 
-        foreach ($validated['attachments'] ?? [] as $attachment) {
-            $storedFile = StoredFile::query()
-                ->where('server_id', $server->id)
-                ->where('path', $attachment['path'])
-                ->first();
+        $this->broadcastMutation($result->message, $result->newMentions, true);
 
-            if ($storedFile !== null && $storedFile->attachable_id === null) {
-                $storedFile->update([
-                    'attachable_type' => Message::class,
-                    'attachable_id' => $message->id,
-                    'original_name' => $attachment['original_name'],
-                    'mime_type' => $attachment['mime_type'] ?? $storedFile->mime_type,
-                    'size' => $attachment['size'] ?? $storedFile->size,
-                ]);
-            }
-        }
-
-        $message->load(['user:id,name,email', 'attachments']);
-
-        $this->broadcaster->broadcastToOthers(new MessageCreated($message));
-
-        return response()->json(['message' => $message], 201);
+        return response()->json(['message' => $this->payload->make($result->message)], 201);
     }
 
     public function update(Request $request, Server $server, Channel $channel, Message $message): JsonResponse
@@ -104,10 +96,12 @@ class MessageController extends Controller
             'body' => ['required', 'string', 'max:10000'],
         ]);
 
-        $message->update(['body' => $validated['body']]);
-        $message->load(['user:id,name,email', 'attachments']);
+        /** @var User $user */
+        $user = $request->user();
+        $result = $this->mutation->update($server, $channel, $message, $user, $validated['body']);
+        $this->broadcastMutation($result->message, $result->newMentions);
 
-        return response()->json(['message' => $message]);
+        return response()->json(['message' => $this->payload->make($result->message)]);
     }
 
     public function destroy(Server $server, Channel $channel, Message $message): JsonResponse
@@ -128,5 +122,19 @@ class MessageController extends Controller
                 && $message->channel_id === $channel->id,
             404,
         );
+    }
+
+    /**
+     * @param  Collection<int, MessageMention>  $newMentions
+     */
+    private function broadcastMutation(Message $message, Collection $newMentions, bool $created = false): void
+    {
+        if ($created) {
+            $this->broadcaster->broadcastToOthers(new MessageCreated($message));
+        }
+
+        foreach ($newMentions as $mention) {
+            $this->broadcaster->broadcast(new MentionNotificationCreated($mention));
+        }
     }
 }

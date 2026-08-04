@@ -10,17 +10,26 @@ class MessagePolicy
 {
     public function create(User $user, Channel $channel): bool
     {
-        return $channel->server->members()->whereKey($user->id)->exists();
+        return $channel->server->archived_at === null
+            && $channel->server->members()->whereKey($user->id)->exists();
     }
 
     public function update(User $user, Message $message): bool
     {
-        return $message->user_id === $user->id;
+        return $message->server->archived_at === null
+            && $message->user_id === $user->id;
     }
 
     public function delete(User $user, Message $message): bool
     {
-        return $message->user_id === $user->id
-            || $message->server->created_by === $user->id;
+        return $message->server->archived_at === null
+            && ($message->user_id === $user->id
+                || $message->server->isAdministrator($user));
+    }
+
+    public function react(User $user, Message $message): bool
+    {
+        return $message->server->archived_at === null
+            && $message->server->members()->whereKey($user->id)->exists();
     }
 }

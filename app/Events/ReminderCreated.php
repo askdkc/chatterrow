@@ -23,4 +23,9 @@ class ReminderCreated implements ShouldBroadcast
             new PrivateChannel("server.{$this->message->server_id}.channel.{$this->message->channel_id}"),
         ];
     }
+
+    public function broadcastAs(): string
+    {
+        return 'ReminderCreated';
+    }
 }

@@ -36,6 +36,18 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $servers = $user
+            ? $user->servers()
+                ->active()
+                ->orderBy('servers.name')
+                ->get(['servers.id', 'servers.name', 'servers.icon_path'])
+                ->map(fn ($server): array => [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'icon_url' => $server->icon_url,
+                    'project_folder_id' => $server->pivot->project_folder_id,
+                ])
+            : [];
 
         return [
             ...parent::share($request),
@@ -45,8 +57,12 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $user,
-                'servers' => $user
-                    ? $user->servers()->orderBy('servers.name')->get(['servers.id', 'servers.name'])
+                'servers' => $servers,
+                'folders' => $user
+                    ? $user->projectFolders()
+                        ->orderBy('position')
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'color', 'icon_path', 'position'])
                     : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

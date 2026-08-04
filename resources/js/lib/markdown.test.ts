@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { MentionResource } from '@/types';
 import {
     renderHighlightedMessageMarkdown,
+    renderHighlightedMessageMarkdownParts,
     renderMessageMarkdown,
 } from './markdown';
 
@@ -35,6 +37,42 @@ describe('renderMessageMarkdown', () => {
         expect(rendered).not.toContain('<img');
         expect(rendered).not.toContain('href=');
     });
+
+    it('renders resolved, everyone, and self mentions without exposing IDs', () => {
+        const mentions: MentionResource[] = [
+            { id: 12, name: 'Alice <Admin>', kind: 'direct' },
+        ];
+        const rendered = renderMessageMarkdown(
+            '<@12> <!everyone> <@999>',
+            mentions,
+            12,
+        );
+
+        expect(rendered).toContain(
+            'class="mention mention-direct mention-self"',
+        );
+        expect(rendered).toContain('&lt;Admin&gt;');
+        expect(rendered).toContain('class="mention mention-everyone"');
+        expect(rendered).toContain('[deleted user]');
+        expect(rendered).not.toContain('<@999>');
+    });
+
+    it('does not convert mentions in inline or fenced code', () => {
+        const mentions: MentionResource[] = [
+            { id: 12, name: 'Alice', kind: 'direct' },
+        ];
+        const rendered = renderMessageMarkdown(
+            '`<@12>`\n~~~\n<@12>\n~~~\n<@12>',
+            mentions,
+            12,
+        );
+
+        expect(rendered).toContain('<code>&lt;@12&gt;</code>');
+        expect(rendered).toContain('<pre><code>&lt;@12&gt;</code></pre>');
+        expect(rendered).toContain(
+            'class="mention mention-direct mention-self"',
+        );
+    });
 });
 
 describe('renderHighlightedMessageMarkdown', () => {
@@ -44,17 +82,44 @@ describe('renderHighlightedMessageMarkdown', () => {
         );
 
         expect(rendered).toContain('class="shiki');
+        expect(rendered).toContain('github-light-high-contrast');
+        expect(rendered).toContain('github-dark-high-contrast');
+        expect(rendered).toContain('background-color:#ffffff');
+        expect(rendered).toContain('--shiki-dark-bg:#0a0c10');
+        expect(rendered).toContain('--shiki-dark');
         expect(rendered).toContain('<span');
         expect(rendered).toContain('answer');
     });
 
     it('detects HTML while keeping its source escaped', async () => {
-        const rendered = await renderHighlightedMessageMarkdown(
-            '```\n<h1>Hello</h1>\n```',
+        const source = '```\n<h1>Hello</h1>\n```';
+        const rendered = await renderHighlightedMessageMarkdown(source);
+        const parts = await renderHighlightedMessageMarkdownParts(source);
+        const codePart = parts.find((part) => part.kind === 'code');
+
+        if (!codePart || codePart.kind !== 'code') {
+            throw new Error('Expected an HTML code part');
+        }
+
+        const tokenColors = Array.from(
+            codePart.html.matchAll(/style="color:(#[0-9a-f]{6})/gi),
+            (match) => match[1].toLowerCase(),
         );
 
+        expect(codePart.language).toBe('html');
+        expect(new Set(tokenColors).size).toBeGreaterThan(1);
         expect(rendered).toContain('class="shiki');
         expect(rendered).not.toContain('<h1>Hello</h1>');
         expect(rendered).toContain('&#x3C;');
+    });
+
+    it('keeps an explicit HTML language label', async () => {
+        const parts = await renderHighlightedMessageMarkdownParts(
+            '```html\n<div class="note">Hello</div>\n```',
+        );
+        const codePart = parts.find((part) => part.kind === 'code');
+
+        expect(codePart?.kind).toBe('code');
+        expect(codePart?.kind === 'code' && codePart.language).toBe('html');
     });
 });

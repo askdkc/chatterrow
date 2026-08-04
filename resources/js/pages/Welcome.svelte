@@ -681,7 +681,7 @@
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        メンバーは閲覧・投稿、作成者は管理。
+                        メンバーは閲覧・投稿、管理者はプロジェクトを管理。
                         メンションとタグで「誰宛か」を明確にし、
                         限定的な範囲に情報を閉じません。
                     </p>
