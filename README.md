@@ -4,6 +4,9 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 
 プロジェクトごとにチャンネルを作り、チャット、タスク、ファイル、ガントチャートを一元管理します。リアルタイム配信にはLaravel Reverb、Officeファイルの読取専用プレビューにはONLYOFFICE Document Serverを使用します。
 
+## オンプレグループウェアの利点 (茶多楼はApp Server部分のサービスとなります)
+<img width="650" height="362" alt="image" src="https://github.com/user-attachments/assets/6dda7830-caef-45c2-8a26-d10fb8f42c58" />
+
 ## 主な機能
 
 - **プロジェクト管理**: プロジェクト名、内容、開始日、終了日、メンバーを設定
@@ -12,6 +15,7 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 - **安全なMarkdown**: HTMLエスケープ、HTTP(S) URL制限、Shikiコードハイライト
 - **添付ファイル**: ファイル／フォルダのD&D、10件単位アップロード、画像・PDF・Officeサムネイル
 - **ファイルプレビュー**: 画像・PDFの中央ビューア、ONLYOFFICEによるOfficeプレビュー、Escで終了
+- **Office/PDFのマークダウン変換保存**: バックグラウンドでMarkdown化してAI学習に利用しやすくします
 - **タスク管理**: 開始日・開始時刻・終了日・終了時刻、優先度、メモ、完了状態
 - **ガントチャート**: プロジェクトまたはチャンネル単位の期間表示
 - **期限リマインダー**: スケジューラとキューワーカーによる自動通知
