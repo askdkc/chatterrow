@@ -56,7 +56,7 @@ class ProjectFolder extends Model
         );
     }
 
-    /** @return Attribute<string|null, never> */
+    /** @return Attribute<covariant string|null, never> */
     protected function iconUrl(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->icon_path !== null

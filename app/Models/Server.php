@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -35,6 +36,7 @@ use RuntimeException;
  * @property-read Collection<int, ServerInvitation> $invitations
  * @property-read Collection<int, Channel> $channels
  * @property-read string|null $icon_url
+ * @property-read Pivot&object{project_folder_id: int|null} $pivot
  */
 #[Appends(['icon_url'])]
 #[Fillable(['created_by', 'name', 'description', 'icon_path', 'starts_on', 'ends_on', 'archived_at'])]
@@ -156,7 +158,7 @@ class Server extends Model
         ];
     }
 
-    /** @return Attribute<string|null, never> */
+    /** @return Attribute<covariant string|null, never> */
     protected function iconUrl(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->icon_path !== null
