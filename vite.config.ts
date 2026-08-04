@@ -8,8 +8,9 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 const isSvelteCheck = process.argv.some((argument) => argument.includes('svelte-check'));
+const isVitest = process.env.VITEST === 'true';
 
-if (isSvelteCheck) {
+if (isSvelteCheck || isVitest) {
     process.env.LARAVEL_BYPASS_ENV_CHECK ??= '1';
 }
 
