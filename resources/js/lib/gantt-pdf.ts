@@ -27,6 +27,8 @@ const HEADER_H = 18;
 const DATE_ROW_H = 9;
 const ROW_H = 9;
 const LABEL_W = 72;
+const GRID_LINE_W = 0.2;
+const GRID_STRONG_LINE_W = 0.3;
 
 type Rgb = [number, number, number];
 
@@ -34,7 +36,8 @@ const COLORS: Record<string, Rgb> = {
     channel: [88, 101, 242],
     todo: [240, 178, 50],
     completed: [35, 165, 89],
-    grid: [230, 230, 235],
+    grid: [185, 190, 200],
+    gridStrong: [145, 152, 165],
     weekend: [243, 244, 247],
     text: [30, 34, 40],
     muted: [110, 115, 125],
@@ -143,9 +146,12 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         chartX + (day - options.rangeStart) * dayW;
 
     const drawTableFrame = (): void => {
-        doc.setDrawColor(...COLORS.grid);
-        doc.setLineWidth(0.15);
+        doc.setDrawColor(...COLORS.gridStrong);
+        doc.setLineWidth(GRID_STRONG_LINE_W);
         doc.rect(tableX, tableY, tableW, tableH);
+
+        doc.setDrawColor(...COLORS.grid);
+        doc.setLineWidth(GRID_LINE_W);
 
         for (let day = options.rangeStart; day <= options.rangeEnd; day += 1) {
             const date = new Date(day * 86_400_000);
@@ -156,10 +162,16 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
                 doc.rect(dayX(day), tableY, dayW, tableH, 'F');
             }
 
-            doc.setDrawColor(...COLORS.grid);
             doc.line(dayX(day), tableY, dayX(day), tableY + tableH);
         }
 
+        for (let row = 1; row < visibleTasks.length; row += 1) {
+            const y = tableY + DATE_ROW_H + row * ROW_H;
+            doc.line(tableX, y, tableX + tableW, y);
+        }
+
+        doc.setDrawColor(...COLORS.gridStrong);
+        doc.setLineWidth(GRID_STRONG_LINE_W);
         doc.line(chartX, tableY, chartX, tableY + tableH);
         doc.line(
             tableX,
@@ -183,7 +195,7 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
                 doc.setDrawColor(...COLORS.channel);
                 doc.setLineWidth(0.3);
                 doc.rect(x, tableY, dayW, DATE_ROW_H);
-                doc.setLineWidth(0.15);
+                doc.setLineWidth(GRID_LINE_W);
             }
 
             doc.text(label, x + dayW / 2, tableY + DATE_ROW_H / 2 + 1, {

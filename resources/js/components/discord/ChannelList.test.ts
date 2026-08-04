@@ -28,6 +28,40 @@ describe('ChannelList', () => {
         ).toBeNull();
     });
 
+    it('uses the channel color for a configured period marker', () => {
+        render(ChannelList, {
+            props: {
+                server: {
+                    id: 1,
+                    name: 'Test Server',
+                    description: null,
+                    starts_on: null,
+                    ends_on: null,
+                    created_by: 1,
+                },
+                channels: [
+                    {
+                        id: 2,
+                        server_id: 1,
+                        name: '実装',
+                        description: null,
+                        starts_on: '2026-08-03',
+                        ends_on: '2026-08-07',
+                        created_by: 1,
+                    },
+                ],
+                members: [],
+                activeChannelId: null,
+                onManageMembers: vi.fn(),
+            },
+        });
+
+        const marker = screen.getByTitle('チャンネル期間設定あり');
+
+        expect(marker.classList.contains('bg-brand')).toBe(true);
+        expect(marker.classList.contains('bg-[#f0b232]')).toBe(false);
+    });
+
     it('opens channel settings without navigating to the channel', async () => {
         const onEditChannel = vi.fn();
         const channel = {

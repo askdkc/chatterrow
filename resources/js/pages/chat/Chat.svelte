@@ -17,7 +17,6 @@
         Paperclip,
         Plus,
         Send,
-        Smile,
         SquareCode,
         Strikethrough,
         TextQuote,
@@ -27,6 +26,7 @@
     import { onMount } from 'svelte';
     import ChannelDialog from '@/components/discord/ChannelDialog.svelte';
     import ChannelList from '@/components/discord/ChannelList.svelte';
+    import EmojiPicker from '@/components/discord/EmojiPicker.svelte';
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import MessageItem from '@/components/discord/MessageItem.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
@@ -73,6 +73,7 @@
     let threadError = $state('');
     let sending = $state(false);
     let composerExpanded = $state(false);
+    let emojiPickerOpen = $state(false);
     let showFormatting = $state(true);
     let dragActive = $state(false);
     let pendingFiles: StoredFileResource[] = $state([]);
@@ -221,6 +222,7 @@
             appendMessage(data.message);
             draft = '';
             pendingFiles = [];
+            emojiPickerOpen = false;
             composerExpanded = false;
             resetComposerHeight();
         } catch (e) {
@@ -297,9 +299,9 @@
         }
 
         composer.style.height = 'auto';
-        composer.style.height = `${Math.min(composer.scrollHeight, 240)}px`;
+        composer.style.height = `${Math.min(composer.scrollHeight, 192)}px`;
         composer.style.overflowY =
-            composer.scrollHeight > 240 ? 'auto' : 'hidden';
+            composer.scrollHeight > 192 ? 'auto' : 'hidden';
     }
 
     function resetComposerHeight() {
@@ -312,7 +314,10 @@
 
     function collapseComposerIfIdle() {
         requestAnimationFrame(() => {
-            if (!composerShell?.contains(document.activeElement)) {
+            if (
+                !emojiPickerOpen &&
+                !composerShell?.contains(document.activeElement)
+            ) {
                 composerExpanded = false;
             }
         });
@@ -789,91 +794,93 @@
                         />
                         {#if composerExpanded && showFormatting}
                             <div
-                                class="flex min-h-12 items-center gap-1 overflow-x-auto px-3 pt-2 text-[#b5bac1]"
+                                class="flex min-h-10 items-center gap-1 overflow-x-auto px-2 pt-1 text-[#b5bac1]"
                                 aria-label="書式設定"
                             >
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('**')}
                                     title="太字"
                                 >
-                                    <Bold class="h-5 w-5" />
+                                    <Bold class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('_')}
                                     title="斜体"
                                 >
-                                    <Italic class="h-5 w-5" />
+                                    <Italic class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('__')}
                                     title="下線"
                                 >
-                                    <Underline class="h-5 w-5" />
+                                    <Underline class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('~~')}
                                     title="取り消し線"
                                 >
-                                    <Strikethrough class="h-5 w-5" />
+                                    <Strikethrough class="h-4 w-4" />
                                 </button>
-                                <span class="mx-1 h-6 w-px shrink-0 bg-white/10"
+                                <span
+                                    class="mx-0.5 h-5 w-px shrink-0 bg-white/10"
                                 ></span>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={insertComposerLink}
                                     title="リンク"
                                 >
-                                    <Link2 class="h-5 w-5" />
+                                    <Link2 class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() =>
                                         prefixComposerLines(
                                             (index) => `${index + 1}. `,
                                         )}
                                     title="番号付きリスト"
                                 >
-                                    <ListOrdered class="h-5 w-5" />
+                                    <ListOrdered class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => prefixComposerLines('- ')}
                                     title="箇条書き"
                                 >
-                                    <ListIcon class="h-5 w-5" />
+                                    <ListIcon class="h-4 w-4" />
                                 </button>
-                                <span class="mx-1 h-6 w-px shrink-0 bg-white/10"
+                                <span
+                                    class="mx-0.5 h-5 w-px shrink-0 bg-white/10"
                                 ></span>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => prefixComposerLines('> ')}
                                     title="引用"
                                 >
-                                    <TextQuote class="h-5 w-5" />
+                                    <TextQuote class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('`')}
                                     title="インラインコード"
                                 >
-                                    <Code class="h-5 w-5" />
+                                    <Code class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded p-2 transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() =>
                                         wrapComposerSelection(
                                             '```\n',
@@ -882,32 +889,32 @@
                                         )}
                                     title="コードブロック"
                                 >
-                                    <SquareCode class="h-5 w-5" />
+                                    <SquareCode class="h-4 w-4" />
                                 </button>
                             </div>
                         {/if}
                         <div
                             class={composerExpanded
                                 ? ''
-                                : 'flex h-14 items-center gap-2 px-3'}
+                                : 'flex h-12 items-center gap-1.5 px-2'}
                         >
                             {#if !composerExpanded}
                                 <button
                                     type="button"
-                                    class="rounded-full p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
+                                    class="rounded-full p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={() => fileInput?.click()}
                                     title="ファイルを添付"
                                 >
-                                    <Plus class="h-5 w-5" />
+                                    <Plus class="h-4 w-4" />
                                 </button>
                             {/if}
                             <textarea
                                 bind:this={composer}
                                 bind:value={draft}
-                                rows={composerExpanded ? 4 : 1}
+                                rows={composerExpanded ? 3 : 1}
                                 class={composerExpanded
-                                    ? 'block max-h-60 min-h-28 w-full resize-none bg-transparent px-4 py-3 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#a5a7ad]'
-                                    : 'h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#80848e]'}
+                                    ? 'block max-h-48 min-h-20 w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#a5a7ad]'
+                                    : 'h-9 min-w-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#80848e]'}
                                 placeholder={threadParent
                                     ? `「${threadParent.user?.name}」への返信`
                                     : 'メッセージを入力'}
@@ -916,17 +923,15 @@
                                 onkeydown={onComposerKeydown}
                             ></textarea>
                             {#if !composerExpanded}
+                                <div class="hidden sm:block">
+                                    <EmojiPicker
+                                        bind:open={emojiPickerOpen}
+                                        onselect={insertComposerText}
+                                    />
+                                </div>
                                 <button
                                     type="button"
-                                    class="hidden rounded p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white sm:block"
-                                    onclick={() => insertComposerText('🙂')}
-                                    title="絵文字を挿入"
-                                >
-                                    <Smile class="h-5 w-5" />
-                                </button>
-                                <button
-                                    type="button"
-                                    class="rounded p-2 text-[#80848e] transition enabled:text-[#dbdee1] enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-40"
+                                    class="rounded p-1.5 text-[#80848e] transition enabled:text-[#dbdee1] enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-40"
                                     onclick={sendMessage}
                                     disabled={sending ||
                                         (!draft.trim() &&
@@ -934,26 +939,26 @@
                                     title="送信"
                                 >
                                     {#if sending}
-                                        <Loader2 class="h-5 w-5 animate-spin" />
+                                        <Loader2 class="h-4 w-4 animate-spin" />
                                     {:else}
-                                        <Send class="h-5 w-5" />
+                                        <Send class="h-4 w-4" />
                                     {/if}
                                 </button>
                             {/if}
                         </div>
                         {#if composerExpanded}
-                            <div class="flex items-center gap-1 px-3 py-2">
+                            <div class="flex items-center gap-1 px-2 py-1.5">
                                 <button
                                     type="button"
-                                    class="rounded-full bg-white/5 p-2.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
+                                    class="rounded-full bg-white/5 p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={() => fileInput?.click()}
                                     title="ファイルを添付"
                                 >
-                                    <Plus class="h-5 w-5" />
+                                    <Plus class="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    class={`rounded px-2 py-1.5 text-lg font-medium underline decoration-2 underline-offset-4 transition hover:bg-white/10 hover:text-white ${
+                                    class={`rounded px-2 py-1 text-base font-medium underline decoration-2 underline-offset-4 transition hover:bg-white/10 hover:text-white ${
                                         showFormatting
                                             ? 'text-[#dbdee1]'
                                             : 'text-[#80848e]'
@@ -966,27 +971,26 @@
                                 >
                                     Aa
                                 </button>
+                                <EmojiPicker
+                                    bind:open={emojiPickerOpen}
+                                    align="start"
+                                    alignOffset={-88}
+                                    onselect={insertComposerText}
+                                />
                                 <button
                                     type="button"
-                                    class="rounded p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
-                                    onclick={() => insertComposerText('🙂')}
-                                    title="絵文字を挿入"
-                                >
-                                    <Smile class="h-5 w-5" />
-                                </button>
-                                <button
-                                    type="button"
-                                    class="rounded p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
+                                    class="rounded p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={() => insertComposerText('@')}
                                     title="メンションを挿入"
                                 >
-                                    <AtSign class="h-5 w-5" />
+                                    <AtSign class="h-4 w-4" />
                                 </button>
-                                <span class="mx-1 h-6 w-px shrink-0 bg-white/10"
+                                <span
+                                    class="mx-0.5 h-5 w-px shrink-0 bg-white/10"
                                 ></span>
                                 <button
                                     type="button"
-                                    class="ml-auto rounded-md p-2.5 text-[#80848e] transition enabled:text-[#dbdee1] enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-40"
+                                    class="ml-auto rounded-md p-2 text-[#80848e] transition enabled:text-[#dbdee1] enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-40"
                                     onclick={sendMessage}
                                     disabled={sending ||
                                         (!draft.trim() &&
@@ -994,9 +998,9 @@
                                     title="送信"
                                 >
                                     {#if sending}
-                                        <Loader2 class="h-5 w-5 animate-spin" />
+                                        <Loader2 class="h-4 w-4 animate-spin" />
                                     {:else}
-                                        <Send class="h-5 w-5" />
+                                        <Send class="h-4 w-4" />
                                     {/if}
                                 </button>
                             </div>

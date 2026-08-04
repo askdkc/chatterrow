@@ -53,6 +53,7 @@
     --color-brand-pink-solid: var(--brand-pink-solid);
     --color-success: var(--success);
     --color-danger: var(--danger);
+    --color-gantt-today-marker: var(--gantt-today-marker);
 
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
@@ -127,6 +128,7 @@
     --brand-pink-solid: hsl(332 68% 42%);
     --success: hsl(145 71% 30%);
     --danger: hsl(359 59% 49%);
+    --gantt-today-marker: hsl(235 65% 56% / 0.35);
     --chart-1: hsl(12 76% 61%);
     --chart-2: hsl(173 58% 39%);
     --chart-3: hsl(197 37% 24%);
@@ -173,6 +175,7 @@
     --brand-pink-solid: hsl(332 68% 42%);
     --success: hsl(145 64% 39%);
     --danger: hsl(359 59% 49%);
+    --gantt-today-marker: hsl(235 89% 76% / 0.55);
     --chart-1: hsl(220 70% 50%);
     --chart-2: hsl(160 60% 45%);
     --chart-3: hsl(30 80% 55%);

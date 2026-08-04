@@ -360,7 +360,7 @@ describe('Chat composer', () => {
         expect(chatColumn.contains(composer)).toBe(true);
         expect(chatColumn.contains(todoPanel)).toBe(false);
         expect(chatColumn.parentElement).toBe(todoPanel?.parentElement);
-        expect(composer.rows).toBe(4);
+        expect(composer.rows).toBe(3);
         expect(screen.getByLabelText('書式設定')).toBeTruthy();
 
         await fireEvent.focusOut(composer, { relatedTarget: null });
@@ -418,7 +418,7 @@ describe('Chat composer', () => {
                 'メッセージを入力',
             ) as HTMLTextAreaElement;
 
-            expect(expandedComposer.rows).toBe(4);
+            expect(expandedComposer.rows).toBe(3);
             expect(expandedComposer).toBe(compactComposer);
             expect(document.activeElement).toBe(expandedComposer);
         });
@@ -429,5 +429,35 @@ describe('Chat composer', () => {
         });
 
         expect(expandedComposer.value).toBe('キーボード入力');
+    });
+
+    it('inserts a picked emoji at the cursor without collapsing the composer', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue(
+                new Response(JSON.stringify({ todos: [] }), {
+                    status: 200,
+                }),
+            ),
+        );
+        renderChat();
+
+        const composer = await focusComposer();
+        await fireEvent.input(composer, { target: { value: '前後' } });
+        composer.setSelectionRange(1, 1);
+
+        await fireEvent.click(
+            screen.getByRole('button', { name: '絵文字を選ぶ' }),
+        );
+        expect(await screen.findByLabelText('クイック絵文字')).toBeTruthy();
+        expect(composer.rows).toBe(3);
+
+        await fireEvent.click(screen.getByRole('button', { name: '👍を挿入' }));
+
+        await waitFor(() => {
+            expect(composer.value).toBe('前👍後');
+            expect(document.activeElement).toBe(composer);
+            expect(screen.queryByLabelText('クイック絵文字')).toBeNull();
+        });
     });
 });

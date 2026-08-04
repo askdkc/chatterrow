@@ -253,6 +253,7 @@
   "Two-factor authentication QR code": "2段階認証のQRコード",
   "Hide recovery codes": "リカバリーコードを非表示",
   "Close": "閉じる",
+  "PDF, Office and CSV files are shown here without downloading.": "PDF、Office、CSVファイルをダウンロードせずに表示できます。",
   "Profile settings": "アカウント設定",
   "Security settings": "セキュリティ設定",
   "Appearance settings": "スタイル設定",

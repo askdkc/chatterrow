@@ -265,6 +265,19 @@
                     {/each}
                 </div>
 
+                {#if today >= rangeStart && today <= rangeEnd}
+                    <div
+                        class="pointer-events-none absolute inset-x-0 top-12 bottom-0 z-10 grid"
+                        style={`grid-template-columns: 260px repeat(${dayCount}, minmax(24px, 1fr));`}
+                        aria-hidden="true"
+                    >
+                        <div
+                            class="h-full w-0 justify-self-center border-l-2 border-gantt-today-marker"
+                            style={`grid-column: ${today - rangeStart + 2};`}
+                        ></div>
+                    </div>
+                {/if}
+
                 <!-- Header row: blank + ticks -->
                 <div
                     class="sticky left-0 top-0 z-20 flex h-12 items-center border-b border-r border-black/10 bg-[#2b2d31] px-3 text-xs font-semibold text-[#80848e]"
@@ -281,13 +294,18 @@
                 </div>
                 {#each ticks as day (day)}
                     <div
-                        class="sticky top-0 z-10 flex h-12 items-center justify-center border-b border-l border-black/10 bg-[#2b2d31] px-1 text-xs font-medium whitespace-nowrap text-[#80848e]"
-                        class:bg-[#232428]={day % 7 === 0}
-                        class:text-[#5865f2]={day === today}
+                        class={`sticky top-0 z-10 flex h-12 items-center justify-center border-b border-l border-black/10 bg-[#2b2d31] px-1 text-xs font-medium whitespace-nowrap text-[#80848e] ${day === today ? 'bg-[#5865f2]/10 py-1 text-[#5865f2] flex-col gap-0.5' : day % 7 === 0 ? 'bg-[#232428]' : ''}`}
                         style={`grid-column: ${day - rangeStart + 2}; grid-row: 1;`}
                         title={day === today ? '今日' : undefined}
                     >
-                        {formatTick(day)}
+                        {#if day === today}
+                            <span
+                                class="rounded-md border border-[#5865f2] bg-white px-1.5 py-0.5 text-[10px] font-medium leading-none text-[#5865f2] dark:bg-[#313338]"
+                            >
+                                今日
+                            </span>
+                        {/if}
+                        <span>{formatTick(day)}</span>
                     </div>
                 {/each}
 

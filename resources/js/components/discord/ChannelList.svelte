@@ -108,8 +108,8 @@
                     <span class="truncate">{channel.name}</span>
                     {#if channel.starts_on || channel.ends_on}
                         <span
-                            class="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#f0b232]"
-                            title="タスク期間設定あり"
+                            class="ml-auto size-2 shrink-0 rounded-full bg-brand"
+                            title="チャンネル期間設定あり"
                         ></span>
                     {/if}
                 </Link>

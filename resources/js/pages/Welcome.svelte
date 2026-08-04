@@ -487,6 +487,107 @@
                 </h2>
             </div>
 
+            <div class="mb-12 flex flex-col gap-6">
+                <figure
+                    class="grid overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]"
+                >
+                    <img
+                        src="/images/welcome/chat-screen.png"
+                        alt="架空の新商品プロジェクトを題材にしたチャット画面のサンプル"
+                        width="1667"
+                        height="943"
+                        loading="lazy"
+                        decoding="async"
+                        class="block aspect-video w-full object-cover object-top lg:border-r lg:border-border"
+                    />
+                    <figcaption
+                        class="flex flex-col justify-center gap-3 border-t border-border p-6 lg:border-t-0 lg:p-8"
+                    >
+                        <div
+                            class="flex size-10 items-center justify-center rounded-xl bg-brand/10 text-brand-accent"
+                        >
+                            <MessagesSquare class="size-5" />
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-card-foreground">
+                                チャット画面
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
+                            >
+                                会話、共有ファイル、タスクの進捗を同じ流れで確認できます。
+                            </p>
+                        </div>
+                    </figcaption>
+                </figure>
+
+                <figure
+                    class="grid overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]"
+                >
+                    <figcaption
+                        class="flex flex-col justify-center gap-3 border-b border-border p-6 lg:border-r lg:border-b-0 lg:p-8"
+                    >
+                        <div
+                            class="flex size-10 items-center justify-center rounded-xl bg-brand-pink/10 text-brand-pink"
+                        >
+                            <GanttChartSquare class="size-5" />
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-card-foreground">
+                                ガントチャート画面
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
+                            >
+                                業務の期間、進捗、依存関係をひとつの時間軸で把握できます。
+                            </p>
+                        </div>
+                    </figcaption>
+                    <img
+                        src="/images/welcome/gantt-screen.png"
+                        alt="架空の新商品プロジェクトを題材にしたガントチャート画面のサンプル"
+                        width="1668"
+                        height="943"
+                        loading="lazy"
+                        decoding="async"
+                        class="block aspect-video w-full object-cover object-top"
+                    />
+                </figure>
+
+                <figure
+                    class="grid overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]"
+                >
+                    <img
+                        src="/images/welcome/file-preview-screen.png"
+                        alt="架空の提案資料を表示したファイルプレビュー画面のサンプル"
+                        width="1665"
+                        height="945"
+                        loading="lazy"
+                        decoding="async"
+                        class="block aspect-video w-full object-cover object-top lg:border-r lg:border-border"
+                    />
+                    <figcaption
+                        class="flex flex-col justify-center gap-3 border-t border-border p-6 lg:border-t-0 lg:p-8"
+                    >
+                        <div
+                            class="flex size-10 items-center justify-center rounded-xl bg-success/10 text-success"
+                        >
+                            <FileText class="size-5" />
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-card-foreground">
+                                ファイルプレビュー画面
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
+                            >
+                                会話を離れず、共有された資料をダウンロードせずに確認できます。
+                            </p>
+                        </div>
+                    </figcaption>
+                </figure>
+            </div>
+
             <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div class="rounded-2xl border border-border bg-card p-6">
                     <div
