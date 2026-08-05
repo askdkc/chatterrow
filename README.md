@@ -67,6 +67,12 @@ cd chatterrow
 ./setup.sh
 ```
 
+ローカル開発・検証環境や閉域網など、インターネットからアクセスできる公開ドメインとHTTPSが不要な場合は、`--no-ssl`を付けて実行してください。Let's Encryptは使用せず、HTTPのみで構成します。`chatterrow.test`などのローカルドメインを使用する場合は、事前にDNSまたは`/etc/hosts`でこのサーバーへ名前解決できるようにしてください。
+
+```bash
+./setup.sh --domain chatterrow.test --database sqlite --no-ssl
+```
+
 `setup.sh` 実行時にsudoのパスワードを聞かれます。sudoパスワード不要でsudo可能なユーザーの場合は下記の例のように`--sudo-nopasswd`オプションを付けて実行します。
 
 
