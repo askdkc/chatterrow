@@ -140,6 +140,21 @@ apt_get_with_lock_wait() {
         -o DPkg::Lock::Timeout=300 "$@"
 }
 
+wait_for_supervisor() {
+    local attempt
+
+    for attempt in {1..30}; do
+        if sudo supervisorctl status >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    sudo systemctl --no-pager --full status supervisor >&2 || true
+    sudo journalctl --no-pager -u supervisor -n 80 >&2 || true
+    return 1
+}
+
 backup_nginx_file() {
     local source="$1" name="$2" existing
 
@@ -1241,6 +1256,15 @@ apt_get_with_lock_wait install -y \
     poppler-utils imagemagick ghostscript \
     fonts-dejavu-core fonts-liberation fonts-noto-cjk sqlite3
 
+# ONLYOFFICE's Debian post-install script calls supervisorctl while it is
+# configuring the Document Server. On a fresh Ubuntu install supervisor may be
+# installed but not started yet, which makes that call fail because its Unix
+# socket does not exist. Start it before installing ONLYOFFICE so the package
+# can register its services against a live supervisord instance.
+sudo systemctl enable --now supervisor
+wait_for_supervisor \
+    || die "Supervisor did not expose its control socket before ONLYOFFICE installation"
+
 IMAGEMAGICK_BINARY="$(resolve_imagemagick_path)" \
     || die "ImageMagick was installed but neither magick nor convert is executable"
 "$IMAGEMAGICK_BINARY" -version >/dev/null 2>&1 \
@@ -1521,8 +1545,10 @@ configure_nginx_worker_user
 restrict_onlyoffice_listener
 sudo nginx -t
 sudo systemctl enable --now nginx supervisor
-sudo supervisorctl reread >/dev/null
-sudo supervisorctl update >/dev/null
+wait_for_supervisor \
+    || die "Supervisor did not expose its control socket after ONLYOFFICE installation"
+sudo supervisorctl reread
+sudo supervisorctl update
 valid_jwt_secret "$ONLYOFFICE_JWT_SECRET" \
     || die "ONLYOFFICE_JWT_SECRET must be at least 32 non-whitespace characters"
 
