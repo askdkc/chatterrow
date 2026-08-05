@@ -1187,6 +1187,7 @@ log "Domain: $DOMAIN | OnlyOffice: $OFFICE_DOMAIN | Database: $DATABASE"
 
 # --------------------------------------------------- base packages --------
 log "Installing web, database, preview, SSL, and build packages..."
+remove_ubuntu_nginx_packages
 sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl gnupg ca-certificates lsb-release ubuntu-keyring
 
@@ -1199,9 +1200,8 @@ grep -qx '573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62' <<< "$NGINX_KEY_FINGERPRINTS
 echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/ubuntu ${VERSION_CODENAME} nginx" | \
     sudo tee /etc/apt/sources.list.d/nginx.list >/dev/null
 printf 'Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n' | \
-    sudo tee /etc/apt/preferences.d/99nginx >/dev/null
+sudo tee /etc/apt/preferences.d/99nginx >/dev/null
 sudo apt-get update -y
-remove_ubuntu_nginx_packages
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common \
     git unzip zip rsync acl jq openssl \
