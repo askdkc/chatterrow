@@ -102,6 +102,8 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 10. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
 11. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
 
+既存のUbuntu版`nginx-extras`、`nginx-full`、`nginx-light`などがある場合は、設定ファイルを保持したまま削除し、nginx公式リポジトリ版へ切り替えます。
+
 ## macOSローカルOnlyOffice
 
 macOSではLinux用のOnlyOfficeパッケージをインストールせず、Appleの`container`でDocumentServerを起動します。Apple siliconとmacOS 26以降が必要です。

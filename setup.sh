@@ -259,6 +259,30 @@ install_nodesource_repository() {
     sudo apt-get update -y
 }
 
+remove_ubuntu_nginx_packages() {
+    local package
+    local -a packages=(nginx-extras nginx-full nginx-light nginx-core nginx-common)
+    local -a installed_packages=()
+
+    for package in "${packages[@]}"; do
+        if dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null | grep -qx 'installed'; then
+            installed_packages+=("$package")
+        fi
+    done
+
+    while IFS= read -r package; do
+        [[ -z "$package" ]] || installed_packages+=("$package")
+    done < <(
+        dpkg-query -W -f='${binary:Package} ${db:Status-Status}\n' 'libnginx-mod-*' 2>/dev/null \
+            | awk '$2 == "installed" { print $1 }' || true
+    )
+
+    if [[ "${#installed_packages[@]}" -gt 0 ]]; then
+        warn "Removing Ubuntu nginx packages before installing the nginx.org build: ${installed_packages[*]}"
+        sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y "${installed_packages[@]}"
+    fi
+}
+
 prepare_app_update() {
     local supervisor_config
 
@@ -1177,6 +1201,7 @@ echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://ngin
 printf 'Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n' | \
     sudo tee /etc/apt/preferences.d/99nginx >/dev/null
 sudo apt-get update -y
+remove_ubuntu_nginx_packages
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common \
     git unzip zip rsync acl jq openssl \
