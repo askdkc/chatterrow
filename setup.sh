@@ -47,15 +47,6 @@ if [[ "$(id -u)" -eq 0 ]]; then
             command "$@"
         fi
     }
-else
-    SUDO_BINARY="$(type -P sudo 2>/dev/null || true)"
-    sudo() {
-        if [[ "$SUDO_NOPASSWD" == "1" && "${1:-}" != "-n" ]]; then
-            command "$SUDO_BINARY" -n "$@"
-        else
-            command "$SUDO_BINARY" "$@"
-        fi
-    }
 fi
 
 # ---------------------------------------------------------------- helpers --
@@ -924,6 +915,15 @@ prompt_required() {
     printf '%s' "$value"
 }
 
+announce_passwordless_sudo_option() {
+    [[ "$(id -u)" -ne 0 && "$SUDO_NOPASSWD" != "1" ]] || return 0
+
+    if sudo -n true >/dev/null 2>&1; then
+        log "Passwordless sudo detected; continuing in passwordless mode. Explicit option: ./setup.sh --sudo-nopasswd"
+        SUDO_NOPASSWD=1
+    fi
+}
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 APP_DIR="${APP_DIR:-$SCRIPT_DIR}"
 REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
@@ -971,7 +971,7 @@ Options:
   --app-dir <path>           App install path (default: cloned repository directory)
   --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrow.git)
   --onlyoffice-image <image> OnlyOffice image pulled on each macOS run (default: onlyoffice/documentserver:latest)
-  --sudo-nopasswd            Require passwordless sudo and never prompt for a password
+  --sudo-nopasswd            Use a passwordless sudo user and skip sudo -v validation
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
 
@@ -1033,17 +1033,16 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     exit 0
 fi
 
+announce_passwordless_sudo_option
+
 # ----------------------------------------------------------- preflight -----
 if [[ "$(id -u)" -eq 0 ]]; then
     command -v runuser >/dev/null || die "runuser is required for direct root execution"
 else
-    [[ -n "$SUDO_BINARY" ]] || die "sudo is required"
-    sudo -v || {
-        if [[ "$SUDO_NOPASSWD" == "1" ]]; then
-            die "Passwordless sudo is required; run as a sudoers user with NOPASSWD:ALL or omit --sudo-nopasswd"
-        fi
-        die "sudo authentication failed"
-    }
+    command -v sudo >/dev/null || die "sudo is required"
+    if [[ "$SUDO_NOPASSWD" != "1" ]]; then
+        sudo -v || die "sudo authentication failed"
+    fi
 fi
 
 if [[ -z "$DOMAIN" ]]; then
@@ -1146,7 +1145,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
     warn "Running as root; application files will be owned by ${DEPLOY_USER}"
 fi
 
-if [[ "$(id -u)" -ne 0 ]]; then
+if [[ "$(id -u)" -ne 0 && "$SUDO_NOPASSWD" != "1" ]]; then
     (
         while sleep 60; do
             sudo -n -v || exit

@@ -66,7 +66,9 @@ cd chatterrow
 ./setup.sh
 ```
 
-sudoパスワードを入力できない運用ユーザーでは、`NOPASSWD`設定済みの一般ユーザーとして次のオプションを付けて実行します。セットアップ中のsudoは`sudo -n`で実行され、パスワードを要求せず、設定がない場合は停止します。
+sudoパスワードを入力しない運用ユーザーでは、`NOPASSWD`設定済みの一般ユーザーとして次のオプションを付けて実行します。指定時は`sudo -v`によるパスワード確認を行わず、セットアップ内のsudoコマンドを通常どおり実行します。
+
+オプションなしで実行した場合も、パスワード不要のsudoが検出されると、セットアップ開始時に`--sudo-nopasswd`の使用方法を表示し、その実行ではパスワード確認を省略します。
 
 ```bash
 ./setup.sh --sudo-nopasswd
@@ -292,7 +294,7 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 | `--app-dir <path>`           | `setup.sh`のあるリポジトリ         | `/home`または`/var/www`配下の配備先               |
 | `--repo <url>`               | GitHub SSH URL                     | 配備するGitリポジトリ                             |
 | `--onlyoffice-image <image>` | `onlyoffice/documentserver:latest` | macOSで毎回pullして使用するDocumentServerイメージ |
-| `--sudo-nopasswd`            | off                                | パスワード無しsudo（`sudo -n`）を強制              |
+| `--sudo-nopasswd`            | off                                | パスワード無しsudoユーザー向け。`sudo -v`を省略    |
 | `--no-ssl`                   | off                                | Certbotを省略しHTTPで構成                         |
 
 同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`、`DEPLOY_USER`、`SUDO_NOPASSWD`、`ONLYOFFICE_PORT`、`ONLYOFFICE_JWT_SECRET`。
