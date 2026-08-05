@@ -55,25 +55,28 @@ chat.example.com  A/AAAA -> サーバー
 
 ONLYOFFICEはアプリと同じドメインの`/onlyoffice/`で公開します。ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポートは外部公開しないでください。クラウドファイアウォールやホスト側ファイアウォールでは、SSH用ポートと80/443だけを許可します。
 
-## Ubuntu自動セットアップ
+## Ubuntu環境への自動セットアップ
 
-Ubuntuではリポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。一般ユーザーまたはrootユーザーで実行できます。
+新規のUbuntu Serverで本リポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。一般ユーザーまたはrootユーザーで実行できます。
 
 ```bash
-git clone git@github.com:askdkc/chatterrow.git
+apt install -y git
+
+git clone https://github.com/askdkc/chatterrow.git
 cd chatterrow
 ./setup.sh
 ```
 
-sudoパスワードを入力しない運用ユーザーでは、`NOPASSWD`設定済みの一般ユーザーとして次のオプションを付けて実行します。指定時は`sudo -v`によるパスワード確認を行わず、セットアップ内のsudoコマンドを通常どおり実行します。
+`setup.sh` 実行時にsudoのパスワードを聞かれます。sudoパスワード不要でsudo可能なユーザーの場合は下記の例のように`--sudo-nopasswd`オプションを付けて実行します。
 
-オプションなしで実行した場合、パスワード不要のsudoが検出されると、セットアップを開始せず`--sudo-nopasswd`の使用方法を表示して終了します。
 
 ```bash
 ./setup.sh --sudo-nopasswd
 ```
 
-入力例:
+仮にオプションなしで実行した場合、パスワード不要のsudoが検出されると、セットアップを開始せず`--sudo-nopasswd`の使用方法を表示して終了します。
+
+`setup.sh`を実行後の入力例:
 
 ```text
 Application domain (e.g. chat.example.com): chat.example.com
@@ -82,6 +85,7 @@ Application database:
   2) postgresql
 Select database (default: 1): 2
 Let's Encrypt email (optional): admin@example.com
+（中略）
 PostgreSQL password (leave blank to generate):
 ```
 
@@ -132,7 +136,7 @@ ONLYOFFICE_ALLOW_PRINT
 IMAGEMAGICK_PATH
 ```
 
-### Valet・Herd・artisan serveの自動判定
+### macOS開発時：Valet・Herd・artisan serveの自動判定
 
 `setup.sh`は`valet`と`herd`コマンドの有無、`APP_URL/up`、`127.0.0.1:<ポート>/up`の応答を確認して接続方法を選択します。Valet/Herd側とartisan serve側の両方が応答する場合は、`APP_URL`のValet/Herd側を優先します。
 
@@ -174,6 +178,7 @@ MACOS_APP_SERVER=herd ./setup.sh
 
 DNSサーバーを上書きする場合は環境変数を指定します。値はIPv4アドレスで指定してください。
 
+Cloudflareの1.1.1.1からGoogleの8.8.8.8に変更して実行する例：
 ```bash
 MACOS_CONTAINER_DNS=8.8.8.8 ./setup.sh
 ```
