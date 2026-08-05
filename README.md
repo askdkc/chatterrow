@@ -42,7 +42,7 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 - PHP 8.5 CLI/FPMとRedis拡張
 - Python 3.10以上、MarkItDown 0.1.7、Redis Server
 - sudoを使用できる一般ユーザー、またはrootユーザー
-- 2 CPU、2 GB RAM、40 GB空きディスク以上
+- 2 CPU、2 GB RAM、30 GB空きディスク以上（ONLYOFFICE公式推奨は40 GB以上）
 - 4 GB以上のswapを推奨
 - TCP 80/443をインターネットから到達可能にする
 - アプリ用のDNS名
@@ -354,7 +354,7 @@ Valet/Herd使用時、Laravelアプリは`APP_URL`のホスト名と通常のHTT
 
 ## SSLと自動更新
 
-Certbotはアプリドメインの証明書をnginxへ設定します。同じ証明書で`/onlyoffice/`も配信します。`certbot.timer`が更新時期を定期確認し、更新成功後にnginxをreloadします。セットアップ時にはdry-runも実行します。
+Certbotは`/var/www/letsencrypt`を固定ACME webrootとして使用し、challengeをLaravelへ渡さずにアプリドメインの証明書をnginxへ設定します。同じ証明書で`/onlyoffice/`も配信します。`certbot.timer`が更新時期を定期確認し、更新成功後にnginxをreloadします。セットアップ時にはdry-runも実行します。
 
 `unattended-upgrades`はUbuntuのsecurity originを日次で確認し、`nginx`、`nginx-extras`、対応する`libnginx-mod-*`を依存関係ごと更新します。nginx以外のセキュリティ更新も維持します。通常の`-updates` pocketは自動適用しません。
 

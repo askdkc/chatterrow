@@ -15,6 +15,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command?->warn(
+                'No production seed data is defined; create the first user through /register.',
+            );
+
+            return;
+        }
+
         // User::factory(10)->create();
 
         User::factory()->create([

@@ -133,6 +133,13 @@ valid_postgresql_identifier() {
     [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#1}" -le 63 ]]
 }
 
+apt_get_with_lock_wait() {
+    # apt-daily and unattended-upgrades can briefly hold the dpkg frontend
+    # lock. Wait for them instead of failing the whole provisioning run.
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get \
+        -o DPkg::Lock::Timeout=300 "$@"
+}
+
 backup_nginx_file() {
     local source="$1" name="$2" existing
 
@@ -261,7 +268,7 @@ install_nodesource_repository() {
         || die "NodeSource signing key fingerprint check failed"
     printf 'deb [signed-by=%s] https://deb.nodesource.com/node_24.x nodistro main\n' "$keyring" | \
         sudo tee /etc/apt/sources.list.d/nodesource.list >/dev/null
-    sudo apt-get update -y
+    apt_get_with_lock_wait update -y
 }
 
 configure_unattended_upgrades() {
@@ -968,6 +975,7 @@ NO_SSL=0
 REVERB_SERVER_PORT=8081
 ONLYOFFICE_PORT="${ONLYOFFICE_PORT:-8080}"
 ONLYOFFICE_PUBLIC_PATH=/onlyoffice
+ACME_WEBROOT=/var/www/letsencrypt
 APP_INTERNAL_PORT=8090
 ONLYOFFICE_IMAGE="${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}"
 ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatterrow-onlyoffice-documentserver}"
@@ -1144,7 +1152,11 @@ SWAP_MB="$(awk '/SwapTotal:/ { print int($2 / 1024) }' /proc/meminfo)"
 AVAILABLE_DISK_MB="$(df -Pm /var | awk 'NR == 2 { print $4 }')"
 [[ "$CPU_COUNT" =~ ^[0-9]+$ && "$CPU_COUNT" -ge 2 ]] || die "At least 2 CPU cores are required for ONLYOFFICE"
 [[ "$MEMORY_MB" =~ ^[0-9]+$ && "$MEMORY_MB" -ge 2048 ]] || die "At least 2 GB RAM is required for ONLYOFFICE"
-[[ "$AVAILABLE_DISK_MB" =~ ^[0-9]+$ && "$AVAILABLE_DISK_MB" -ge 40960 ]] || die "At least 40 GB free space under /var is required"
+[[ "$AVAILABLE_DISK_MB" =~ ^[0-9]+$ ]] || die "Could not determine free disk space under /var"
+(( AVAILABLE_DISK_MB >= 30720 )) \
+    || die "At least 30 GB free space under /var is required; detected $((AVAILABLE_DISK_MB / 1024)) GB"
+(( AVAILABLE_DISK_MB >= 40960 )) \
+    || warn "ONLYOFFICE officially recommends at least 40 GB free space; continuing with $((AVAILABLE_DISK_MB / 1024)) GB"
 (( SWAP_MB >= 4096 )) || warn "ONLYOFFICE recommends at least 4 GB swap; detected ${SWAP_MB} MB"
 
 if [[ -z "${DEPLOY_USER:-}" ]]; then
@@ -1183,14 +1195,14 @@ log "Domain: $DOMAIN | OnlyOffice: ${DOMAIN}${ONLYOFFICE_PUBLIC_PATH} | Database
 
 # --------------------------------------------------- base packages --------
 log "Installing web, database, preview, SSL, and build packages..."
-sudo apt-get update -y
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+apt_get_with_lock_wait update -y
+apt_get_with_lock_wait install -y \
     curl gnupg ca-certificates lsb-release software-properties-common ubuntu-keyring
-sudo add-apt-repository -y universe
-sudo apt-get update -y
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx-extras
+sudo add-apt-repository -y --no-update universe
+apt_get_with_lock_wait update -y
+apt_get_with_lock_wait install -y nginx-extras
 
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+apt_get_with_lock_wait install -y \
     apt-transport-https ca-certificates curl gnupg lsb-release \
     git unzip zip rsync acl jq openssl \
     supervisor certbot python3-certbot-nginx \
@@ -1219,6 +1231,7 @@ NGINX_BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-nginx.XXXXXX")" \
 backup_nginx_file /etc/nginx/nginx.conf nginx.conf
 backup_nginx_file /etc/nginx/conf.d/00-sites-enabled.conf sites-include.conf
 backup_nginx_file /etc/nginx/conf.d/default.conf default-conf
+backup_nginx_file /etc/nginx/snippets/chatterrow-acme-webroot.conf chatterrow-acme-snippet
 backup_nginx_file /etc/nginx/sites-available/chatterrow chatterrow-available
 backup_nginx_file /etc/nginx/sites-available/onlyoffice onlyoffice-available
 backup_nginx_file /etc/nginx/sites-enabled/chatterrow chatterrow-enabled
@@ -1228,7 +1241,7 @@ configure_nginx_worker_user
 
 # Microsoft core fonts improve Office rendering but are not required to run.
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ttf-mscorefonts-installer || \
+apt_get_with_lock_wait install -y ttf-mscorefonts-installer || \
     warn "Microsoft core fonts could not be installed; continuing with open fonts"
 
 # Japanese fonts are required for ONLYOFFICE previews and the file viewer.
@@ -1245,8 +1258,8 @@ PHP_PACKAGE_PREFIX="php8.5"
 case "$VERSION_ID" in
     24.04)
         log "Enabling the maintained PHP repository for PHP 8.5 on Ubuntu $VERSION_ID..."
-        sudo add-apt-repository -y ppa:ondrej/php
-        sudo apt-get update -y
+        sudo add-apt-repository -y --no-update ppa:ondrej/php
+        apt_get_with_lock_wait update -y
         ;;
     26.04)
         log "Using the Ubuntu repositories for PHP 8.5 on Ubuntu $VERSION_ID..."
@@ -1254,7 +1267,7 @@ case "$VERSION_ID" in
 esac
 
 log "Installing PHP 8.5 and required extensions..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+apt_get_with_lock_wait install -y \
     "${PHP_PACKAGE_PREFIX}-cli" "${PHP_PACKAGE_PREFIX}-fpm" "${PHP_PACKAGE_PREFIX}-common" \
     "${PHP_PACKAGE_PREFIX}-curl" "${PHP_PACKAGE_PREFIX}-mbstring" \
     "${PHP_PACKAGE_PREFIX}-xml" "${PHP_PACKAGE_PREFIX}-zip" "${PHP_PACKAGE_PREFIX}-bcmath" \
@@ -1300,7 +1313,7 @@ composer --version
 if ! command -v node >/dev/null || ! command -v npm >/dev/null || [[ "$(node -v | tr -d 'v' | cut -d. -f1)" -lt 24 ]]; then
     log "Installing Node.js 24 from NodeSource..."
     install_nodesource_repository
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+    apt_get_with_lock_wait install -y nodejs
 fi
 node --version
 npm --version
@@ -1377,6 +1390,7 @@ log "PostgreSQL tuned: shared_buffers=${ACTUAL_SHARED_BUFFERS}, work_mem=${WORK_
 
 if [[ "$DATABASE" == "pgsql" ]]; then
     DB_CREDENTIAL_FILE="/etc/chatterrow/database-password"
+    DB_PASSWORD_GENERATED=0
     if [[ -z "$DB_PASSWORD" ]] && sudo test -r "$DB_CREDENTIAL_FILE"; then
         DB_PASSWORD="$(sudo sh -c "tr -d '\\r\\n' < '$DB_CREDENTIAL_FILE'")"
     fi
@@ -1390,11 +1404,17 @@ if [[ "$DATABASE" == "pgsql" ]]; then
         read -r -s -p "PostgreSQL password (leave blank to generate): " DB_PASSWORD
         printf '\n'
     fi
-    [[ -n "$DB_PASSWORD" ]] || DB_PASSWORD="$(openssl rand -hex 32)"
+    if [[ -z "$DB_PASSWORD" ]]; then
+        DB_PASSWORD="$(openssl rand -hex 32)"
+        DB_PASSWORD_GENERATED=1
+    fi
     sudo install -d -o root -g root -m 0700 /etc/chatterrow
     printf '%s\n' "$DB_PASSWORD" | sudo tee "$DB_CREDENTIAL_FILE" >/dev/null
     sudo chown root:root "$DB_CREDENTIAL_FILE"
     sudo chmod 0600 "$DB_CREDENTIAL_FILE"
+    if [[ "$DB_PASSWORD_GENERATED" -eq 1 ]]; then
+        log "Generated PostgreSQL password saved to $DB_CREDENTIAL_FILE (root-only; view with: sudo cat $DB_CREDENTIAL_FILE)"
+    fi
 
     log "Ensuring PostgreSQL superuser role '$DEPLOY_USER' exists..."
     sudo -u postgres psql \
@@ -1465,8 +1485,8 @@ else
     echo "onlyoffice-documentserver onlyoffice/ds-port select $ONLYOFFICE_PORT" | sudo debconf-set-selections
     echo "onlyoffice-documentserver onlyoffice/jwt-enabled boolean true" | sudo debconf-set-selections
     echo "onlyoffice-documentserver onlyoffice/jwt-secret password $ONLYOFFICE_JWT_SECRET" | sudo debconf-set-selections
-    sudo apt-get update -y
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y onlyoffice-documentserver
+    apt_get_with_lock_wait update -y
+    apt_get_with_lock_wait install -y onlyoffice-documentserver
 fi
 
 configure_nginx_worker_user
@@ -1608,6 +1628,17 @@ grant_web_traverse
 # --------------------------------------------------------- nginx conf ------
 log "Generating nginx virtual hosts..."
 sudo install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
+sudo install -d -m 0755 /etc/nginx/snippets
+sudo install -d -o root -g root -m 0755 "$ACME_WEBROOT"
+sudo install -d -o root -g root -m 0755 "$ACME_WEBROOT/.well-known"
+sudo install -d -o root -g root -m 0755 "$ACME_WEBROOT/.well-known/acme-challenge"
+sudo tee /etc/nginx/snippets/chatterrow-acme-webroot.conf >/dev/null <<NGINX
+location ^~ /.well-known/acme-challenge/ {
+    root ${ACME_WEBROOT};
+    default_type text/plain;
+    try_files \$uri =404;
+}
+NGINX
 NGINX_CONFIG_CHANGED=1
 if sudo grep -Eq '^[[:space:]]*include[[:space:]]+/etc/nginx/sites-enabled/\*;' /etc/nginx/nginx.conf; then
     sudo rm -f /etc/nginx/conf.d/00-sites-enabled.conf
@@ -1617,12 +1648,13 @@ else
 fi
 
 PRESERVE_NGINX_CONFIG=0
-if [[ $NO_SSL -eq 0 \
-    && -d "/etc/letsencrypt/live/$DOMAIN" \
-    && -f /etc/nginx/sites-available/chatterrow ]] \
+if [[ $NO_SSL -eq 0 ]] \
+    && sudo test -d "/etc/letsencrypt/live/$DOMAIN" \
+    && sudo test -f /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "server_name ${DOMAIN};" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "root ${APP_DIR}/public;" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "fastcgi_pass unix:${PHP_FPM_SOCK};" /etc/nginx/sites-available/chatterrow \
+    && sudo grep -Fq "include /etc/nginx/snippets/chatterrow-acme-webroot.conf;" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "location ^~ ${ONLYOFFICE_PUBLIC_PATH}/" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT}/;" /etc/nginx/sites-available/chatterrow; then
     PRESERVE_NGINX_CONFIG=1
@@ -1635,7 +1667,12 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name _;
-    return 444;
+
+    include /etc/nginx/snippets/chatterrow-acme-webroot.conf;
+
+    location / {
+        return 444;
+    }
 }
 
 server {
@@ -1646,6 +1683,8 @@ server {
     root ${APP_DIR}/public;
     index index.php;
     client_max_body_size 64M;
+
+    include /etc/nginx/snippets/chatterrow-acme-webroot.conf;
 
     location = ${ONLYOFFICE_PUBLIC_PATH} {
         return 301 ${ONLYOFFICE_PUBLIC_PATH}/;
@@ -1815,25 +1854,82 @@ fi
 if [[ $NO_SSL -eq 1 ]]; then
     warn "Skipping Let's Encrypt; HTTP-only deployment requested"
 else
-    log "Requesting Let's Encrypt certificate for $DOMAIN..."
-    CERTBOT_ARGS=(--nginx -d "$DOMAIN" --redirect --non-interactive --agree-tos)
-    if [[ -n "$EMAIL" ]]; then
-        CERTBOT_ARGS+=(--email "$EMAIL")
+    if sudo test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" \
+        && sudo test -f "/etc/letsencrypt/live/$DOMAIN/privkey.pem"; then
+        log "Installing the existing Let's Encrypt certificate for $DOMAIN into nginx..."
+        sudo certbot install --cert-name "$DOMAIN" --nginx \
+            --redirect --non-interactive \
+            || die "Certbot could not install the existing certificate into the generated nginx server block for $DOMAIN"
     else
-        CERTBOT_ARGS+=(--register-unsafely-without-email)
+        log "Requesting Let's Encrypt certificate for $DOMAIN..."
+        ACME_PROBE_TOKEN="chatterrow-$(openssl rand -hex 12)"
+        ACME_PROBE_FILE="$ACME_WEBROOT/.well-known/acme-challenge/$ACME_PROBE_TOKEN"
+        ACME_PROBE_BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/chatterrow-acme-response.XXXXXX")" \
+            || die "Could not create a temporary ACME response file"
+        printf '%s\n' "$ACME_PROBE_TOKEN" | sudo tee "$ACME_PROBE_FILE" >/dev/null
+        sudo chown root:root "$ACME_PROBE_FILE"
+        sudo chmod 0644 "$ACME_PROBE_FILE"
+        sudo -u www-data test -r "$ACME_PROBE_FILE" || {
+            sudo rm -f "$ACME_PROBE_FILE"
+            rm -f "$ACME_PROBE_BODY_FILE"
+            die "nginx worker user www-data cannot read the ACME probe file under $ACME_WEBROOT"
+        }
+        ACME_PROBE_HTTP_CODE="$(curl --noproxy '*' --silent --show-error \
+            --connect-timeout 5 --max-time 10 \
+            --resolve "$DOMAIN:80:127.0.0.1" \
+            --output "$ACME_PROBE_BODY_FILE" --write-out '%{http_code}' \
+            "http://$DOMAIN/.well-known/acme-challenge/$ACME_PROBE_TOKEN" || true)"
+        ACME_PROBE_RESPONSE="$(head -c 512 "$ACME_PROBE_BODY_FILE")"
+        sudo rm -f "$ACME_PROBE_FILE"
+        rm -f "$ACME_PROBE_BODY_FILE"
+        if [[ "$ACME_PROBE_HTTP_CODE" != "200" || "$ACME_PROBE_RESPONSE" != "$ACME_PROBE_TOKEN" ]]; then
+            printf -v ACME_PROBE_RESPONSE_QUOTED '%q' "$ACME_PROBE_RESPONSE"
+            die "The nginx ACME webroot preflight failed for $DOMAIN: HTTP ${ACME_PROBE_HTTP_CODE:-no-response}, response ${ACME_PROBE_RESPONSE_QUOTED}"
+        fi
+        log "ACME webroot preflight passed"
+
+        CERTBOT_ARGS=(run --authenticator webroot --installer nginx \
+            --webroot-path "$ACME_WEBROOT" -d "$DOMAIN" \
+            --redirect --non-interactive --agree-tos)
+        if [[ -n "$EMAIL" ]]; then
+            CERTBOT_ARGS+=(--email "$EMAIL")
+        else
+            CERTBOT_ARGS+=(--register-unsafely-without-email)
+        fi
+
+        sudo certbot "${CERTBOT_ARGS[@]}" \
+            || die "Certbot failed after the local ACME webroot preflight passed. Confirm that external HTTP requests for $DOMAIN reach this nginx instance, then rerun setup."
     fi
 
-    if sudo certbot "${CERTBOT_ARGS[@]}"; then
-        sudo install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
-        printf '#!/usr/bin/env bash\nsystemctl reload nginx\n' | \
-            sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx >/dev/null
-        sudo chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
-        sudo systemctl enable --now certbot.timer
-        sudo certbot renew --dry-run --cert-name "$DOMAIN" || warn "Certbot dry-run renewal failed; inspect /var/log/letsencrypt before production use"
-        log "SSL installed; certbot.timer and nginx reload hook enabled"
+    sudo install -d -m 0755 \
+        /etc/letsencrypt/renewal-hooks/pre \
+        /etc/letsencrypt/renewal-hooks/deploy \
+        /etc/letsencrypt/renewal-hooks/post
+    printf '#!/usr/bin/env bash\nif systemctl is-active --quiet nginx; then\n    systemctl reload nginx\nfi\n' | \
+        sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx >/dev/null
+    sudo chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+
+    # A certificate obtained manually with the standalone authenticator needs
+    # port 80 released during renewal. Webroot lineages keep nginx online.
+    if sudo grep -Eq '^[[:space:]]*authenticator[[:space:]]*=[[:space:]]*standalone[[:space:]]*$' \
+        "/etc/letsencrypt/renewal/$DOMAIN.conf"; then
+        printf '#!/usr/bin/env bash\nsystemctl stop nginx\n' | \
+            sudo tee /etc/letsencrypt/renewal-hooks/pre/stop-nginx-for-standalone >/dev/null
+        printf '#!/usr/bin/env bash\nsystemctl start nginx\n' | \
+            sudo tee /etc/letsencrypt/renewal-hooks/post/start-nginx-after-standalone >/dev/null
+        sudo chmod 0755 \
+            /etc/letsencrypt/renewal-hooks/pre/stop-nginx-for-standalone \
+            /etc/letsencrypt/renewal-hooks/post/start-nginx-after-standalone
+        log "Configured nginx stop/start hooks for standalone certificate renewal"
     else
-        die "Certbot failed. Confirm the DNS A/AAAA record and inbound TCP 80 access for $DOMAIN, then rerun setup."
+        sudo rm -f \
+            /etc/letsencrypt/renewal-hooks/pre/stop-nginx-for-standalone \
+            /etc/letsencrypt/renewal-hooks/post/start-nginx-after-standalone
     fi
+
+    sudo systemctl enable --now certbot.timer
+    sudo certbot renew --dry-run --cert-name "$DOMAIN" || warn "Certbot dry-run renewal failed; inspect /var/log/letsencrypt before production use"
+    log "SSL installed; certbot.timer and renewal hooks enabled"
 fi
 
 configure_unattended_upgrades
@@ -1851,21 +1947,35 @@ QUEUE_RUNNING="$(printf '%s\n' "$QUEUE_STATUS" | awk '$2 == "RUNNING" { count++ 
 printf '%s\n' "$QUEUE_STATUS"
 sudo supervisorctl status chatterrow-reverb chatterrow-schedule
 
-if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
+if [[ $NO_SSL -eq 0 ]] \
+    && sudo test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" \
+    && sudo test -f "/etc/letsencrypt/live/$DOMAIN/privkey.pem"; then
     curl --resolve "$DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
         -fsS -o /dev/null "https://$DOMAIN/up" || \
         die "Application HTTPS health check failed"
-    curl --resolve "$DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
-        -fsS "https://${DOMAIN}${ONLYOFFICE_PUBLIC_PATH}/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+    ONLYOFFICE_HEALTH_URL="https://${DOMAIN}${ONLYOFFICE_PUBLIC_PATH}/healthcheck"
+    ONLYOFFICE_HEALTH_RESPONSE="$(curl --resolve "$DOMAIN:443:127.0.0.1" \
+        --connect-timeout 5 --max-time 15 -fsS "$ONLYOFFICE_HEALTH_URL")" \
+        || die "ONLYOFFICE HTTPS health request failed: $ONLYOFFICE_HEALTH_URL"
+    if ! grep -Eq 'true|ok' <<< "$ONLYOFFICE_HEALTH_RESPONSE"; then
+        printf 'Unexpected ONLYOFFICE health response from %s: %s\n' \
+            "$ONLYOFFICE_HEALTH_URL" "$ONLYOFFICE_HEALTH_RESPONSE" >&2
         die "ONLYOFFICE HTTPS health check failed"
+    fi
     log "Application health check passed over HTTPS"
 else
     curl -H "Host: $DOMAIN" --connect-timeout 5 --max-time 15 \
         -fsS -o /dev/null "http://127.0.0.1/up" || \
         die "Application HTTP health check failed"
-    curl -H "Host: $DOMAIN" --connect-timeout 5 --max-time 15 \
-        -fsS "http://127.0.0.1${ONLYOFFICE_PUBLIC_PATH}/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+    ONLYOFFICE_HEALTH_URL="http://127.0.0.1${ONLYOFFICE_PUBLIC_PATH}/healthcheck"
+    ONLYOFFICE_HEALTH_RESPONSE="$(curl -H "Host: $DOMAIN" \
+        --connect-timeout 5 --max-time 15 -fsS "$ONLYOFFICE_HEALTH_URL")" \
+        || die "ONLYOFFICE HTTP health request failed: $ONLYOFFICE_HEALTH_URL"
+    if ! grep -Eq 'true|ok' <<< "$ONLYOFFICE_HEALTH_RESPONSE"; then
+        printf 'Unexpected ONLYOFFICE health response from %s: %s\n' \
+            "$ONLYOFFICE_HEALTH_URL" "$ONLYOFFICE_HEALTH_RESPONSE" >&2
         die "ONLYOFFICE HTTP health check failed"
+    fi
     log "Application health check passed over HTTP"
 fi
 
