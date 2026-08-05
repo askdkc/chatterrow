@@ -919,7 +919,7 @@ esac
 log "Installing PHP 8.5 and required extensions..."
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     "${PHP_PACKAGE_PREFIX}-cli" "${PHP_PACKAGE_PREFIX}-fpm" "${PHP_PACKAGE_PREFIX}-common" \
-    "${PHP_PACKAGE_PREFIX}-opcache" "${PHP_PACKAGE_PREFIX}-curl" "${PHP_PACKAGE_PREFIX}-mbstring" \
+    "${PHP_PACKAGE_PREFIX}-curl" "${PHP_PACKAGE_PREFIX}-mbstring" \
     "${PHP_PACKAGE_PREFIX}-xml" "${PHP_PACKAGE_PREFIX}-zip" "${PHP_PACKAGE_PREFIX}-bcmath" \
     "${PHP_PACKAGE_PREFIX}-intl" "${PHP_PACKAGE_PREFIX}-sqlite3" "${PHP_PACKAGE_PREFIX}-pgsql" \
     "${PHP_PACKAGE_PREFIX}-gd" "${PHP_PACKAGE_PREFIX}-redis"
