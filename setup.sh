@@ -187,35 +187,36 @@ configure_nginx_worker_user() {
 }
 
 restrict_onlyoffice_listener() {
-    local -a external_configs local_configs
+    local -a listener_configs local_configs
     local config index
 
-    mapfile -t external_configs < <(
+    # Some hosts disable IPv6 entirely. Binding ONLYOFFICE to [::1] on those
+    # systems makes even `nginx -t` fail with EADDRNOTAVAIL. Keep the private
+    # listener on IPv4 loopback and remove the matching IPv6 listener.
+    mapfile -t listener_configs < <(
         sudo grep -RIl --include='*.conf' -E \
-            "^[[:space:]]*listen[[:space:]]+(0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|^[[:space:]]*listen[[:space:]]+\\[::\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;" \
+            "^[[:space:]]*listen[[:space:]]+((0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}|\\[::(1)?\\]:${ONLYOFFICE_PORT})([[:space:]].*)?;" \
             /etc/nginx 2>/dev/null || true
     )
 
-    if [[ "${#external_configs[@]}" -eq 0 ]]; then
-        mapfile -t local_configs < <(
-            sudo grep -RIl --include='*.conf' -E \
-                "^[[:space:]]*listen[[:space:]]+(127\\.0\\.0\\.1:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|^[[:space:]]*listen[[:space:]]+\\[::1\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;" \
-                /etc/nginx 2>/dev/null || true
-        )
-        [[ "${#local_configs[@]}" -gt 0 ]] || die "Could not locate the ONLYOFFICE listener on port $ONLYOFFICE_PORT"
-        return 0
-    fi
-
-    for index in "${!external_configs[@]}"; do
-        config="${external_configs[$index]}"
+    for index in "${!listener_configs[@]}"; do
+        config="${listener_configs[$index]}"
         backup_nginx_file "$config" "onlyoffice-listener-${index}"
         NGINX_CONFIG_CHANGED=1
         sudo sed -E -i.bak \
-            -e "s|^([[:space:]]*)listen[[:space:]]+(0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|\\1listen 127.0.0.1:${ONLYOFFICE_PORT};|" \
-            -e "s|^([[:space:]]*)listen[[:space:]]+\\[::\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;|\\1listen [::1]:${ONLYOFFICE_PORT};|" \
+            -e "s|^([[:space:]]*)listen[[:space:]]+(0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}([[:space:]].*)?;[[:space:]]*$|\\1listen 127.0.0.1:${ONLYOFFICE_PORT}\\3;|" \
+            -e "/^[[:space:]]*listen[[:space:]]+\\[::(1)?\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;[[:space:]]*$/d" \
             "$config"
         sudo rm -f "$config.bak"
     done
+
+    mapfile -t local_configs < <(
+        sudo grep -RIl --include='*.conf' -E \
+            "^[[:space:]]*listen[[:space:]]+127\\.0\\.0\\.1:${ONLYOFFICE_PORT}([[:space:]].*)?;" \
+            /etc/nginx 2>/dev/null || true
+    )
+    [[ "${#local_configs[@]}" -gt 0 ]] \
+        || die "Could not configure the ONLYOFFICE IPv4 loopback listener on port $ONLYOFFICE_PORT"
 }
 
 configure_rabbitmq() {
@@ -224,6 +225,7 @@ configure_rabbitmq() {
     sudo install -d -m 0755 /etc/rabbitmq
     if sudo test -f "$config"; then
         sudo sed -E -i.bak \
+            -e '/^# Managed by chatterrow setup\.sh$/d' \
             -e '/^[[:space:]]*listeners\.tcp\./d' \
             -e '/^[[:space:]]*distribution\.listener\.interface[[:space:]]*=/d' \
             "$config"
@@ -231,11 +233,14 @@ configure_rabbitmq() {
     else
         sudo touch "$config"
     fi
-    printf '\n# Managed by chatterrow setup.sh\nlisteners.tcp.1 = 127.0.0.1:5672\nlisteners.tcp.2 = ::1:5672\ndistribution.listener.interface = 127.0.0.1\n' | \
+    printf '\n# Managed by chatterrow setup.sh\nlisteners.tcp.1 = 127.0.0.1:5672\ndistribution.listener.interface = 127.0.0.1\n' | \
         sudo tee -a "$config" >/dev/null
 
     if sudo test -f "$env_file"; then
-        sudo sed -E -i.bak '/^[[:space:]]*ERL_EPMD_ADDRESS=/d' "$env_file"
+        sudo sed -E -i.bak \
+            -e '/^# Managed by chatterrow setup\.sh$/d' \
+            -e '/^[[:space:]]*ERL_EPMD_ADDRESS=/d' \
+            "$env_file"
         sudo rm -f "$env_file.bak"
     else
         sudo touch "$env_file"
@@ -1786,7 +1791,13 @@ sudo systemctl enable --now "php${PHP_VER}-fpm" redis-server
 sudo systemctl stop rabbitmq-server >/dev/null 2>&1 || true
 sudo epmd -kill >/dev/null 2>&1 || true
 sudo systemctl enable rabbitmq-server
-sudo systemctl start rabbitmq-server
+if ! sudo systemctl start rabbitmq-server; then
+    sudo systemctl --no-pager --full status rabbitmq-server >&2 || true
+    sudo journalctl --no-pager -u rabbitmq-server -n 80 >&2 || true
+    die "RabbitMQ failed to start; inspect the status and journal output above"
+fi
+sudo systemctl is-active --quiet rabbitmq-server \
+    || die "RabbitMQ did not remain active after startup"
 REDIS_PING="$(redis-cli --raw ping 2>/dev/null || true)"
 [[ "$REDIS_PING" == "PONG" ]] || die "Redis did not respond to redis-cli ping"
 log "Redis is ready"
