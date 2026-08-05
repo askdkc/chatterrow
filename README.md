@@ -41,7 +41,7 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 - Ubuntu 24.04 LTSまたはUbuntu 26.04 LTS（amd64）
 - PHP 8.5 CLI/FPMとRedis拡張
 - Python 3.10以上、MarkItDown 0.1.7、Redis Server
-- sudoを使用できる一般ユーザー。rootユーザーとして直接実行しないでください
+- sudoを使用できる一般ユーザー、またはrootユーザー
 - 2 CPU、2 GB RAM、40 GB空きディスク以上
 - 4 GB以上のswapを推奨
 - TCP 80/443をインターネットから到達可能にする
@@ -58,7 +58,7 @@ ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポート�
 
 ## Ubuntu自動セットアップ
 
-Ubuntuではリポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。
+Ubuntuではリポジトリを取得して`setup.sh`を実行します。ドメイン、データベース、Let's Encryptメールアドレスを対話的に確認します。一般ユーザーまたはrootユーザーで実行できます。
 
 ```bash
 git clone git@github.com:askdkc/chatterrow.git

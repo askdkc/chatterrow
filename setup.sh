@@ -2,8 +2,8 @@
 #
 # chatterrow - one-shot provisioning for Ubuntu 24.04 / 26.04
 #
-# Run as a regular sudo-capable user. Missing values are prompted when the
-# script is attached to a terminal:
+# Run as a regular sudo-capable user or root. Missing values are prompted when
+# the script is attached to a terminal:
 #   ./setup.sh
 #
 # For unattended provisioning, pass all required values:
@@ -824,7 +824,6 @@ APP_DIR="$(realpath -m -- "$APP_DIR")"
 
 # ----------------------------------------------------------- preflight -----
 command -v sudo >/dev/null || die "sudo is required"
-[[ "$(id -u)" -ne 0 ]] || die "run as a regular sudo user, not root"
 sudo -v || die "sudo authentication failed"
 
 . /etc/os-release
@@ -845,6 +844,9 @@ AVAILABLE_DISK_MB="$(df -Pm /var | awk 'NR == 2 { print $4 }')"
 (( SWAP_MB >= 4096 )) || warn "ONLYOFFICE recommends at least 4 GB swap; detected ${SWAP_MB} MB"
 
 DEPLOY_USER="${SUDO_USER:-${USER:-$(id -un)}}"
+if [[ "$(id -u)" -eq 0 ]]; then
+    warn "Running as root; application files will be owned by ${DEPLOY_USER}"
+fi
 PUBLIC_SCHEME="https"
 PUBLIC_PORT=443
 [[ $NO_SSL -eq 0 ]] || { PUBLIC_SCHEME="http"; PUBLIC_PORT=80; }
