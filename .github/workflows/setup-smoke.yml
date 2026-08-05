@@ -1,0 +1,120 @@
+name: setup-smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - setup.sh
+      - .github/setup-systemd.Dockerfile
+      - .github/workflows/setup-smoke.yml
+  pull_request:
+    paths:
+      - setup.sh
+      - .github/setup-systemd.Dockerfile
+      - .github/workflows/setup-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Shell validation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b0 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Validate setup.sh
+        run: |
+          bash -n setup.sh
+          shellcheck -x -S error setup.sh
+          ./setup.sh --help >/dev/null
+
+  ubuntu:
+    name: Ubuntu ${{ matrix.version }} systemd smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '24.04'
+          - '26.04'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b0 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build Ubuntu systemd image
+        run: |
+          docker build --pull \
+            --build-arg UBUNTU_VERSION=${{ matrix.version }} \
+            --file .github/setup-systemd.Dockerfile \
+            --tag chatterrow-setup:${{ matrix.version }} .
+
+      - name: Run setup.sh in a clean Ubuntu container
+        run: |
+          set -Eeuo pipefail
+
+          container_name="chatterrow-setup-${{ matrix.version }}"
+          cleanup() {
+            docker logs "$container_name" 2>&1 || true
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run --detach \
+            --name "$container_name" \
+            --privileged \
+            --cgroupns=host \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            --volume "$GITHUB_WORKSPACE:/workspace/chatterrow:ro" \
+            "chatterrow-setup:${{ matrix.version }}"
+
+          system_state=""
+          for _ in $(seq 1 90); do
+            system_state="$(docker exec "$container_name" systemctl is-system-running 2>/dev/null || true)"
+            if [[ "$system_state" == "running" || "$system_state" == "degraded" ]]; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$system_state" != "running" && "$system_state" != "degraded" ]]; then
+            docker exec "$container_name" systemctl --no-pager --failed || true
+            printf 'systemd did not become ready: %s\n' "$system_state" >&2
+            exit 1
+          fi
+
+          docker exec "$container_name" bash -lc '
+            set -Eeuo pipefail
+            cd /workspace/chatterrow
+            ./setup.sh \
+              --domain chatterrow.test \
+              --database sqlite \
+              --app-dir /var/www/chatterrow \
+              --repo file:///workspace/chatterrow \
+              --no-ssl
+
+            token="ci-acme-${RANDOM}${RANDOM}"
+            challenge="/var/www/letsencrypt/.well-known/acme-challenge/$token"
+            printf "%s\n" "$token" > "$challenge"
+            response="$(curl --fail --silent --show-error \
+              --header "Host: chatterrow.test" \
+              "http://127.0.0.1/.well-known/acme-challenge/$token")"
+            [[ "$response" == "$token" ]]
+            rm -f "$challenge"
+          '

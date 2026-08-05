@@ -177,6 +177,34 @@ restore_nginx_state() {
     sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx >/dev/null 2>&1 || true
 }
 
+nginx_http_ipv4_listener_exists() {
+    command -v ss >/dev/null 2>&1 || return 1
+
+    sudo ss -H -ltn4 'sport = :80' 2>/dev/null | \
+        awk '$4 ~ /(^|:)80$/ { found=1 } END { exit !found }'
+}
+
+show_nginx_startup_failure() {
+    sudo systemctl --no-pager --full status nginx >&2 || true
+    sudo ss -ltnp 'sport = :80' >&2 || true
+    sudo journalctl --no-pager -u nginx -n 80 >&2 || true
+}
+
+restart_nginx_and_verify_http_listener() {
+    # The package starts the default site before the generated virtual host is
+    # written. A reload can return successfully while old workers still serve
+    # the previous configuration, so use a full restart for this transition.
+    if ! sudo systemctl restart nginx; then
+        show_nginx_startup_failure
+        return 1
+    fi
+
+    if ! sudo systemctl is-active --quiet nginx || ! nginx_http_ipv4_listener_exists; then
+        show_nginx_startup_failure
+        return 1
+    fi
+}
+
 configure_nginx_worker_user() {
     local config=/etc/nginx/nginx.conf
 
@@ -1777,7 +1805,8 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo rm -f /etc/nginx/conf.d/default.conf
 sudo nginx -t
 sudo systemctl enable --now nginx
-sudo systemctl reload nginx
+restart_nginx_and_verify_http_listener \
+    || die "nginx is not serving IPv4 TCP port 80; resolve the nginx status/journal error above and rerun setup"
 
 # ---------------------------------------------------- supervisor conf ------
 log "Generating queue, Reverb, and scheduler process definitions..."
@@ -1874,12 +1903,22 @@ else
             rm -f "$ACME_PROBE_BODY_FILE"
             die "nginx worker user www-data cannot read the ACME probe file under $ACME_WEBROOT"
         }
-        ACME_PROBE_HTTP_CODE="$(curl --noproxy '*' --silent --show-error \
-            --connect-timeout 5 --max-time 10 \
-            --resolve "$DOMAIN:80:127.0.0.1" \
-            --output "$ACME_PROBE_BODY_FILE" --write-out '%{http_code}' \
-            "http://$DOMAIN/.well-known/acme-challenge/$ACME_PROBE_TOKEN" || true)"
-        ACME_PROBE_RESPONSE="$(head -c 512 "$ACME_PROBE_BODY_FILE")"
+        ACME_PROBE_HTTP_CODE=000
+        ACME_PROBE_RESPONSE=""
+        for ACME_PROBE_ATTEMPT in 1 2 3 4 5; do
+            # This is a local nginx test. Use loopback directly and preserve
+            # virtual-host selection with Host instead of involving DNS.
+            ACME_PROBE_HTTP_CODE="$(curl --noproxy '*' --silent --show-error \
+                --connect-timeout 5 --max-time 10 \
+                --header "Host: $DOMAIN" \
+                --output "$ACME_PROBE_BODY_FILE" --write-out '%{http_code}' \
+                "http://127.0.0.1/.well-known/acme-challenge/$ACME_PROBE_TOKEN" || true)"
+            ACME_PROBE_RESPONSE="$(head -c 512 "$ACME_PROBE_BODY_FILE")"
+            if [[ "$ACME_PROBE_HTTP_CODE" == "200" && "$ACME_PROBE_RESPONSE" == "$ACME_PROBE_TOKEN" ]]; then
+                break
+            fi
+            [[ "$ACME_PROBE_ATTEMPT" -eq 5 ]] || sleep 1
+        done
         sudo rm -f "$ACME_PROBE_FILE"
         rm -f "$ACME_PROBE_BODY_FILE"
         if [[ "$ACME_PROBE_HTTP_CODE" != "200" || "$ACME_PROBE_RESPONSE" != "$ACME_PROBE_TOKEN" ]]; then
