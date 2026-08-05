@@ -919,8 +919,8 @@ announce_passwordless_sudo_option() {
     [[ "$(id -u)" -ne 0 && "$SUDO_NOPASSWD" != "1" ]] || return 0
 
     if sudo -n true >/dev/null 2>&1; then
-        log "Passwordless sudo detected; continuing in passwordless mode. Explicit option: ./setup.sh --sudo-nopasswd"
-        SUDO_NOPASSWD=1
+        log "Passwordless sudo detected; rerun with: ./setup.sh --sudo-nopasswd"
+        exit 0
     fi
 }
 
