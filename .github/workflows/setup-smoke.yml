@@ -102,7 +102,15 @@ jobs:
           docker exec "$container_name" bash -lc '
             set -Eeuo pipefail
             cd /workspace/chatterrow
-            ./setup.sh \
+
+            git_config_global="$(mktemp)"
+            printf "%s\n" \
+              "[safe]" \
+              "directory = /workspace/chatterrow" \
+              "directory = /workspace/chatterrow/.git" \
+              >"$git_config_global"
+
+            GIT_CONFIG_GLOBAL="$git_config_global" ./setup.sh \
               --domain chatterrow.test \
               --database sqlite \
               --app-dir /var/www/chatterrow \
