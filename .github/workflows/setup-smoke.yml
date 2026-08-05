@@ -69,6 +69,12 @@ jobs:
 
           container_name="chatterrow-setup-${{ matrix.version }}"
           cleanup() {
+            docker exec "$container_name" bash -lc '
+              systemctl is-system-running || true
+              systemctl --no-pager --full status systemd dbus supervisor || true
+              journalctl -b --no-pager -n 300 || true
+              ls -l /run/systemd/private /run/dbus/system_bus_socket 2>/dev/null || true
+            ' 2>&1 || true
             docker logs "$container_name" 2>&1 || true
             docker rm -f "$container_name" >/dev/null 2>&1 || true
           }
@@ -98,6 +104,14 @@ jobs:
             printf 'systemd did not become ready: %s\n' "$system_state" >&2
             exit 1
           fi
+
+          docker exec "$container_name" bash -lc '
+            set -Eeuo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            apt-get update
+            apt-get -y upgrade
+          '
 
           docker exec "$container_name" bash -lc '
             set -Eeuo pipefail
