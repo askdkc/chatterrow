@@ -1,5 +1,11 @@
 # 茶多楼 chatterrow
 
+## 業務の一元管理を支える機能をチャットに詰め込みました
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/f7032613-194f-46b6-ac77-cfb1a4f2f1a3" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/619f867d-9598-4628-8e94-89eac10558d1" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/981ccc86-ae70-4122-bfb3-93a6d01cce29" />
+
+
 Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェクト型グループウェアです。
 
 プロジェクトごとにチャンネルを作り、チャット、タスク、ファイル、ガントチャートを一元管理します。リアルタイム配信にはLaravel Reverb、Officeファイルの読取専用プレビューにはONLYOFFICE Document Serverを使用します。
