@@ -34,7 +34,7 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 | Conversion | Microsoft MarkItDown 0.1.7（PDF / DOCX / XLSX / PPTX）        |
 | Queue      | Redis / Laravel queue worker                                  |
 | Office     | ONLYOFFICE Document Server Community Edition（JWT、読取専用） |
-| Production | nginx 1.30+ / PHP-FPM / Supervisor / Certbot                  |
+| Production | Ubuntu nginx-extras / PHP-FPM / Supervisor / Certbot         |
 
 ## 本番要件
 
@@ -45,16 +45,15 @@ Laravel 13、Inertia 3、Svelte 5で構築した、Discord風UIのプロジェ�
 - 2 CPU、2 GB RAM、40 GB空きディスク以上
 - 4 GB以上のswapを推奨
 - TCP 80/443をインターネットから到達可能にする
-- アプリ用とONLYOFFICE用の異なる2つのDNS名
+- アプリ用のDNS名
 
 例:
 
 ```text
-chat.example.com         A/AAAA -> サーバー
-office.chat.example.com  A/AAAA -> サーバー
+chat.example.com  A/AAAA -> サーバー
 ```
 
-ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポートは外部公開しないでください。クラウドファイアウォールやホスト側ファイアウォールでは、SSH用ポートと80/443だけを許可します。
+ONLYOFFICEはアプリと同じドメインの`/onlyoffice/`で公開します。ONLYOFFICE、Reverb、アプリ内部取得用の8080、8081、8090番ポートは外部公開しないでください。クラウドファイアウォールやホスト側ファイアウォールでは、SSH用ポートと80/443だけを許可します。
 
 ## Ubuntu自動セットアップ
 
@@ -86,11 +85,11 @@ Let's Encrypt email (optional): admin@example.com
 PostgreSQL password (leave blank to generate):
 ```
 
-ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になります。上の例では`office.chat.example.com`です。
+ONLYOFFICEの公開URLは`https://<アプリドメイン>/onlyoffice`です。上の例では`https://chat.example.com/onlyoffice`です。
 
 セットアップは以下を自動実行します。
 
-1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 24を構成
+1. Ubuntu公式`nginx-extras`、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 24を構成
 2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入し、ImageMagickの絶対パスを`.env`へ設定
 3. Python仮想環境`.markitdown/venv`へMarkItDown 0.1.7を構築し、`pip check`とCLIバージョンを検証
 4. PostgreSQLをCPU数と搭載RAMに合わせて調整
@@ -100,9 +99,10 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 8. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
 9. SupervisorでRedisキュー10プロセス、Reverb、スケジューラを`www-data`として常駐
 10. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
-11. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
+11. `unattended-upgrades`でnginxを含むUbuntuセキュリティ更新を日次適用
+12. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
 
-既存のUbuntu版`nginx-extras`、`nginx-full`、`nginx-light`などがある場合は、設定ファイルを保持したまま削除し、nginx公式リポジトリ版へ切り替えます。
+nginxはUbuntuのAPTパッケージだけを使用します。
 
 ## macOSローカルOnlyOffice
 
@@ -277,7 +277,6 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 ```bash
 ./setup.sh \
     --domain chat.example.com \
-    --office-domain office.chat.example.com \
     --email admin@example.com \
     --database postgresql
 ```
@@ -287,7 +286,6 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 | オプション                   | デフォルト                         | 説明                                              |
 |------------------------------|------------------------------------|---------------------------------------------------|
 | `--domain <domain>`          | 対話入力                           | アプリの公開ドメイン                              |
-| `--office-domain <domain>`   | `office.<domain>`                  | ONLYOFFICEの公開ドメイン                          |
 | `--email <email>`            | 空                                 | Let's Encrypt登録・期限通知メール                 |
 | `--database <driver>`        | 対話時は`sqlite`                   | `sqlite`または`postgresql`                        |
 | `--db-name <name>`           | `chatterrow`                       | アプリ用PostgreSQL DB名                           |
@@ -356,12 +354,16 @@ Valet/Herd使用時、Laravelアプリは`APP_URL`のホスト名と通常のHTT
 
 ## SSLと自動更新
 
-Certbotはアプリ用とONLYOFFICE用の両ドメインを含む証明書をnginxへ設定します。`certbot.timer`が更新時期を定期確認し、更新成功後にnginxをreloadします。セットアップ時にはdry-runも実行します。
+Certbotはアプリドメインの証明書をnginxへ設定します。同じ証明書で`/onlyoffice/`も配信します。`certbot.timer`が更新時期を定期確認し、更新成功後にnginxをreloadします。セットアップ時にはdry-runも実行します。
+
+`unattended-upgrades`はUbuntuのsecurity originを日次で確認し、`nginx`、`nginx-extras`、対応する`libnginx-mod-*`を依存関係ごと更新します。nginx以外のセキュリティ更新も維持します。通常の`-updates` pocketは自動適用しません。
 
 ```bash
 sudo systemctl status certbot.timer
 sudo certbot certificates
 sudo certbot renew --dry-run
+sudo systemctl status apt-daily-upgrade.timer
+sudo unattended-upgrade --dry-run --debug
 ```
 
 ## 運用
@@ -455,7 +457,7 @@ sudo rsync -a /home/ubuntu/chatterrow/storage/markdowned-docs/ /backup/markdowne
 | Officeプレビューが開かない（Ubuntu） | `curl http://127.0.0.1:8080/healthcheck`、JWT秘密鍵、8090番内部URL、`php artisan files:previews`                  |
 | Officeプレビューが開かない（macOS）  | `curl http://127.0.0.1:8086/healthcheck`、JWT秘密鍵、`APP_ONLYOFFICE_INTERNAL_URL`、コンテナ内から`/up`への到達性 |
 | PostgreSQLへ接続できない             | `.env`、`sudo -u postgres pg_isready`、`/etc/chatterrow/database-password`                                        |
-| 証明書を発行できない                 | 両ドメインのA/AAAA、80番到達性、`/var/log/letsencrypt/`                                                           |
+| 証明書を発行できない                 | アプリドメインのA/AAAA、インターネットからの80番到達性、`/var/log/letsencrypt/`                                  |
 
 ## ローカル開発
 

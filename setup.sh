@@ -259,28 +259,29 @@ install_nodesource_repository() {
     sudo apt-get update -y
 }
 
-remove_ubuntu_nginx_packages() {
-    local package
-    local -a packages=(nginx-extras nginx-full nginx-light nginx-core nginx-common)
-    local -a installed_packages=()
+configure_unattended_upgrades() {
+    local config=/etc/apt/apt.conf.d/52chatterrow-unattended-upgrades
 
-    for package in "${packages[@]}"; do
-        if dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null | grep -qx 'installed'; then
-            installed_packages+=("$package")
-        fi
-    done
+    log "Enabling daily unattended Ubuntu security upgrades, including nginx..."
+    sudo tee "$config" >/dev/null <<'APTCONF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
 
-    while IFS= read -r package; do
-        [[ -z "$package" ]] || installed_packages+=("$package")
-    done < <(
-        dpkg-query -W -f='${binary:Package} ${db:Status-Status}\n' 'libnginx-mod-*' 2>/dev/null \
-            | awk '$2 == "installed" { print $1 }' || true
-    )
+// Keep Ubuntu security updates enabled explicitly. nginx, nginx-extras, and
+// their matching libnginx-mod-* packages are upgraded together from here.
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}-security";
+};
+APTCONF
+    sudo chmod 0644 "$config"
 
-    if [[ "${#installed_packages[@]}" -gt 0 ]]; then
-        warn "Removing Ubuntu nginx packages before installing the nginx.org build: ${installed_packages[*]}"
-        sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y "${installed_packages[@]}"
-    fi
+    apt-config dump | grep -F 'APT::Periodic::Unattended-Upgrade "1";' >/dev/null \
+        || die "Could not enable unattended upgrades in APT configuration"
+    sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+    sudo systemctl is-enabled --quiet apt-daily-upgrade.timer \
+        || die "apt-daily-upgrade.timer is not enabled"
+    sudo systemctl is-active --quiet apt-daily-upgrade.timer \
+        || die "apt-daily-upgrade.timer is not active"
 }
 
 prepare_app_update() {
@@ -953,7 +954,6 @@ APP_DIR="${APP_DIR:-$SCRIPT_DIR}"
 REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
-OFFICE_DOMAIN="${OFFICE_DOMAIN:-}"
 DATABASE="${DATABASE:-}"
 DB_NAME="${DB_NAME:-chatterrow}"
 DB_USER="${DB_USER:-chatterrow}"
@@ -962,6 +962,7 @@ ONLYOFFICE_JWT_SECRET="${ONLYOFFICE_JWT_SECRET:-}"
 NO_SSL=0
 REVERB_SERVER_PORT=8081
 ONLYOFFICE_PORT="${ONLYOFFICE_PORT:-8080}"
+ONLYOFFICE_PUBLIC_PATH=/onlyoffice
 APP_INTERNAL_PORT=8090
 ONLYOFFICE_IMAGE="${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:latest}"
 ONLYOFFICE_CONTAINER_NAME="${ONLYOFFICE_CONTAINER_NAME:-chatterrow-onlyoffice-documentserver}"
@@ -987,7 +988,6 @@ Usage: ./setup.sh [options]
 Options:
   --domain <domain>          App domain, e.g. chat.example.com (prompted if omitted)
   --email <email>            Let's Encrypt registration / expiry mail
-  --office-domain <domain>   OnlyOffice domain (default: office.<domain>)
   --database <driver>        App DB: sqlite or postgresql (prompted; default: sqlite)
   --db-name <name>           PostgreSQL database name (default: chatterrow)
   --db-user <name>           PostgreSQL role name (default: chatterrow)
@@ -1024,12 +1024,11 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain|--email|--office-domain|--database|--db-name|--db-user|--db-password|--app-dir|--repo|--onlyoffice-image)
+        --domain|--email|--database|--db-name|--db-user|--db-password|--app-dir|--repo|--onlyoffice-image)
             [[ $# -ge 2 ]] || die "$1 requires a value"
             case "$1" in
                 --domain)        DOMAIN="$2" ;;
                 --email)         EMAIL="$2" ;;
-                --office-domain) OFFICE_DOMAIN="$2" ;;
                 --database)      DATABASE="$2" ;;
                 --db-name)       DB_NAME="$2" ;;
                 --db-user)       DB_USER="$2" ;;
@@ -1105,18 +1104,10 @@ else
     warn "--no-ssl selected; the app will use HTTP"
 fi
 
-OFFICE_DOMAIN="${OFFICE_DOMAIN:-office.${DOMAIN}}"
-if [[ $NO_SSL -eq 0 ]]; then
-    valid_hostname "$OFFICE_DOMAIN" || die "Invalid OnlyOffice domain: $OFFICE_DOMAIN"
-else
-    valid_local_hostname "$OFFICE_DOMAIN" || die "Invalid OnlyOffice domain: $OFFICE_DOMAIN"
-fi
-
 [[ -z "$EMAIL" || "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid email: $EMAIL"
 [[ "$DB_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#DB_NAME}" -le 63 ]] || die "Invalid PostgreSQL database name: $DB_NAME"
 [[ "$DB_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#DB_USER}" -le 63 ]] || die "Invalid PostgreSQL role name: $DB_USER"
 [[ "$DB_PASSWORD" != *$'\n'* && "$DB_PASSWORD" != *$'\r'* ]] || die "PostgreSQL password cannot contain newlines"
-[[ "$DOMAIN" != "$OFFICE_DOMAIN" ]] || die "App and OnlyOffice domains must be different"
 [[ ! "$DB_NAME" =~ ^(postgres|template0|template1)$ ]] || die "Reserved PostgreSQL database name: $DB_NAME"
 [[ "$DB_USER" != "postgres" ]] || die "The PostgreSQL superuser cannot be used by the application"
 valid_port "$ONLYOFFICE_PORT" || die "Invalid OnlyOffice port: $ONLYOFFICE_PORT"
@@ -1183,29 +1174,22 @@ PUBLIC_PORT=443
 [[ $NO_SSL -eq 0 ]] || { PUBLIC_SCHEME="http"; PUBLIC_PORT=80; }
 
 log "Ubuntu $VERSION_ID ($VERSION_CODENAME) on $ARCHITECTURE"
-log "Domain: $DOMAIN | OnlyOffice: $OFFICE_DOMAIN | Database: $DATABASE"
+log "Domain: $DOMAIN | OnlyOffice: ${DOMAIN}${ONLYOFFICE_PUBLIC_PATH} | Database: $DATABASE"
 
 # --------------------------------------------------- base packages --------
 log "Installing web, database, preview, SSL, and build packages..."
-remove_ubuntu_nginx_packages
-sudo apt-get update -y
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl gnupg ca-certificates lsb-release ubuntu-keyring
-
-# ONLYOFFICE requires nginx 1.30+. Ubuntu 24.04 and 26.04 currently ship
-# older builds, so use the signed official stable repository.
-curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor | \
-    sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
-NGINX_KEY_FINGERPRINTS="$(gpg --no-default-keyring --keyring /usr/share/keyrings/nginx-archive-keyring.gpg --with-colons --fingerprint 2>/dev/null | awk -F: '$1 == "fpr" { print $10 }')"
-grep -qx '573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62' <<< "$NGINX_KEY_FINGERPRINTS" || die "Official nginx signing key fingerprint check failed"
-echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/ubuntu ${VERSION_CODENAME} nginx" | \
-    sudo tee /etc/apt/sources.list.d/nginx.list >/dev/null
-printf 'Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n' | \
-sudo tee /etc/apt/preferences.d/99nginx >/dev/null
 sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common \
+    curl gnupg ca-certificates lsb-release software-properties-common ubuntu-keyring
+sudo add-apt-repository -y universe
+sudo apt-get update -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx-extras
+
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    apt-transport-https ca-certificates curl gnupg lsb-release \
     git unzip zip rsync acl jq openssl \
-    nginx supervisor certbot python3-certbot-nginx \
+    supervisor certbot python3-certbot-nginx \
+    unattended-upgrades \
     python3 python3-venv \
     postgresql postgresql-client postgresql-contrib \
     redis-server rabbitmq-server \
@@ -1218,8 +1202,12 @@ IMAGEMAGICK_BINARY="$(resolve_imagemagick_path)" \
     || die "ImageMagick could not be executed: $IMAGEMAGICK_BINARY"
 log "ImageMagick executable: $IMAGEMAGICK_BINARY"
 
+dpkg-query -W -f='${db:Status-Status}' nginx-extras 2>/dev/null | grep -qx 'installed' \
+    || die "Ubuntu nginx-extras was not installed"
 NGINX_VERSION="$(nginx -v 2>&1 | cut -d/ -f2)"
-dpkg --compare-versions "$NGINX_VERSION" ge 1.30 || die "ONLYOFFICE requires nginx 1.30+; installed version is $NGINX_VERSION"
+nginx -V 2>&1 | grep -q -- '--with-http_secure_link_module' \
+    || die "The installed nginx build lacks the http_secure_link module required by ONLYOFFICE"
+log "Using Ubuntu nginx-extras (nginx $NGINX_VERSION)"
 
 NGINX_BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-nginx.XXXXXX")" \
     || die "Could not create a temporary nginx backup directory"
@@ -1578,7 +1566,7 @@ set_env VITE_REVERB_SCHEME '"${REVERB_SCHEME}"'
 
 set_env ONLYOFFICE_ENABLED true
 set_env ONLYOFFICE_DOCUMENT_SERVER_URL "http://127.0.0.1:$ONLYOFFICE_PORT"
-set_env ONLYOFFICE_PUBLIC_URL "$PUBLIC_SCHEME://$OFFICE_DOMAIN"
+set_env ONLYOFFICE_PUBLIC_URL "$PUBLIC_SCHEME://${DOMAIN}${ONLYOFFICE_PUBLIC_PATH}"
 set_env APP_ONLYOFFICE_INTERNAL_URL "http://127.0.0.1:$APP_INTERNAL_PORT"
 set_env ONLYOFFICE_JWT_SECRET "$(dotenv_quote "$ONLYOFFICE_JWT_SECRET")"
 set_env ONLYOFFICE_ALLOW_DOWNLOAD true
@@ -1616,18 +1604,22 @@ grant_web_traverse
 log "Generating nginx virtual hosts..."
 sudo install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
 NGINX_CONFIG_CHANGED=1
-printf 'include /etc/nginx/sites-enabled/*;\n' | sudo tee /etc/nginx/conf.d/00-sites-enabled.conf >/dev/null
+if sudo grep -Eq '^[[:space:]]*include[[:space:]]+/etc/nginx/sites-enabled/\*;' /etc/nginx/nginx.conf; then
+    sudo rm -f /etc/nginx/conf.d/00-sites-enabled.conf
+else
+    printf 'include /etc/nginx/sites-enabled/*;\n' | \
+        sudo tee /etc/nginx/conf.d/00-sites-enabled.conf >/dev/null
+fi
 
 PRESERVE_NGINX_CONFIG=0
 if [[ $NO_SSL -eq 0 \
     && -d "/etc/letsencrypt/live/$DOMAIN" \
-    && -f /etc/nginx/sites-available/chatterrow \
-    && -f /etc/nginx/sites-available/onlyoffice ]] \
+    && -f /etc/nginx/sites-available/chatterrow ]] \
     && sudo grep -Fq "server_name ${DOMAIN};" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "root ${APP_DIR}/public;" /etc/nginx/sites-available/chatterrow \
     && sudo grep -Fq "fastcgi_pass unix:${PHP_FPM_SOCK};" /etc/nginx/sites-available/chatterrow \
-    && sudo grep -Fq "server_name ${OFFICE_DOMAIN};" /etc/nginx/sites-available/onlyoffice \
-    && sudo grep -Fq "proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT};" /etc/nginx/sites-available/onlyoffice; then
+    && sudo grep -Fq "location ^~ ${ONLYOFFICE_PUBLIC_PATH}/" /etc/nginx/sites-available/chatterrow \
+    && sudo grep -Fq "proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT}/;" /etc/nginx/sites-available/chatterrow; then
     PRESERVE_NGINX_CONFIG=1
     log "Existing TLS-enabled nginx configuration detected; preserving it during redeployment"
 fi
@@ -1649,6 +1641,24 @@ server {
     root ${APP_DIR}/public;
     index index.php;
     client_max_body_size 64M;
+
+    location = ${ONLYOFFICE_PUBLIC_PATH} {
+        return 301 ${ONLYOFFICE_PUBLIC_PATH}/;
+    }
+
+    location ^~ ${ONLYOFFICE_PUBLIC_PATH}/ {
+        client_max_body_size 100M;
+        proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-Host \$host${ONLYOFFICE_PUBLIC_PATH};
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+    }
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -1715,32 +1725,10 @@ server {
     }
 }
 NGINX
-
-sudo tee /etc/nginx/sites-available/onlyoffice >/dev/null <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${OFFICE_DOMAIN};
-    client_max_body_size 100M;
-
-    location / {
-        proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 600s;
-    }
-}
-NGINX
 fi
 
 sudo ln -sfn /etc/nginx/sites-available/chatterrow /etc/nginx/sites-enabled/chatterrow
-sudo ln -sfn /etc/nginx/sites-available/onlyoffice /etc/nginx/sites-enabled/onlyoffice
+sudo rm -f /etc/nginx/sites-enabled/onlyoffice /etc/nginx/sites-available/onlyoffice
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo rm -f /etc/nginx/conf.d/default.conf
 sudo nginx -t
@@ -1816,8 +1804,8 @@ fi
 if [[ $NO_SSL -eq 1 ]]; then
     warn "Skipping Let's Encrypt; HTTP-only deployment requested"
 else
-    log "Requesting Let's Encrypt certificate for $DOMAIN and $OFFICE_DOMAIN..."
-    CERTBOT_ARGS=(--nginx -d "$DOMAIN" -d "$OFFICE_DOMAIN" --redirect --non-interactive --agree-tos)
+    log "Requesting Let's Encrypt certificate for $DOMAIN..."
+    CERTBOT_ARGS=(--nginx -d "$DOMAIN" --redirect --non-interactive --agree-tos)
     if [[ -n "$EMAIL" ]]; then
         CERTBOT_ARGS+=(--email "$EMAIL")
     else
@@ -1833,9 +1821,11 @@ else
         sudo certbot renew --dry-run --cert-name "$DOMAIN" || warn "Certbot dry-run renewal failed; inspect /var/log/letsencrypt before production use"
         log "SSL installed; certbot.timer and nginx reload hook enabled"
     else
-        die "Certbot failed. Confirm DNS A/AAAA records for $DOMAIN and $OFFICE_DOMAIN, then rerun setup."
+        die "Certbot failed. Confirm the DNS A/AAAA record and inbound TCP 80 access for $DOMAIN, then rerun setup."
     fi
 fi
+
+configure_unattended_upgrades
 
 # ------------------------------------------------------------ verify -------
 log "Verifying services..."
@@ -1854,23 +1844,23 @@ if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
     curl --resolve "$DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
         -fsS -o /dev/null "https://$DOMAIN/up" || \
         die "Application HTTPS health check failed"
-    curl --resolve "$OFFICE_DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
-        -fsS "https://$OFFICE_DOMAIN/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+    curl --resolve "$DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
+        -fsS "https://${DOMAIN}${ONLYOFFICE_PUBLIC_PATH}/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
         die "ONLYOFFICE HTTPS health check failed"
     log "Application health check passed over HTTPS"
 else
     curl -H "Host: $DOMAIN" --connect-timeout 5 --max-time 15 \
         -fsS -o /dev/null "http://127.0.0.1/up" || \
         die "Application HTTP health check failed"
-    curl -H "Host: $OFFICE_DOMAIN" --connect-timeout 5 --max-time 15 \
-        -fsS "http://127.0.0.1/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+    curl -H "Host: $DOMAIN" --connect-timeout 5 --max-time 15 \
+        -fsS "http://127.0.0.1${ONLYOFFICE_PUBLIC_PATH}/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
         die "ONLYOFFICE HTTP health check failed"
     log "Application health check passed over HTTP"
 fi
 
 log "Provisioning complete."
 log "App:        $PUBLIC_SCHEME://$DOMAIN (first user: /register)"
-log "OnlyOffice: $PUBLIC_SCHEME://$OFFICE_DOMAIN"
+log "OnlyOffice: $PUBLIC_SCHEME://${DOMAIN}${ONLYOFFICE_PUBLIC_PATH}"
 log "Database:   $DATABASE"
 log "PostgreSQL: $PG_CONFIG_DIR/conf.d/99-chatterrow-tuning.conf"
 log "Processes:  sudo supervisorctl status"

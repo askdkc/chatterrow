@@ -3,7 +3,7 @@
 return [
     'enabled' => (bool) env('ONLYOFFICE_ENABLED', false),
     'document_server_url' => env('ONLYOFFICE_DOCUMENT_SERVER_URL', 'http://onlyoffice-documentserver'),
-    'public_url' => env('ONLYOFFICE_PUBLIC_URL', 'https://office.example.com'),
+    'public_url' => env('ONLYOFFICE_PUBLIC_URL', 'https://example.com/onlyoffice'),
     'internal_url' => env('APP_ONLYOFFICE_INTERNAL_URL', 'http://app'),
     'jwt_secret' => env('ONLYOFFICE_JWT_SECRET', ''),
     'download_ttl' => (int) env('ONLYOFFICE_INTERNAL_DOWNLOAD_TTL', 300),
