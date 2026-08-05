@@ -11,6 +11,53 @@
 #
 set -euo pipefail
 
+SUDO_KEEPALIVE_PID=""
+SUDO_NOPASSWD="${SUDO_NOPASSWD:-0}"
+NGINX_BACKUP_DIR=""
+NGINX_CONFIG_CHANGED=0
+APP_PROCESSES_STOPPED=0
+APP_MAINTENANCE=0
+declare -a NGINX_BACKUP_SOURCES=()
+declare -a NGINX_BACKUP_NAMES=()
+
+# Keep the existing sudo call sites usable for direct root execution. The
+# wrapper still uses runuser for commands that must run as postgres.
+if [[ "$(id -u)" -eq 0 ]]; then
+    sudo() {
+        local target
+
+        if [[ "${1:-}" == "-v" ]]; then
+            return 0
+        fi
+
+        if [[ "${1:-}" == "-u" ]]; then
+            [[ $# -ge 3 ]] || return 2
+            target="$2"
+            shift 2
+            command runuser -u "$target" -- "$@"
+            return
+        fi
+
+        if [[ "${1:-}" == "-E" ]]; then
+            shift
+        fi
+        if [[ "${1:-}" == *=* ]]; then
+            command env "$@"
+        else
+            command "$@"
+        fi
+    }
+else
+    SUDO_BINARY="$(type -P sudo 2>/dev/null || true)"
+    sudo() {
+        if [[ "$SUDO_NOPASSWD" == "1" && "${1:-}" != "-n" ]]; then
+            command "$SUDO_BINARY" -n "$@"
+        else
+            command "$SUDO_BINARY" "$@"
+        fi
+    }
+fi
+
 # ---------------------------------------------------------------- helpers --
 log()  { printf '\033[1;34m[chatterrow]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[chatterrow:warn]\033[0m %s\n' "$*"; }
@@ -64,7 +111,7 @@ valid_hostname() {
 }
 
 valid_local_hostname() {
-    valid_hostname "$1" || [[ "$1" == "localhost" ]] || [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]
+    valid_hostname "$1" || [[ "$1" == "localhost" ]] || valid_ipv4 "$1"
 }
 
 valid_ipv4() {
@@ -79,6 +126,206 @@ valid_ipv4() {
         (( 10#$octet <= 255 )) || return 1
     done
 }
+
+valid_port() {
+    [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 ))
+}
+
+valid_jwt_secret() {
+    local value="$1"
+
+    [[ "${#value}" -ge 32 ]] \
+        && [[ "$value" != *$'\n'* && "$value" != *$'\r'* && "$value" != *[[:space:]]* ]]
+}
+
+valid_postgresql_identifier() {
+    [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#1}" -le 63 ]]
+}
+
+backup_nginx_file() {
+    local source="$1" name="$2" existing
+
+    [[ -n "$NGINX_BACKUP_DIR" ]] || return 0
+
+    for existing in "${NGINX_BACKUP_SOURCES[@]}"; do
+        [[ "$existing" == "$source" ]] && return 0
+    done
+
+    if sudo test -e "$source" || sudo test -L "$source"; then
+        sudo cp -a "$source" "$NGINX_BACKUP_DIR/$name"
+        : > "$NGINX_BACKUP_DIR/$name.present"
+    else
+        : > "$NGINX_BACKUP_DIR/$name.missing"
+    fi
+
+    NGINX_BACKUP_SOURCES+=("$source")
+    NGINX_BACKUP_NAMES+=("$name")
+}
+
+restore_nginx_state() {
+    local index current source name
+
+    for (( index=${#NGINX_BACKUP_SOURCES[@]}; index > 0; index-- )); do
+        current=$((index - 1))
+        source="${NGINX_BACKUP_SOURCES[$current]}"
+        name="${NGINX_BACKUP_NAMES[$current]}"
+        sudo rm -f -- "$source"
+
+        if [[ -f "$NGINX_BACKUP_DIR/$name.present" ]]; then
+            sudo cp -a "$NGINX_BACKUP_DIR/$name" "$source"
+        fi
+    done
+
+    sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx >/dev/null 2>&1 || true
+}
+
+configure_nginx_worker_user() {
+    local config=/etc/nginx/nginx.conf
+
+    sudo test -f "$config" || die "Could not find $config"
+    if ! sudo grep -Eq '^[[:space:]]*user[[:space:]]+www-data[[:space:]]*;' "$config"; then
+        backup_nginx_file "$config" nginx.conf
+        NGINX_CONFIG_CHANGED=1
+        if sudo grep -Eq '^[[:space:]]*user[[:space:]]+[^;]+;' "$config"; then
+            sudo sed -E -i.bak 's|^[[:space:]]*user[[:space:]]+[^;]+;|user www-data;|' "$config"
+        else
+            sudo sed -i.bak '1i user www-data;' "$config"
+        fi
+        sudo rm -f "$config.bak"
+    fi
+}
+
+restrict_onlyoffice_listener() {
+    local -a external_configs local_configs
+    local config index
+
+    mapfile -t external_configs < <(
+        sudo grep -RIl --include='*.conf' -E \
+            "^[[:space:]]*listen[[:space:]]+(0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|^[[:space:]]*listen[[:space:]]+\\[::\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;" \
+            /etc/nginx 2>/dev/null || true
+    )
+
+    if [[ "${#external_configs[@]}" -eq 0 ]]; then
+        mapfile -t local_configs < <(
+            sudo grep -RIl --include='*.conf' -E \
+                "^[[:space:]]*listen[[:space:]]+(127\\.0\\.0\\.1:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|^[[:space:]]*listen[[:space:]]+\\[::1\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;" \
+                /etc/nginx 2>/dev/null || true
+        )
+        [[ "${#local_configs[@]}" -gt 0 ]] || die "Could not locate the ONLYOFFICE listener on port $ONLYOFFICE_PORT"
+        return 0
+    fi
+
+    for index in "${!external_configs[@]}"; do
+        config="${external_configs[$index]}"
+        backup_nginx_file "$config" "onlyoffice-listener-${index}"
+        NGINX_CONFIG_CHANGED=1
+        sudo sed -E -i.bak \
+            -e "s|^([[:space:]]*)listen[[:space:]]+(0\\.0\\.0\\.0:)?${ONLYOFFICE_PORT}([[:space:]].*)?;|\\1listen 127.0.0.1:${ONLYOFFICE_PORT};|" \
+            -e "s|^([[:space:]]*)listen[[:space:]]+\\[::\\]:${ONLYOFFICE_PORT}([[:space:]].*)?;|\\1listen [::1]:${ONLYOFFICE_PORT};|" \
+            "$config"
+        sudo rm -f "$config.bak"
+    done
+}
+
+configure_rabbitmq() {
+    local config=/etc/rabbitmq/rabbitmq.conf env_file=/etc/rabbitmq/rabbitmq-env.conf
+
+    sudo install -d -m 0755 /etc/rabbitmq
+    if sudo test -f "$config"; then
+        sudo sed -E -i.bak \
+            -e '/^[[:space:]]*listeners\.tcp\./d' \
+            -e '/^[[:space:]]*distribution\.listener\.interface[[:space:]]*=/d' \
+            "$config"
+        sudo rm -f "$config.bak"
+    else
+        sudo touch "$config"
+    fi
+    printf '\n# Managed by chatterrow setup.sh\nlisteners.tcp.1 = 127.0.0.1:5672\nlisteners.tcp.2 = ::1:5672\ndistribution.listener.interface = 127.0.0.1\n' | \
+        sudo tee -a "$config" >/dev/null
+
+    if sudo test -f "$env_file"; then
+        sudo sed -E -i.bak '/^[[:space:]]*ERL_EPMD_ADDRESS=/d' "$env_file"
+        sudo rm -f "$env_file.bak"
+    else
+        sudo touch "$env_file"
+    fi
+    printf '\n# Managed by chatterrow setup.sh\nERL_EPMD_ADDRESS=127.0.0.1\n' | \
+        sudo tee -a "$env_file" >/dev/null
+}
+
+install_nodesource_repository() {
+    local keyring=/usr/share/keyrings/nodesource.gpg
+    local fingerprints
+
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
+        gpg --dearmor | sudo tee "$keyring" >/dev/null
+    fingerprints="$(gpg --no-default-keyring --keyring "$keyring" --with-colons --fingerprint 2>/dev/null \
+        | awk -F: '$1 == "fpr" { print $10 }')"
+    grep -qx '6F71F525282841EEDAF851B42F59B5F99B1BE0B4' <<< "$fingerprints" \
+        || die "NodeSource signing key fingerprint check failed"
+    printf 'deb [signed-by=%s] https://deb.nodesource.com/node_24.x nodistro main\n' "$keyring" | \
+        sudo tee /etc/apt/sources.list.d/nodesource.list >/dev/null
+    sudo apt-get update -y
+}
+
+prepare_app_update() {
+    local supervisor_config
+
+    if [[ -f "$APP_DIR/artisan" ]]; then
+        if (cd "$APP_DIR" && php artisan down --render=errors::503 >/dev/null 2>&1); then
+            APP_MAINTENANCE=1
+        fi
+    fi
+
+    if sudo systemctl is-active --quiet supervisor; then
+        for supervisor_config in \
+            /etc/supervisor/conf.d/chatterrow-queue.conf \
+            /etc/supervisor/conf.d/chatterrow-reverb.conf \
+            /etc/supervisor/conf.d/chatterrow-schedule.conf; do
+            if sudo test -f "$supervisor_config"; then
+                sudo sed -E -i.bak 's/^stopwaitsecs=.*/stopwaitsecs=300/' "$supervisor_config"
+                sudo rm -f "$supervisor_config.bak"
+            fi
+        done
+        sudo supervisorctl reread >/dev/null 2>&1 || true
+        sudo supervisorctl update >/dev/null 2>&1 || true
+        sudo supervisorctl stop 'chatterrow-queue:*' chatterrow-reverb chatterrow-schedule >/dev/null 2>&1 || true
+        APP_PROCESSES_STOPPED=1
+    fi
+}
+
+grant_web_traverse() {
+    local path="$APP_DIR"
+
+    while [[ "$path" != "/" ]]; do
+        sudo setfacl -m u:www-data:--x "$path"
+        path="$(dirname "$path")"
+    done
+}
+
+cleanup() {
+    local status=$?
+
+    set +e
+    if [[ "$status" -ne 0 && "$NGINX_CONFIG_CHANGED" -eq 1 && -n "$NGINX_BACKUP_DIR" ]]; then
+        warn "Setup failed; restoring the previous nginx configuration..."
+        restore_nginx_state
+    fi
+    if [[ "$status" -ne 0 && "$APP_PROCESSES_STOPPED" -eq 1 ]]; then
+        sudo supervisorctl reread >/dev/null 2>&1 || true
+        sudo supervisorctl update >/dev/null 2>&1 || true
+        sudo supervisorctl start 'chatterrow-queue:*' chatterrow-reverb chatterrow-schedule >/dev/null 2>&1 || true
+    fi
+    if [[ "$APP_MAINTENANCE" -eq 1 && -f "${APP_DIR:-}/artisan" ]]; then
+        (cd "$APP_DIR" && php artisan up) >/dev/null 2>&1 || true
+    fi
+    [[ -z "$SUDO_KEEPALIVE_PID" ]] || kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    [[ -z "$NGINX_BACKUP_DIR" ]] || rm -rf -- "$NGINX_BACKUP_DIR"
+
+    return "$status"
+}
+
+trap cleanup EXIT
 
 endpoint_returns_ok() {
     local response
@@ -392,7 +639,6 @@ setup_macos_onlyoffice() {
     [[ "$macos_major" =~ ^[0-9]+$ && "$macos_major" -ge 26 ]] || die "Apple Container requires macOS 26 or newer"
 
     app_dir="$APP_DIR"
-    [[ "$app_dir" == "/var/www/chatterrow" ]] && app_dir="$PWD"
     env_file="$app_dir/.env"
 
     [[ -f "$env_file" ]] || {
@@ -678,7 +924,8 @@ prompt_required() {
     printf '%s' "$value"
 }
 
-APP_DIR="${APP_DIR:-/var/www/chatterrow}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+APP_DIR="${APP_DIR:-$SCRIPT_DIR}"
 REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
@@ -687,6 +934,7 @@ DATABASE="${DATABASE:-}"
 DB_NAME="${DB_NAME:-chatterrow}"
 DB_USER="${DB_USER:-chatterrow}"
 DB_PASSWORD="${DB_PASSWORD:-}"
+ONLYOFFICE_JWT_SECRET="${ONLYOFFICE_JWT_SECRET:-}"
 NO_SSL=0
 REVERB_SERVER_PORT=8081
 ONLYOFFICE_PORT="${ONLYOFFICE_PORT:-8080}"
@@ -720,15 +968,21 @@ Options:
   --db-name <name>           PostgreSQL database name (default: chatterrow)
   --db-user <name>           PostgreSQL role name (default: chatterrow)
   --db-password <password>   PostgreSQL password (default: securely generated)
-  --app-dir <path>           App install path (default: /var/www/chatterrow)
+  --app-dir <path>           App install path (default: cloned repository directory)
   --repo <url>               Git repo to deploy (default: git@github.com:askdkc/chatterrow.git)
   --onlyoffice-image <image> OnlyOffice image pulled on each macOS run (default: onlyoffice/documentserver:latest)
+  --sudo-nopasswd            Require passwordless sudo and never prompt for a password
   --no-ssl                   Skip Let's Encrypt (HTTP only, for testing)
   -h, --help                 Show this help
 
 All options can also be supplied through same-named uppercase environment
 variables, except --no-ssl. Non-interactive runs require --domain and
 --database (or DOMAIN and DATABASE).
+
+Ubuntu environment overrides:
+  DEPLOY_USER                   Application file owner (default: current user, or root when running as root)
+  ONLYOFFICE_PORT               Internal OnlyOffice port (default: 8080)
+  ONLYOFFICE_JWT_SECRET         Existing secret, at least 32 non-whitespace characters
 
 macOS Apple Container overrides:
   MACOS_APP_HOST              Application hostname override (default: APP_URL host)
@@ -762,15 +1016,34 @@ while [[ $# -gt 0 ]]; do
             esac
             shift 2
             ;;
+        --sudo-nopasswd) SUDO_NOPASSWD=1; shift ;;
         --no-ssl) NO_SSL=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) die "Unknown option: $1 (see --help)" ;;
     esac
 done
 
+case "$SUDO_NOPASSWD" in
+    0|1) ;;
+    *) die "SUDO_NOPASSWD must be 0 or 1" ;;
+esac
+
 if [[ "$(uname -s)" == "Darwin" ]]; then
     setup_macos_onlyoffice
     exit 0
+fi
+
+# ----------------------------------------------------------- preflight -----
+if [[ "$(id -u)" -eq 0 ]]; then
+    command -v runuser >/dev/null || die "runuser is required for direct root execution"
+else
+    [[ -n "$SUDO_BINARY" ]] || die "sudo is required"
+    sudo -v || {
+        if [[ "$SUDO_NOPASSWD" == "1" ]]; then
+            die "Passwordless sudo is required; run as a sudoers user with NOPASSWD:ALL or omit --sudo-nopasswd"
+        fi
+        die "sudo authentication failed"
+    }
 fi
 
 if [[ -z "$DOMAIN" ]]; then
@@ -780,8 +1053,15 @@ fi
 
 if [[ -z "$DATABASE" ]]; then
     [[ -t 0 ]] || die "--database is required for non-interactive installation"
-    read -r -p "Application database [sqlite/postgresql] (default: sqlite): " DATABASE
-    DATABASE="${DATABASE:-sqlite}"
+    while true; do
+        printf 'Application database:\n  1) sqlite\n  2) postgresql\n'
+        read -r -p "Select database (default: 1): " DATABASE_SELECTION
+        case "${DATABASE_SELECTION:-1}" in
+            1) DATABASE="sqlite"; break ;;
+            2) DATABASE="postgresql"; break ;;
+            *) warn "Please select 1 (sqlite) or 2 (postgresql)." ;;
+        esac
+    done
 fi
 
 DATABASE="${DATABASE,,}"
@@ -810,22 +1090,27 @@ else
 fi
 
 [[ -z "$EMAIL" || "$EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Invalid email: $EMAIL"
-[[ "$DB_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "Invalid PostgreSQL database name: $DB_NAME"
-[[ "$DB_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "Invalid PostgreSQL role name: $DB_USER"
+[[ "$DB_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#DB_NAME}" -le 63 ]] || die "Invalid PostgreSQL database name: $DB_NAME"
+[[ "$DB_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${#DB_USER}" -le 63 ]] || die "Invalid PostgreSQL role name: $DB_USER"
 [[ "$DB_PASSWORD" != *$'\n'* && "$DB_PASSWORD" != *$'\r'* ]] || die "PostgreSQL password cannot contain newlines"
 [[ "$DOMAIN" != "$OFFICE_DOMAIN" ]] || die "App and OnlyOffice domains must be different"
 [[ ! "$DB_NAME" =~ ^(postgres|template0|template1)$ ]] || die "Reserved PostgreSQL database name: $DB_NAME"
 [[ "$DB_USER" != "postgres" ]] || die "The PostgreSQL superuser cannot be used by the application"
+valid_port "$ONLYOFFICE_PORT" || die "Invalid OnlyOffice port: $ONLYOFFICE_PORT"
+if [[ -n "$ONLYOFFICE_JWT_SECRET" ]]; then
+    valid_jwt_secret "$ONLYOFFICE_JWT_SECRET" || die "ONLYOFFICE_JWT_SECRET must be at least 32 non-whitespace characters"
+fi
 
 APP_DIR="$(realpath -m -- "$APP_DIR")"
-[[ "$APP_DIR" == /var/www/* && "$APP_DIR" != "/var/www/" ]] || die "--app-dir must be a child of /var/www"
+[[ "$APP_DIR" =~ ^/(var/www|home)/[A-Za-z0-9._/-]+$ ]] || die "--app-dir must be under /var/www or /home and contain only safe path characters"
 [[ "$APP_DIR" != *$'\n'* && "$APP_DIR" != *$'\r'* && "$APP_DIR" != *[[:space:]]* ]] || die "--app-dir cannot contain whitespace"
 [[ "$REPO_URL" != *$'\n'* && "$REPO_URL" != *$'\r'* ]] || die "--repo cannot contain newlines"
 
-# ----------------------------------------------------------- preflight -----
-command -v sudo >/dev/null || die "sudo is required"
-sudo -v || die "sudo authentication failed"
+if [[ "$APP_DIR" == "$SCRIPT_DIR" && ! -d "$APP_DIR/.git" ]]; then
+    die "The setup script must be run from a cloned Git repository"
+fi
 
+# ----------------------------------------------------------- preflight -----
 . /etc/os-release
 case "$VERSION_ID" in
     24.04|26.04) ;;
@@ -843,10 +1128,33 @@ AVAILABLE_DISK_MB="$(df -Pm /var | awk 'NR == 2 { print $4 }')"
 [[ "$AVAILABLE_DISK_MB" =~ ^[0-9]+$ && "$AVAILABLE_DISK_MB" -ge 40960 ]] || die "At least 40 GB free space under /var is required"
 (( SWAP_MB >= 4096 )) || warn "ONLYOFFICE recommends at least 4 GB swap; detected ${SWAP_MB} MB"
 
-DEPLOY_USER="${SUDO_USER:-${USER:-$(id -un)}}"
+if [[ -z "${DEPLOY_USER:-}" ]]; then
+    if [[ "$(id -u)" -eq 0 ]]; then
+        DEPLOY_USER="root"
+    else
+        DEPLOY_USER="$(id -un)"
+    fi
+fi
+id "$DEPLOY_USER" >/dev/null 2>&1 || die "Deployment user does not exist: $DEPLOY_USER"
+if [[ "$DATABASE" == "pgsql" ]]; then
+    valid_postgresql_identifier "$DEPLOY_USER" \
+        || die "Deployment user must be a valid PostgreSQL role name: $DEPLOY_USER"
+    [[ "$DB_USER" != "$DEPLOY_USER" ]] \
+        || die "DB_USER must differ from DEPLOY_USER because the deployment role is a PostgreSQL superuser"
+fi
 if [[ "$(id -u)" -eq 0 ]]; then
     warn "Running as root; application files will be owned by ${DEPLOY_USER}"
 fi
+
+if [[ "$(id -u)" -ne 0 ]]; then
+    (
+        while sleep 60; do
+            sudo -n -v || exit
+        done
+    ) &
+    SUDO_KEEPALIVE_PID=$!
+fi
+umask 022
 PUBLIC_SCHEME="https"
 PUBLIC_PORT=443
 [[ $NO_SSL -eq 0 ]] || { PUBLIC_SCHEME="http"; PUBLIC_PORT=80; }
@@ -888,6 +1196,18 @@ log "ImageMagick executable: $IMAGEMAGICK_BINARY"
 
 NGINX_VERSION="$(nginx -v 2>&1 | cut -d/ -f2)"
 dpkg --compare-versions "$NGINX_VERSION" ge 1.30 || die "ONLYOFFICE requires nginx 1.30+; installed version is $NGINX_VERSION"
+
+NGINX_BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-nginx.XXXXXX")" \
+    || die "Could not create a temporary nginx backup directory"
+backup_nginx_file /etc/nginx/nginx.conf nginx.conf
+backup_nginx_file /etc/nginx/conf.d/00-sites-enabled.conf sites-include.conf
+backup_nginx_file /etc/nginx/conf.d/default.conf default-conf
+backup_nginx_file /etc/nginx/sites-available/chatterrow chatterrow-available
+backup_nginx_file /etc/nginx/sites-available/onlyoffice onlyoffice-available
+backup_nginx_file /etc/nginx/sites-enabled/chatterrow chatterrow-enabled
+backup_nginx_file /etc/nginx/sites-enabled/onlyoffice onlyoffice-enabled
+backup_nginx_file /etc/nginx/sites-enabled/default default-enabled
+configure_nginx_worker_user
 
 # Microsoft core fonts improve Office rendering but are not required to run.
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
@@ -934,12 +1254,12 @@ PHP_VERSION_ID="$($PHP_BINARY -r 'echo PHP_VERSION_ID;')"
 [[ "$($PHP_BINARY -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')" == "8.5" ]] || die "PHP CLI was not switched to /usr/bin/php8.5"
 
 for PHP_EXTENSION in curl mbstring xml zip bcmath intl sqlite3 pgsql gd redis; do
-    "$PHP_BINARY" -r "exit(extension_loaded('$PHP_EXTENSION') ? 0 : 1)" \
+    "$PHP_BINARY" -r "exit(extension_loaded('$PHP_EXTENSION') ? 0 : 1);" \
         || die "PHP 8.5 extension is missing: $PHP_EXTENSION"
 done
 
 "$PHP_BINARY" -r \
-    'exit(count(array_diff(["sqlite", "pgsql"], PDO::getAvailableDrivers())) === 0 ? 0 : 1)' \
+    'exit(count(array_diff(["sqlite", "pgsql"], PDO::getAvailableDrivers())) === 0 ? 0 : 1);' \
     || die "PHP 8.5 PDO sqlite and pgsql drivers are required"
 
 sudo systemctl enable --now php8.5-fpm
@@ -962,7 +1282,7 @@ composer --version
 # ---------------------------------------------------------- nodejs 24 ------
 if ! command -v node >/dev/null || ! command -v npm >/dev/null || [[ "$(node -v | tr -d 'v' | cut -d. -f1)" -lt 24 ]]; then
     log "Installing Node.js 24 from NodeSource..."
-    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+    install_nodesource_repository
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 fi
 node --version
@@ -1059,6 +1379,26 @@ if [[ "$DATABASE" == "pgsql" ]]; then
     sudo chown root:root "$DB_CREDENTIAL_FILE"
     sudo chmod 0600 "$DB_CREDENTIAL_FILE"
 
+    log "Ensuring PostgreSQL superuser role '$DEPLOY_USER' exists..."
+    sudo -u postgres psql \
+        -p "$PG_PORT" \
+        --set=ON_ERROR_STOP=1 \
+        --set=installer_role="$DEPLOY_USER" \
+        postgres <<'SQL'
+SELECT format('CREATE ROLE %I LOGIN SUPERUSER', :'installer_role')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'installer_role') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN SUPERUSER', :'installer_role') \gexec
+SQL
+    INSTALLER_ROLE_IS_SUPERUSER="$(sudo -u postgres psql \
+        -p "$PG_PORT" \
+        --set=installer_role="$DEPLOY_USER" \
+        -Atq postgres <<'SQL'
+SELECT rolsuper FROM pg_roles WHERE rolname = :'installer_role';
+SQL
+    )"
+    [[ "$INSTALLER_ROLE_IS_SUPERUSER" == "t" ]] \
+        || die "PostgreSQL superuser role was not created for $DEPLOY_USER"
+
     ROLE_IS_PRIVILEGED="$(sudo -u postgres psql -p "$PG_PORT" --set=db_user="$DB_USER" -Atq postgres <<'SQL'
 SELECT EXISTS (
     SELECT 1 FROM pg_roles
@@ -1099,6 +1439,10 @@ else
     ONLYOFFICE_JWT_SECRET="${ONLYOFFICE_JWT_SECRET:-$(openssl rand -hex 24)}"
     curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | \
         sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/onlyoffice.gpg
+    ONLYOFFICE_KEY_FINGERPRINTS="$(gpg --no-default-keyring --keyring /usr/share/keyrings/onlyoffice.gpg \
+        --with-colons --fingerprint 2>/dev/null | awk -F: '$1 == "fpr" { print $10 }')"
+    grep -qx 'E09CA29F6E178040EF22B4098320CA65CB2DE8E5' <<< "$ONLYOFFICE_KEY_FINGERPRINTS" \
+        || die "ONLYOFFICE signing key fingerprint check failed"
     echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | \
         sudo tee /etc/apt/sources.list.d/onlyoffice.list >/dev/null
     echo "onlyoffice-documentserver onlyoffice/ds-port select $ONLYOFFICE_PORT" | sudo debconf-set-selections
@@ -1108,9 +1452,19 @@ else
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y onlyoffice-documentserver
 fi
 
+configure_nginx_worker_user
+restrict_onlyoffice_listener
+sudo nginx -t
+sudo systemctl enable --now nginx supervisor
+sudo supervisorctl reread >/dev/null
+sudo supervisorctl update >/dev/null
+valid_jwt_secret "$ONLYOFFICE_JWT_SECRET" \
+    || die "ONLYOFFICE_JWT_SECRET must be at least 32 non-whitespace characters"
+
 ONLYOFFICE_READY=0
 for _ in {1..30}; do
-    if curl -fsS "http://127.0.0.1:${ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -q 'true'; then
+    if curl -fsS --connect-timeout 2 --max-time 5 \
+        "http://127.0.0.1:${ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -q 'true'; then
         ONLYOFFICE_READY=1
         break
     fi
@@ -1122,6 +1476,7 @@ done
 log "Deploying chatterrow into $APP_DIR..."
 sudo mkdir -p "$APP_DIR"
 sudo chown "$DEPLOY_USER":"$DEPLOY_USER" "$APP_DIR"
+prepare_app_update
 if [[ -d "$APP_DIR/.git" ]]; then
     log "Repository already present; pulling with fast-forward only"
     git -C "$APP_DIR" pull --ff-only
@@ -1198,7 +1553,7 @@ set_env VITE_REVERB_PORT '"${REVERB_PORT}"'
 set_env VITE_REVERB_SCHEME '"${REVERB_SCHEME}"'
 
 set_env ONLYOFFICE_ENABLED true
-set_env ONLYOFFICE_DOCUMENT_SERVER_URL "$PUBLIC_SCHEME://$OFFICE_DOMAIN"
+set_env ONLYOFFICE_DOCUMENT_SERVER_URL "http://127.0.0.1:$ONLYOFFICE_PORT"
 set_env ONLYOFFICE_PUBLIC_URL "$PUBLIC_SCHEME://$OFFICE_DOMAIN"
 set_env APP_ONLYOFFICE_INTERNAL_URL "http://127.0.0.1:$APP_INTERNAL_PORT"
 set_env ONLYOFFICE_JWT_SECRET "$(dotenv_quote "$ONLYOFFICE_JWT_SECRET")"
@@ -1209,7 +1564,6 @@ CURRENT_APP_KEY="$(sed -n 's/^[[:space:]]*APP_KEY=//p' .env | sed -n '1p')"
 CURRENT_APP_KEY="${CURRENT_APP_KEY#\"}"
 CURRENT_APP_KEY="${CURRENT_APP_KEY%\"}"
 [[ -n "$CURRENT_APP_KEY" ]] || php artisan key:generate --force
-php artisan optimize:clear
 
 log "Building frontend assets..."
 npm ci --no-audit --no-fund
@@ -1217,6 +1571,7 @@ npm run build
 
 log "Running database migrations..."
 php artisan migrate --force
+php artisan optimize:clear
 
 log "Setting application permissions..."
 sudo chown -R "$DEPLOY_USER":www-data "$APP_DIR"
@@ -1231,23 +1586,26 @@ if [[ "$DATABASE" == "sqlite" ]]; then
     sudo chmod 0660 database/database.sqlite
     sudo setfacl -R -m "u:${DEPLOY_USER}:rwx,u:www-data:rwx" -m "d:u:${DEPLOY_USER}:rwx,d:u:www-data:rwx" database
 fi
+grant_web_traverse
 
 # --------------------------------------------------------- nginx conf ------
 log "Generating nginx virtual hosts..."
 sudo install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
+NGINX_CONFIG_CHANGED=1
 printf 'include /etc/nginx/sites-enabled/*;\n' | sudo tee /etc/nginx/conf.d/00-sites-enabled.conf >/dev/null
 
 PRESERVE_NGINX_CONFIG=0
-if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" && -f /etc/nginx/sites-available/chatterrow && -f /etc/nginx/sites-available/onlyoffice ]]; then
+if [[ $NO_SSL -eq 0 \
+    && -d "/etc/letsencrypt/live/$DOMAIN" \
+    && -f /etc/nginx/sites-available/chatterrow \
+    && -f /etc/nginx/sites-available/onlyoffice ]] \
+    && sudo grep -Fq "server_name ${DOMAIN};" /etc/nginx/sites-available/chatterrow \
+    && sudo grep -Fq "root ${APP_DIR}/public;" /etc/nginx/sites-available/chatterrow \
+    && sudo grep -Fq "fastcgi_pass unix:${PHP_FPM_SOCK};" /etc/nginx/sites-available/chatterrow \
+    && sudo grep -Fq "server_name ${OFFICE_DOMAIN};" /etc/nginx/sites-available/onlyoffice \
+    && sudo grep -Fq "proxy_pass http://127.0.0.1:${ONLYOFFICE_PORT};" /etc/nginx/sites-available/onlyoffice; then
     PRESERVE_NGINX_CONFIG=1
     log "Existing TLS-enabled nginx configuration detected; preserving it during redeployment"
-fi
-
-NGINX_BACKUP_DIR=""
-if [[ $NO_SSL -eq 0 && $PRESERVE_NGINX_CONFIG -eq 0 ]]; then
-    NGINX_BACKUP_DIR="$(mktemp -d)"
-    [[ ! -f /etc/nginx/sites-available/chatterrow ]] || sudo cp -a /etc/nginx/sites-available/chatterrow "$NGINX_BACKUP_DIR/chatterrow"
-    [[ ! -f /etc/nginx/sites-available/onlyoffice ]] || sudo cp -a /etc/nginx/sites-available/onlyoffice "$NGINX_BACKUP_DIR/onlyoffice"
 fi
 
 if [[ $PRESERVE_NGINX_CONFIG -eq 0 ]]; then
@@ -1378,7 +1736,7 @@ autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
-stopwaitsecs=3700
+stopwaitsecs=300
 stdout_logfile=/var/log/chatterrow-queue_%(process_num)02d.log
 stderr_logfile=/var/log/chatterrow-queue-error_%(process_num)02d.log
 SUPERVISOR
@@ -1411,7 +1769,12 @@ stdout_logfile=/var/log/chatterrow-schedule.log
 stderr_logfile=/var/log/chatterrow-schedule-error.log
 SUPERVISOR
 
-sudo systemctl enable --now "php${PHP_VER}-fpm" redis-server rabbitmq-server
+configure_rabbitmq
+sudo systemctl enable --now "php${PHP_VER}-fpm" redis-server
+sudo systemctl stop rabbitmq-server >/dev/null 2>&1 || true
+sudo epmd -kill >/dev/null 2>&1 || true
+sudo systemctl enable rabbitmq-server
+sudo systemctl start rabbitmq-server
 REDIS_PING="$(redis-cli --raw ping 2>/dev/null || true)"
 [[ "$REDIS_PING" == "PONG" ]] || die "Redis did not respond to redis-cli ping"
 log "Redis is ready"
@@ -1420,6 +1783,10 @@ sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl restart 'chatterrow-queue:*'
 sudo supervisorctl restart chatterrow-reverb chatterrow-schedule
+if [[ "$APP_MAINTENANCE" -eq 1 ]]; then
+    (cd "$APP_DIR" && php artisan up) || die "Could not leave application maintenance mode"
+    APP_MAINTENANCE=0
+fi
 
 # ------------------------------------------------- Let's Encrypt SSL -------
 if [[ $NO_SSL -eq 1 ]]; then
@@ -1442,15 +1809,9 @@ else
         sudo certbot renew --dry-run --cert-name "$DOMAIN" || warn "Certbot dry-run renewal failed; inspect /var/log/letsencrypt before production use"
         log "SSL installed; certbot.timer and nginx reload hook enabled"
     else
-        if [[ -n "$NGINX_BACKUP_DIR" && -f "$NGINX_BACKUP_DIR/chatterrow" && -f "$NGINX_BACKUP_DIR/onlyoffice" ]]; then
-            sudo cp -a "$NGINX_BACKUP_DIR/chatterrow" /etc/nginx/sites-available/chatterrow
-            sudo cp -a "$NGINX_BACKUP_DIR/onlyoffice" /etc/nginx/sites-available/onlyoffice
-            sudo nginx -t && sudo systemctl reload nginx
-        fi
         die "Certbot failed. Confirm DNS A/AAAA records for $DOMAIN and $OFFICE_DOMAIN, then rerun setup."
     fi
 fi
-[[ -z "$NGINX_BACKUP_DIR" ]] || rm -rf "$NGINX_BACKUP_DIR"
 
 # ------------------------------------------------------------ verify -------
 log "Verifying services..."
@@ -1466,12 +1827,20 @@ printf '%s\n' "$QUEUE_STATUS"
 sudo supervisorctl status chatterrow-reverb chatterrow-schedule
 
 if [[ $NO_SSL -eq 0 && -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
-    curl --resolve "$DOMAIN:443:127.0.0.1" -fsS -o /dev/null "https://$DOMAIN/up" || \
+    curl --resolve "$DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
+        -fsS -o /dev/null "https://$DOMAIN/up" || \
         die "Application HTTPS health check failed"
+    curl --resolve "$OFFICE_DOMAIN:443:127.0.0.1" --connect-timeout 5 --max-time 15 \
+        -fsS "https://$OFFICE_DOMAIN/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+        die "ONLYOFFICE HTTPS health check failed"
     log "Application health check passed over HTTPS"
 else
-    curl -H "Host: $DOMAIN" -fsS -o /dev/null "http://127.0.0.1/up" || \
+    curl -H "Host: $DOMAIN" --connect-timeout 5 --max-time 15 \
+        -fsS -o /dev/null "http://127.0.0.1/up" || \
         die "Application HTTP health check failed"
+    curl -H "Host: $OFFICE_DOMAIN" --connect-timeout 5 --max-time 15 \
+        -fsS "http://127.0.0.1/healthcheck" 2>/dev/null | grep -Eq 'true|ok' || \
+        die "ONLYOFFICE HTTP health check failed"
     log "Application health check passed over HTTP"
 fi
 

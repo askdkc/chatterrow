@@ -66,11 +66,20 @@ cd chatterrow
 ./setup.sh
 ```
 
+sudoパスワードを入力できない運用ユーザーでは、`NOPASSWD`設定済みの一般ユーザーとして次のオプションを付けて実行します。セットアップ中のsudoは`sudo -n`で実行され、パスワードを要求せず、設定がない場合は停止します。
+
+```bash
+./setup.sh --sudo-nopasswd
+```
+
 入力例:
 
 ```text
 Application domain (e.g. chat.example.com): chat.example.com
-Application database [sqlite/postgresql] (default: sqlite): postgresql
+Application database:
+  1) sqlite
+  2) postgresql
+Select database (default: 1): 2
 Let's Encrypt email (optional): admin@example.com
 PostgreSQL password (leave blank to generate):
 ```
@@ -79,16 +88,17 @@ ONLYOFFICE用ドメインは既定で`office.<アプリドメイン>`になり�
 
 セットアップは以下を自動実行します。
 
-1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 22を構成
+1. nginx公式署名済みリポジトリ、PHP 8.5、PostgreSQL、Redis、RabbitMQ、Node.js 24を構成
 2. PHP拡張、Poppler、ImageMagick、Ghostscript、日本語フォントをaptで導入し、ImageMagickの絶対パスを`.env`へ設定
 3. Python仮想環境`.markitdown/venv`へMarkItDown 0.1.7を構築し、`pip check`とCLIバージョンを検証
 4. PostgreSQLをCPU数と搭載RAMに合わせて調整
-5. ONLYOFFICE Document ServerをJWT有効、内部8080番で導入
-6. アプリを`/var/www/chatterrow`へ配備し、依存関係、フロントエンド、マイグレーションを実行
-7. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
-8. SupervisorでRedisキュー10プロセス、Reverb、スケジューラを`www-data`として常駐
-9. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
-10. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
+5. PostgreSQL選択時は、実行ユーザー（`DEPLOY_USER`）と同名の`SUPERUSER LOGIN`ロールを構成
+6. ONLYOFFICE Document ServerをJWT有効、内部8080番（`ONLYOFFICE_PORT`で変更可能）で導入
+7. クローン済みリポジトリへ依存関係、フロントエンド、マイグレーションを適用
+8. nginxでアプリ、ONLYOFFICE、Reverb、ONLYOFFICE内部ダウンロード経路を構成
+9. SupervisorでRedisキュー10プロセス、Reverb、スケジューラを`www-data`として常駐
+10. Certbotで証明書を発行し、`certbot.timer`とnginx reload hookを有効化
+11. PHP 8.5、Redis、PostgreSQL、ONLYOFFICE、Supervisor、アプリのヘルスチェックを実行
 
 ## macOSローカルOnlyOffice
 
@@ -279,19 +289,22 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 | `--db-name <name>`           | `chatterrow`                       | アプリ用PostgreSQL DB名                           |
 | `--db-user <name>`           | `chatterrow`                       | アプリ用PostgreSQLロール                          |
 | `--db-password <password>`   | 自動生成                           | アプリ用PostgreSQLパスワード                      |
-| `--app-dir <path>`           | `/var/www/chatterrow`              | `/var/www`配下の配備先                            |
+| `--app-dir <path>`           | `setup.sh`のあるリポジトリ         | `/home`または`/var/www`配下の配備先               |
 | `--repo <url>`               | GitHub SSH URL                     | 配備するGitリポジトリ                             |
 | `--onlyoffice-image <image>` | `onlyoffice/documentserver:latest` | macOSで毎回pullして使用するDocumentServerイメージ |
+| `--sudo-nopasswd`            | off                                | パスワード無しsudo（`sudo -n`）を強制              |
 | `--no-ssl`                   | off                                | Certbotを省略しHTTPで構成                         |
 
-同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`。
+同名の大文字環境変数も使用できます。例: `DOMAIN`、`DATABASE`、`DB_NAME`、`DB_USER`、`DB_PASSWORD`、`DEPLOY_USER`、`SUDO_NOPASSWD`、`ONLYOFFICE_PORT`、`ONLYOFFICE_JWT_SECRET`。
 
 PostgreSQLパスワードを省略すると64桁のランダム値を生成し、次の場所へ保存します。
 
 ```text
 /etc/chatterrow/database-password  root:root 0600
-/var/www/chatterrow/.env           <deploy-user>:www-data 0640
+/home/ubuntu/chatterrow/.env       <deploy-user>:www-data 0640
 ```
+
+PostgreSQLを選択した場合、実行ユーザー（`DEPLOY_USER`、未指定時は一般ユーザー実行なら`id -un`、root実行なら`root`）と同名のPostgreSQLロールを`LOGIN SUPERUSER`として作成または更新します。アプリ接続用の`DB_USER`は別の非特権ロールとして維持されます。
 
 ## PostgreSQL自動調整
 
@@ -390,10 +403,10 @@ SQLite:
 
 ```bash
 sudo install -d /backup
-sudo -u www-data sqlite3 /var/www/chatterrow/database/database.sqlite \
+sudo -u www-data sqlite3 /home/ubuntu/chatterrow/database/database.sqlite \
     ".backup /backup/chatterrow-$(date +%F).sqlite"
-sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
-sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
+sudo rsync -a /home/ubuntu/chatterrow/storage/app/ /backup/storage-app/
+sudo rsync -a /home/ubuntu/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
 ```
 
 PostgreSQL:
@@ -401,8 +414,8 @@ PostgreSQL:
 ```bash
 sudo install -d /backup
 sudo -u postgres pg_dump --format=custom chatterrow > /backup/chatterrow-$(date +%F).dump
-sudo rsync -a /var/www/chatterrow/storage/app/ /backup/storage-app/
-sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
+sudo rsync -a /home/ubuntu/chatterrow/storage/app/ /backup/storage-app/
+sudo rsync -a /home/ubuntu/chatterrow/storage/markdowned-docs/ /backup/markdowned-docs/
 ```
 
 ## 主な環境変数
@@ -420,7 +433,8 @@ sudo rsync -a /var/www/chatterrow/storage/markdowned-docs/ /backup/markdowned-do
 | `REVERB_HOST/PORT/SCHEME`        | ブラウザとLaravelが接続する公開WebSocket               |
 | `REVERB_SERVER_HOST/PORT`        | Reverbの内部listen先。セットアップでは`127.0.0.1:8081` |
 | `REVERB_ALLOWED_ORIGINS`         | Reverbへの接続を許可する公開ドメイン                   |
-| `ONLYOFFICE_DOCUMENT_SERVER_URL` | ブラウザから見えるONLYOFFICE URL                       |
+| `ONLYOFFICE_DOCUMENT_SERVER_URL` | Laravelから接続するONLYOFFICE内部URL（Ubuntuでは127.0.0.1） |
+| `ONLYOFFICE_PUBLIC_URL`           | ブラウザから見えるONLYOFFICE公開URL                    |
 | `APP_ONLYOFFICE_INTERNAL_URL`    | ONLYOFFICEがファイルを取得する内部アプリURL            |
 | `ONLYOFFICE_JWT_SECRET`          | ONLYOFFICEと共有するJWT秘密鍵                          |
 
