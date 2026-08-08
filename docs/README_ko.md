@@ -1,6 +1,8 @@
 # 茶多楼 chatterrow
 
 ## 업무를 통합 관리할 수 있는 기능을 채팅에 담았습니다
+<img width="100%" alt="Chatterrow サービス紹介" src="./assets/chatterrow-introduction.gif" />
+
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/f7032613-194f-46b6-ac77-cfb1a4f2f1a3" />
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/619f867d-9598-4628-8e94-89eac10558d1" />
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/981ccc86-ae70-4122-bfb3-93a6d01cce29" />
