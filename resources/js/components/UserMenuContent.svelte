@@ -2,6 +2,7 @@
     import { Link, router } from '@inertiajs/svelte';
     import LogOut from 'lucide-svelte/icons/log-out';
     import Settings from 'lucide-svelte/icons/settings';
+    import LanguageSwitcher from '@/components/LanguageSwitcher.svelte';
     import {
         DropdownMenuGroup,
         DropdownMenuItem,
@@ -50,6 +51,10 @@
         {/snippet}
     </DropdownMenuItem>
 </DropdownMenuGroup>
+<DropdownMenuSeparator />
+<div class="px-1 py-1">
+    <LanguageSwitcher class="w-full" />
+</div>
 <DropdownMenuSeparator />
 <DropdownMenuItem asChild>
     {#snippet children(props)}

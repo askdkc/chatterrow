@@ -19,7 +19,9 @@
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
     import * as DropdownMenu from '@/components/ui/dropdown-menu';
+    import { currentLocale } from '@/lib/dates';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import type {
         ProjectFolderResource,
@@ -118,7 +120,7 @@
             : [...folders, folder].sort(
                   (left, right) =>
                       left.position - right.position ||
-                      left.name.localeCompare(right.name, 'ja'),
+                      left.name.localeCompare(right.name, currentLocale()),
               );
     }
 
@@ -144,7 +146,7 @@
             folderError =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'プロジェクトの移動に失敗しました';
+                    : t('Failed to move project');
         } finally {
             movingServerId = null;
         }
@@ -255,7 +257,7 @@
             folderError =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'フォルダの削除に失敗しました';
+                    : t('Failed to delete folder');
         } finally {
             folderActionPending = false;
         }
@@ -284,15 +286,15 @@
         <header
             class="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-black/10 bg-[#313338] px-6 dark:border-black/20"
         >
-            <h1 class="text-[15px] font-bold">プロジェクト一覧</h1>
+            <h1 class="text-[15px] font-bold">{t('Project list')}</h1>
             <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" onclick={createFolder}>
                     <FolderPlus data-icon="inline-start" />
-                    フォルダを作成
+                    {t('Create folder')}
                 </Button>
                 <Button size="sm" onclick={onAddServer}>
                     <Plus data-icon="inline-start" />
-                    プロジェクトを作成
+                    {t('Create project')}
                 </Button>
             </div>
         </header>
@@ -312,7 +314,7 @@
                     <div class="flex items-center gap-2">
                         <Users class="size-4" />
                         <h2 class="text-sm font-semibold">
-                            プロジェクトへの招待
+                            {t('Project invitations')}
                         </h2>
                         <Badge variant="secondary">
                             {currentInvitations.length}
@@ -338,14 +340,16 @@
                         <Hash class="size-8 text-[#5865f2]" />
                     </div>
                     <h2 class="text-lg font-bold">
-                        まだプロジェクトがありません
+                        {t('No projects yet')}
                     </h2>
                     <p class="mt-1 text-sm text-[#80848e]">
-                        プロジェクトを作成して、チームのチャットとタスクを始めましょう
+                        {t(
+                            'Create a project to start chatting and managing tasks with your team',
+                        )}
                     </p>
                     <Button class="mt-4" onclick={onAddServer}>
                         <Plus data-icon="inline-start" />
-                        プロジェクトを作成
+                        {t('Create project')}
                     </Button>
                 </div>
             {:else}
@@ -353,7 +357,9 @@
                     {#each folderGroups as group (group.folder.id)}
                         <section
                             class={`flex flex-col gap-3 rounded-2xl transition-[background-color,box-shadow] ${dragOverDestination === group.folder.id ? 'bg-[#5865f2]/10 ring-2 ring-[#5865f2]' : ''}`}
-                            aria-label={`${group.folder.name}フォルダ`}
+                            aria-label={t('Folder :name', {
+                                name: group.folder.name,
+                            })}
                             data-folder-drop-zone={group.folder.id}
                             ondragover={(event) =>
                                 dragServerOver(event, group.folder.id)}
@@ -376,7 +382,7 @@
                                     <span
                                         class="text-xs font-medium text-[#c9cdfb]"
                                     >
-                                        ここにドロップ
+                                        {t('Drop here')}
                                     </span>
                                 {/if}
 
@@ -386,7 +392,12 @@
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label={`${group.folder.name}の操作`}
+                                                aria-label={t(
+                                                    'Actions for :name',
+                                                    {
+                                                        name: group.folder.name,
+                                                    },
+                                                )}
                                                 onclick={props.onclick}
                                                 aria-expanded={props[
                                                     'aria-expanded'
@@ -419,7 +430,7 @@
                                                         <Pencil
                                                             data-icon="inline-start"
                                                         />
-                                                        フォルダを編集
+                                                        {t('Edit folder')}
                                                     </button>
                                                 {/snippet}
                                             </DropdownMenu.DropdownMenuItem>
@@ -439,7 +450,7 @@
                                                         <Trash2
                                                             data-icon="inline-start"
                                                         />
-                                                        削除
+                                                        {t('Delete')}
                                                     </button>
                                                 {/snippet}
                                             </DropdownMenu.DropdownMenuItem>
@@ -452,7 +463,7 @@
                                 <div
                                     class="rounded-xl border border-dashed border-white/10 px-4 py-5 text-center text-sm text-[#80848e]"
                                 >
-                                    プロジェクトをここへドラッグ＆ドロップできます。
+                                    {t('Drag and drop projects here.')}
                                 </div>
                             {:else}
                                 <div class="flex flex-col gap-3">
@@ -477,7 +488,7 @@
                     {#if folders.length > 0 || unfiledServers.length > 0}
                         <section
                             class={`flex flex-col gap-3 rounded-2xl transition-[background-color,box-shadow] ${dragOverDestination === 'unfiled' ? 'bg-[#5865f2]/10 ring-2 ring-[#5865f2]' : ''}`}
-                            aria-label="未分類プロジェクト"
+                            aria-label={t('Uncategorized projects')}
                             data-folder-drop-zone="unfiled"
                             ondragover={(event) => dragServerOver(event, null)}
                             ondragleave={(event) => leaveDropZone(event, null)}
@@ -489,7 +500,7 @@
                                 >
                                     <Hash class="size-4 text-[#b5bac1]" />
                                     <h2 class="text-sm font-semibold">
-                                        未分類
+                                        {t('Uncategorized')}
                                     </h2>
                                     <Badge variant="secondary">
                                         {unfiledServers.length}
@@ -498,7 +509,7 @@
                                         <span
                                             class="text-xs font-medium text-[#c9cdfb]"
                                         >
-                                            ここにドロップ
+                                            {t('Drop here')}
                                         </span>
                                     {/if}
                                 </div>
@@ -507,7 +518,9 @@
                                 <div
                                     class="rounded-xl border border-dashed border-white/10 px-4 py-5 text-center text-sm text-[#80848e]"
                                 >
-                                    フォルダから外すプロジェクトをここへドラッグ＆ドロップできます。
+                                    {t(
+                                        'Drag and drop projects here to remove them from folders.',
+                                    )}
                                 </div>
                             {:else}
                                 <div class="flex flex-col gap-3">
@@ -540,7 +553,7 @@
             {#snippet children(props)}
                 <a class={props.class} href="/servers/archived">
                     <Archive data-icon="inline-start" />
-                    アーカイブ済み
+                    {t('Archived')}
                     {#if archivedCount > 0}
                         <Badge variant="secondary">{archivedCount}</Badge>
                     {/if}
@@ -617,22 +630,24 @@
 >
     <AlertDialog.Content>
         <AlertDialog.Header>
-            <AlertDialog.Title>フォルダを削除しますか？</AlertDialog.Title>
+            <AlertDialog.Title>{t('Delete folder?')}</AlertDialog.Title>
             <AlertDialog.Description>
-                「{deletingFolder?.name ??
-                    ''}」内のプロジェクトは削除されず、未分類へ移動します。
+                {t(
+                    'Projects in ":name" will not be deleted and will be moved to Uncategorized.',
+                    { name: deletingFolder?.name ?? '' },
+                )}
             </AlertDialog.Description>
         </AlertDialog.Header>
         <AlertDialog.Footer>
             <AlertDialog.Cancel disabled={folderActionPending}>
-                キャンセル
+                {t('Cancel')}
             </AlertDialog.Cancel>
             <AlertDialog.Action
                 variant="destructive"
                 disabled={folderActionPending}
                 onclick={deleteFolder}
             >
-                削除
+                {t('Delete')}
             </AlertDialog.Action>
         </AlertDialog.Footer>
     </AlertDialog.Content>

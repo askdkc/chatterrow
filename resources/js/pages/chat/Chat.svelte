@@ -33,9 +33,11 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoPanel from '@/components/discord/TodoPanel.svelte';
     import { Button } from '@/components/ui/button';
+    import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
     import { getEcho } from '@/lib/echo';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import {
         findMentionQuery,
         replaceMentionRange,
@@ -127,7 +129,7 @@
             id: null,
             kind: 'everyone',
             name: 'everyone',
-            email: '全メンバー',
+            email: t('All members'),
         };
         const candidates: MentionCandidate[] = [
             everyone,
@@ -392,7 +394,9 @@
             resetComposerHeight();
         } catch (e) {
             sendError =
-                e instanceof HttpError ? e.messageText() : '送信に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : t('Failed to send message');
         } finally {
             sending = false;
         }
@@ -411,7 +415,9 @@
 
         uploadError =
             selectedFiles.length < fileList.length
-                ? `添付できるファイルは${maxPendingFiles}件までです`
+                ? t('Up to :count files can be attached', {
+                      count: String(maxPendingFiles),
+                  })
                 : '';
 
         if (selectedFiles.length === 0) {
@@ -441,7 +447,7 @@
             uploadError =
                 e instanceof HttpError
                     ? e.messageText()
-                    : 'アップロードに失敗しました';
+                    : t('Failed to upload files');
         } finally {
             pendingUploadCount = Math.max(
                 pendingUploadCount - selectedFiles.length,
@@ -503,7 +509,9 @@
         } catch (e) {
             pendingFiles = [...pendingFiles, file];
             uploadError =
-                e instanceof HttpError ? e.messageText() : '削除に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : t('Failed to delete file');
         }
     }
 
@@ -520,7 +528,7 @@
         try {
             await onFilesPicked(await filesFromDrop(e.dataTransfer));
         } catch {
-            uploadError = 'フォルダの読み込みに失敗しました';
+            uploadError = t('Failed to read folder');
         }
     }
 
@@ -766,7 +774,7 @@
     function wrapComposerSelection(
         prefix: string,
         suffix = prefix,
-        placeholder = 'テキスト',
+        placeholder = t('Text'),
     ) {
         if (!composer) {
             return;
@@ -791,7 +799,7 @@
 
         const selected =
             draft.slice(composer.selectionStart, composer.selectionEnd) ||
-            'リスト項目';
+            t('List item');
         const replacement = selected
             .split('\n')
             .map(
@@ -810,7 +818,7 @@
 
         const label =
             draft.slice(composer.selectionStart, composer.selectionEnd) ||
-            'リンクテキスト';
+            t('Link text');
         const replacement = `[${label}](https://)`;
         const urlStart = label.length + 3;
 
@@ -858,7 +866,7 @@
                 threadError =
                     error instanceof HttpError
                         ? error.messageText()
-                        : 'スレッドの読み込みに失敗しました';
+                        : t('Failed to load thread');
             }
         } finally {
             if (threadParent?.id === message.id) {
@@ -1010,7 +1018,12 @@
                 <span
                     class="ml-2 rounded bg-[#f0b232]/20 px-2 py-0.5 text-xs text-[#f0b232]"
                 >
-                    {channel.starts_on ?? '?'} 〜 {channel.ends_on ?? '未定'}
+                    {t('Date range: :start - :end', {
+                        start: formatDate(channel.starts_on, { fallback: '?' }),
+                        end: formatDate(channel.ends_on, {
+                            fallback: t('Undecided'),
+                        }),
+                    })}
                 </span>
             {/if}
             <div class="ml-auto flex items-center gap-1">
@@ -1018,36 +1031,39 @@
                     type="button"
                     class="flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium transition hover:bg-white/10"
                     onclick={() => (showTodos = !showTodos)}
-                    title="タスク"
+                    title={t('Tasks')}
                 >
                     <ListTodo class="h-4 w-4" />
-                    タスク
+                    {t('Tasks')}
                 </button>
                 <Link
                     href={`/servers/${serverId}/channels/${channelId}/gantt`}
                     class="flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium transition hover:bg-white/10"
-                    title="ガントチャート"
+                    title={t('Gantt chart')}
                 >
                     <CalendarRange class="h-4 w-4" />
-                    ガント
+                    {t('Gantt')}
                 </Link>
                 <Link
                     href={`/servers/${serverId}/channels/${channelId}/files`}
                     class="flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium transition hover:bg-white/10"
-                    title="ファイル"
+                    title={t('Files')}
                 >
                     <FileText class="h-4 w-4" />
-                    ファイル
+                    {t('Files')}
                 </Link>
             </div>
         </header>
 
         <div class="flex min-h-0 flex-1">
-            <section class="flex min-w-0 flex-1 flex-col" aria-label="チャット">
+            <section
+                class="flex min-w-0 flex-1 flex-col"
+                aria-label={t('Chat')}
+            >
                 <!-- Messages -->
                 <div
                     role="region"
-                    aria-label="メッセージとファイルドロップ領域"
+                    aria-label={t('Messages and file drop area')}
                     ondragover={(e) => {
                         e.preventDefault();
                         dragActive = true;
@@ -1065,7 +1081,9 @@
                             class="flex items-center gap-2 border-b border-black/10 py-2 dark:border-black/20"
                         >
                             <MessageSquare class="h-4 w-4 text-[#80848e]" />
-                            <span class="text-sm font-semibold">スレッド</span>
+                            <span class="text-sm font-semibold"
+                                >{t('Thread')}</span
+                            >
                             <span class="truncate text-sm text-[#80848e]">
                                 {threadParent.user?.name}: {safeMentionText(
                                     threadParent.body,
@@ -1076,7 +1094,7 @@
                                 type="button"
                                 class="ml-auto rounded p-1 hover:bg-white/10"
                                 onclick={closeThread}
-                                title="スレッドを閉じる"
+                                title={t('Close thread')}
                             >
                                 <X class="h-4 w-4" />
                             </button>
@@ -1115,7 +1133,7 @@
                                     class="flex items-center justify-center gap-2 py-8 text-sm text-[#80848e]"
                                 >
                                     <Loader2 class="h-4 w-4 animate-spin" />
-                                    スレッドを読み込み中
+                                    {t('Loading thread')}
                                 </div>
                             {:else}
                                 {#each threadReplies as reply (reply.id)}
@@ -1141,7 +1159,7 @@
                                     <div
                                         class="py-8 text-center text-sm text-[#80848e]"
                                     >
-                                        返信はまだありません
+                                        {t('No replies yet')}
                                     </div>
                                 {/if}
                             {/if}
@@ -1170,7 +1188,7 @@
                                 <div
                                     class="flex h-full items-center justify-center text-sm text-[#80848e]"
                                 >
-                                    まだメッセージがありません
+                                    {t('No messages yet')}
                                 </div>
                             {/if}
                         {/if}
@@ -1202,7 +1220,7 @@
                         bind:this={composerShell}
                         use:preserveComposerFocus
                         role="group"
-                        aria-label="メッセージ入力とファイルドロップ領域"
+                        aria-label={t('Message input and file drop area')}
                         class="overflow-hidden rounded-xl border border-[#686a70] bg-[#383a40] shadow-sm transition focus-within:border-[#8b8d93] focus-within:ring-1 focus-within:ring-white/10"
                         ondragover={(e) => {
                             e.preventDefault();
@@ -1222,13 +1240,13 @@
                         {#if composerExpanded && showFormatting}
                             <div
                                 class="flex min-h-10 items-center gap-1 overflow-x-auto px-2 pt-1 text-[#b5bac1]"
-                                aria-label="書式設定"
+                                aria-label={t('Formatting')}
                             >
                                 <button
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('**')}
-                                    title="太字"
+                                    title={t('Bold')}
                                 >
                                     <Bold class="h-4 w-4" />
                                 </button>
@@ -1236,7 +1254,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('_')}
-                                    title="斜体"
+                                    title={t('Italic')}
                                 >
                                     <Italic class="h-4 w-4" />
                                 </button>
@@ -1244,7 +1262,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('__')}
-                                    title="下線"
+                                    title={t('Underline')}
                                 >
                                     <Underline class="h-4 w-4" />
                                 </button>
@@ -1252,7 +1270,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('~~')}
-                                    title="取り消し線"
+                                    title={t('Strikethrough')}
                                 >
                                     <Strikethrough class="h-4 w-4" />
                                 </button>
@@ -1263,7 +1281,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={insertComposerLink}
-                                    title="リンク"
+                                    title={t('Link')}
                                 >
                                     <Link2 class="h-4 w-4" />
                                 </button>
@@ -1274,7 +1292,7 @@
                                         prefixComposerLines(
                                             (index) => `${index + 1}. `,
                                         )}
-                                    title="番号付きリスト"
+                                    title={t('Numbered list')}
                                 >
                                     <ListOrdered class="h-4 w-4" />
                                 </button>
@@ -1282,7 +1300,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => prefixComposerLines('- ')}
-                                    title="箇条書き"
+                                    title={t('Bulleted list')}
                                 >
                                     <ListIcon class="h-4 w-4" />
                                 </button>
@@ -1293,7 +1311,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => prefixComposerLines('> ')}
-                                    title="引用"
+                                    title={t('Quote')}
                                 >
                                     <TextQuote class="h-4 w-4" />
                                 </button>
@@ -1301,7 +1319,7 @@
                                     type="button"
                                     class="rounded p-1.5 transition hover:bg-white/10 hover:text-white"
                                     onclick={() => wrapComposerSelection('`')}
-                                    title="インラインコード"
+                                    title={t('Inline code')}
                                 >
                                     <Code class="h-4 w-4" />
                                 </button>
@@ -1312,9 +1330,9 @@
                                         wrapComposerSelection(
                                             '```\n',
                                             '\n```',
-                                            'コード',
+                                            t('Code'),
                                         )}
-                                    title="コードブロック"
+                                    title={t('Code block')}
                                 >
                                     <SquareCode class="h-4 w-4" />
                                 </button>
@@ -1323,7 +1341,7 @@
                         {#if pendingFiles.length > 0 || pendingUploadCount > 0}
                             <div
                                 class="flex flex-wrap gap-2 px-3 pt-3"
-                                aria-label="送信予定の添付ファイル"
+                                aria-label={t('Pending attachments')}
                             >
                                 {#each pendingFiles as file (file.path)}
                                     {#if isImageFile(file)}
@@ -1339,8 +1357,13 @@
                                                 variant="secondary"
                                                 size="icon"
                                                 class="absolute right-1 top-1 size-7 opacity-90 shadow-sm transition-opacity group-hover:opacity-100"
-                                                aria-label={`${file.original_name}の添付を削除`}
-                                                title="添付を削除"
+                                                aria-label={t(
+                                                    'Remove attachment: :name',
+                                                    {
+                                                        name: file.original_name,
+                                                    },
+                                                )}
+                                                title={t('Remove attachment')}
                                                 onclick={() =>
                                                     removePendingFile(file)}
                                             >
@@ -1368,8 +1391,13 @@
                                                 variant="ghost"
                                                 size="icon"
                                                 class="size-7 shrink-0"
-                                                aria-label={`${file.original_name}の添付を削除`}
-                                                title="添付を削除"
+                                                aria-label={t(
+                                                    'Remove attachment: :name',
+                                                    {
+                                                        name: file.original_name,
+                                                    },
+                                                )}
+                                                title={t('Remove attachment')}
                                                 onclick={() =>
                                                     removePendingFile(file)}
                                             >
@@ -1385,7 +1413,9 @@
                                         aria-live="polite"
                                     >
                                         <Loader2 class="size-4 animate-spin" />
-                                        {pendingUploadCount}件をアップロード中…
+                                        {t('Uploading :count files...', {
+                                            count: String(pendingUploadCount),
+                                        })}
                                     </div>
                                 {/if}
                             </div>
@@ -1400,7 +1430,7 @@
                                     type="button"
                                     class="rounded-full p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={() => fileInput?.click()}
-                                    title="ファイルを添付"
+                                    title={t('Attach file')}
                                 >
                                     <Plus class="h-4 w-4" />
                                 </button>
@@ -1413,8 +1443,10 @@
                                     ? 'block max-h-48 min-h-20 w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#a5a7ad]'
                                     : 'h-9 min-w-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#80848e]'}
                                 placeholder={threadParent
-                                    ? `「${threadParent.user?.name}」への返信`
-                                    : 'メッセージを入力'}
+                                    ? t('Reply to :name', {
+                                          name: threadParent.user?.name ?? '',
+                                      })
+                                    : t('Enter a message')}
                                 onfocus={expandComposer}
                                 oninput={handleComposerInput}
                                 oncompositionstart={onCompositionStart}
@@ -1438,7 +1470,7 @@
                                         pendingUploadCount > 0 ||
                                         (!draft.trim() &&
                                             pendingFiles.length === 0)}
-                                    title="送信"
+                                    title={t('Send')}
                                 >
                                     {#if sending}
                                         <Loader2 class="h-5 w-5 animate-spin" />
@@ -1454,7 +1486,7 @@
                                     type="button"
                                     class="rounded-full bg-white/5 p-2 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={() => fileInput?.click()}
-                                    title="ファイルを添付"
+                                    title={t('Attach file')}
                                 >
                                     <Plus class="h-4 w-4" />
                                 </button>
@@ -1468,8 +1500,8 @@
                                     onclick={() =>
                                         (showFormatting = !showFormatting)}
                                     aria-pressed={showFormatting}
-                                    aria-label="書式設定を切り替え"
-                                    title="書式設定を切り替え"
+                                    aria-label={t('Toggle formatting')}
+                                    title={t('Toggle formatting')}
                                 >
                                     Aa
                                 </button>
@@ -1483,7 +1515,7 @@
                                     type="button"
                                     class="rounded p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-white"
                                     onclick={openMentionCandidates}
-                                    title="メンションを挿入"
+                                    title={t('Insert mention')}
                                 >
                                     <AtSign class="h-4 w-4" />
                                 </button>
@@ -1492,7 +1524,10 @@
                                 ></span>
                                 <span
                                     class="ml-auto hidden items-center gap-1.5 whitespace-nowrap text-[11px] text-[#6a6f78] sm:inline-flex dark:text-[#949ba4]"
-                                    aria-label={`${sendShortcutModifier} + Enterで送信`}
+                                    aria-label={t(
+                                        'Send with :modifier + Enter',
+                                        { modifier: sendShortcutModifier },
+                                    )}
                                 >
                                     <kbd
                                         class="rounded border border-[#b5bac1] bg-[#dfe1e5] px-1.5 py-0.5 font-sans leading-none text-[#4e5058] dark:border-[#686a70] dark:bg-[#2b2d31] dark:text-[#dbdee1]"
@@ -1503,7 +1538,7 @@
                                         class="rounded border border-[#b5bac1] bg-[#dfe1e5] px-1.5 py-0.5 font-sans leading-none text-[#4e5058] dark:border-[#686a70] dark:bg-[#2b2d31] dark:text-[#dbdee1]"
                                         >Enter</kbd
                                     >
-                                    <span>で送信</span>
+                                    <span>{t('To send')}</span>
                                 </span>
                                 <button
                                     type="button"
@@ -1514,7 +1549,7 @@
                                         pendingUploadCount > 0 ||
                                         (!draft.trim() &&
                                             pendingFiles.length === 0)}
-                                    title="送信"
+                                    title={t('Send')}
                                 >
                                     {#if sending}
                                         <Loader2 class="h-5 w-5 animate-spin" />
@@ -1547,13 +1582,17 @@
             style={mentionMenuStyle}
             role="listbox"
             tabindex="-1"
-            aria-label="メンション候補"
+            aria-label={t('Mention candidates')}
             onpointerdown={(event) => event.preventDefault()}
         >
             <div
                 class="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#80848e]"
             >
-                メンション候補{mentionQuery ? `「${mentionQuery}」` : ''}
+                {mentionQuery
+                    ? t('Mention candidates for :query', {
+                          query: mentionQuery,
+                      })
+                    : t('Mention candidates')}
             </div>
             {#if mentionCandidates.length > 0}
                 {#each mentionCandidates as candidate, index (`${candidate.kind}-${candidate.id ?? 'everyone'}`)}
@@ -1585,7 +1624,7 @@
                 {/each}
             {:else}
                 <p class="px-2 py-3 text-sm text-[#80848e]">
-                    一致するメンバーがいません
+                    {t('No matching members')}
                 </p>
             {/if}
         </div>
@@ -1599,7 +1638,7 @@
                 class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#5865f2] bg-[#313338]/90 px-8 py-6 text-lg font-semibold"
             >
                 <Paperclip class="h-6 w-6" />
-                ドロップしてアップロード
+                {t('Drop files to upload')}
             </div>
         </div>
     {/if}

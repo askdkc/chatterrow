@@ -11,6 +11,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import type { ServerResource } from '@/types';
 
@@ -47,13 +48,13 @@
                     <a
                         class={props.class}
                         href="/servers"
-                        aria-label="プロジェクト一覧へ戻る"
+                        aria-label={t('Back to project list')}
                     >
                         <ArrowLeft />
                     </a>
                 {/snippet}
             </Button>
-            <h1 class="text-[15px] font-bold">アーカイブ済みプロジェクト</h1>
+            <h1 class="text-[15px] font-bold">{t('Archived projects')}</h1>
             <Badge variant="secondary">{servers.length}</Badge>
         </header>
 
@@ -68,16 +69,18 @@
                         <Archive class="size-8 text-muted-foreground" />
                     </div>
                     <h2 class="text-lg font-bold">
-                        アーカイブ済みプロジェクトはありません
+                        {t('No archived projects')}
                     </h2>
                     <p class="mt-1 text-sm text-[#80848e]">
-                        アーカイブしたプロジェクトはここから復元または削除できます。
+                        {t(
+                            'Archived projects can be restored or deleted here.',
+                        )}
                     </p>
                     <Button class="mt-4" variant="outline" asChild>
                         {#snippet children(props)}
                             <a class={props.class} href="/servers">
                                 <ArrowLeft data-icon="inline-start" />
-                                プロジェクト一覧へ戻る
+                                {t('Back to project list')}
                             </a>
                         {/snippet}
                     </Button>
@@ -99,7 +102,7 @@
                                             {server.name}
                                         </span>
                                         <Badge variant="outline">
-                                            アーカイブ済み
+                                            {t('Archived')}
                                         </Badge>
                                     </span>
                                     <span
@@ -107,12 +110,19 @@
                                     >
                                         <span class="flex items-center gap-1">
                                             <Hash class="size-3" />
-                                            チャンネル {server.channels_count ??
-                                                0}
+                                            {t('Channels: :count', {
+                                                count: String(
+                                                    server.channels_count ?? 0,
+                                                ),
+                                            })}
                                         </span>
                                         <span class="flex items-center gap-1">
                                             <Users class="size-3" />
-                                            メンバー {server.members_count ?? 0}
+                                            {t('Members: :count', {
+                                                count: String(
+                                                    server.members_count ?? 0,
+                                                ),
+                                            })}
                                         </span>
                                     </span>
                                 </span>
@@ -123,8 +133,10 @@
                                     variant="ghost"
                                     size="icon"
                                     class="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-                                    aria-label={`${server.name}の設定`}
-                                    title="復元または削除"
+                                    aria-label={t('Settings for :name', {
+                                        name: server.name,
+                                    })}
+                                    title={t('Restore or delete')}
                                     onclick={(event) => {
                                         event.stopPropagation();
                                         editingServer = server;

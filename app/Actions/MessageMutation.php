@@ -112,7 +112,7 @@ final class MessageMutation
 
             if ($token['id'] === null || preg_match('/\A[1-9][0-9]*\z/', $token['id']) !== 1) {
                 throw ValidationException::withMessages([
-                    'body' => ['The message contains an invalid user mention.'],
+                    'body' => [__('The message contains an invalid user mention.')],
                 ]);
             }
 
@@ -127,7 +127,7 @@ final class MessageMutation
         foreach (array_keys($directIds) as $directId) {
             if (! isset($memberIds[$directId])) {
                 throw ValidationException::withMessages([
-                    'body' => ['The selected user is not a member of this server.'],
+                    'body' => [__('The selected user is not a member of this server.')],
                 ]);
             }
         }
@@ -235,7 +235,7 @@ final class MessageMutation
             ->exists();
 
         if (! $isMember) {
-            throw new AuthorizationException('The user is no longer a member of this server.');
+            throw new AuthorizationException(__('The user is no longer a member of this server.'));
         }
     }
 
@@ -254,7 +254,7 @@ final class MessageMutation
 
         if (! $valid) {
             throw ValidationException::withMessages([
-                'parent_id' => ['The selected parent message is invalid.'],
+                'parent_id' => [__('The selected parent message is invalid.')],
             ]);
         }
     }

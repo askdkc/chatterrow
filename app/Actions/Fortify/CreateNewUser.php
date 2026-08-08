@@ -39,13 +39,19 @@ class CreateNewUser implements CreatesNewUsers
             }
 
             if ($invitation === null || $invitation->status !== ServerInvitation::STATUS_PENDING) {
-                $validator->errors()->add('invitation', 'この招待リンクは無効か、すでに使用されています。');
+                $validator->errors()->add(
+                    'invitation',
+                    __('This invitation link is invalid or has already been used.'),
+                );
 
                 return;
             }
 
             if (mb_strtolower((string) ($input['email'] ?? '')) !== mb_strtolower($invitation->email)) {
-                $validator->errors()->add('email', '招待されたメールアドレスで登録してください。');
+                $validator->errors()->add(
+                    'email',
+                    __('Register with the invited email address.'),
+                );
             }
         });
 

@@ -13,7 +13,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.ts'])
         <x-inertia::head>
-            <title>{{ config('app.name', 'Laravel') }}</title>
+            <title>{{ in_array(app()->getLocale(), ['ja', 'zh_CN', 'zh_TW'], true) ? '茶多楼' : 'Chatterrow' }}</title>
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">

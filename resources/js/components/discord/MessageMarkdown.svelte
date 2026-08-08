@@ -2,6 +2,7 @@
     import { Check, Copy } from 'lucide-svelte';
     import { onDestroy } from 'svelte';
     import { Button } from '@/components/ui/button';
+    import { t } from '@/lib/i18n';
     import {
         renderHighlightedMessageMarkdownParts,
         renderMessageMarkdownParts,
@@ -68,20 +69,20 @@
 
     function copyButtonLabel(index: number): string {
         if (copyState?.index !== index) {
-            return 'コードをコピー';
+            return t('Copy code');
         }
 
         return copyState.status === 'copied'
-            ? 'コードをコピーしました'
-            : 'コードをコピーできませんでした';
+            ? t('Code copied')
+            : t('Could not copy code');
     }
 
     function copyButtonText(index: number): string {
         if (copyState?.index !== index) {
-            return 'コピー';
+            return t('Copy');
         }
 
-        return copyState.status === 'copied' ? 'コピー済み' : '再試行';
+        return copyState.status === 'copied' ? t('Copied') : t('Retry');
     }
 
     async function writeToClipboard(code: string): Promise<void> {

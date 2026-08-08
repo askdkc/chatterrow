@@ -45,7 +45,10 @@ class SendDueDateReminders extends Command
             $sent += $this->createReminder(
                 $channel,
                 $channel,
-                "⏰ チャンネル「{$channel->name}」の終了期限（".$targetDate->format('Y-m-d').'）です。',
+                __('⏰ Channel :name is due on :date.', [
+                    'name' => $channel->name,
+                    'date' => $targetDate->format('Y-m-d'),
+                ]),
                 $this->channelReminderKey($channel),
             );
         }
@@ -81,12 +84,18 @@ class SendDueDateReminders extends Command
         $sent = 0;
 
         foreach ($todos as $todo) {
-            $assignee = $todo->assignee?->name !== null ? "（担当: {$todo->assignee->name}）" : '';
+            $assignee = $todo->assignee?->name !== null
+                ? __('Assigned to :name', ['name' => $todo->assignee->name])
+                : '';
             $dueDay = $todo->due_at->copy()->setTimezone($todo->due_timezone)->toDateString();
             $sent += $this->createReminder(
                 $todo,
                 $todo->channel,
-                "⏰ タスク期限: 「{$todo->title}」".$assignee.'（'.$dueDay.'）',
+                __('⏰ Task deadline: :title :assignee (:date)', [
+                    'title' => $todo->title,
+                    'assignee' => $assignee,
+                    'date' => $dueDay,
+                ]),
                 $this->todoReminderKey($todo),
             );
         }

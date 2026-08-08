@@ -1,8 +1,10 @@
 <script lang="ts">
+    import { t } from '@/lib/i18n';
+
     let {
         value = $bindable(''),
         id,
-        placeholder = '時刻を選択',
+        placeholder = t('Select a time'),
         disabled = false,
         class: className = '',
         onValueChange,
@@ -134,7 +136,7 @@
             bind:this={optionsList}
             id={optionsId}
             role="listbox"
-            aria-label="時刻の候補"
+            aria-label={t('Time options')}
             class="absolute top-full right-0 left-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-black/10 bg-[#313338] p-1 shadow-xl"
         >
             {#each options as option}

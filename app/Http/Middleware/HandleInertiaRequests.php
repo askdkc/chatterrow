@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use JsonException;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -36,6 +37,8 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $localeNames = config('app.supported_locales', []);
+        $localeNames = is_array($localeNames) ? $localeNames : [];
         $servers = $user
             ? $user->servers()
                 ->active()
@@ -51,10 +54,13 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
-            'translations' => fn (): array => is_file(lang_path(app()->getLocale().'.json'))
-                ? json_decode((string) file_get_contents(lang_path(app()->getLocale().'.json')), true, 512, JSON_THROW_ON_ERROR)
-                : [],
-            'name' => config('app.name'),
+            'locale' => app()->getLocale(),
+            'locales' => array_keys($localeNames),
+            'localeNames' => $localeNames,
+            'translations' => fn (): array => $this->translations(app()->getLocale()),
+            'name' => in_array(app()->getLocale(), ['ja', 'zh_CN', 'zh_TW'], true)
+                ? '茶多楼'
+                : 'Chatterrow',
             'auth' => [
                 'user' => $user,
                 'servers' => $servers,
@@ -67,5 +73,32 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * Load the JSON catalog used by the Svelte runtime translator.
+     *
+     * @return array<string, string>
+     */
+    private function translations(string $locale): array
+    {
+        $path = lang_path($locale.'.json');
+
+        if (! is_file($path)) {
+            return [];
+        }
+
+        try {
+            $translations = json_decode(
+                (string) file_get_contents($path),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+        } catch (JsonException) {
+            return [];
+        }
+
+        return is_array($translations) ? $translations : [];
     }
 }

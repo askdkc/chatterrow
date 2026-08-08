@@ -296,7 +296,7 @@ class ServerController extends Controller
 
         if ($server->created_by === $user->id) {
             return response()->json([
-                'message' => 'プロジェクト管理者はメンバーから削除できません。',
+                'message' => __('The project administrator cannot be removed from the project.'),
             ], 422);
         }
 
@@ -338,13 +338,13 @@ class ServerController extends Controller
 
         if ($result === 'assigned') {
             return response()->json([
-                'message' => '担当中のタスクがあるメンバーは削除できません。先に担当を変更してください。',
+                'message' => __('Members with assigned tasks cannot be removed. Reassign their tasks first.'),
             ], 409);
         }
 
         if ($result === 'last_admin') {
             return response()->json([
-                'message' => '最後の管理者はメンバーから削除できません。',
+                'message' => __('The last administrator cannot be removed from the project.'),
             ], 422);
         }
 
@@ -364,7 +364,7 @@ class ServerController extends Controller
 
         if ($server->created_by === $user->id && $validated['role'] !== Server::ROLE_ADMIN) {
             return response()->json([
-                'message' => 'プロジェクト作成者の管理者権限は解除できません。',
+                'message' => __('The project creator\'s administrator role cannot be removed.'),
             ], 422);
         }
 
@@ -392,7 +392,7 @@ class ServerController extends Controller
                     ->count();
 
                 if (! $hasPermanentOwner && $adminCount <= 1) {
-                    abort(422, '最後の管理者は一般メンバーへ変更できません。');
+                    abort(422, __('The last administrator cannot be changed to a regular member.'));
                 }
             }
 
@@ -408,7 +408,7 @@ class ServerController extends Controller
 
         if (! $updated) {
             return response()->json([
-                'message' => '指定したユーザーはプロジェクトメンバーではありません。',
+                'message' => __('The selected user is not a member of the project.'),
             ], 404);
         }
 

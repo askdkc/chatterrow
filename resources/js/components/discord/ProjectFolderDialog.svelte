@@ -7,6 +7,7 @@
     import { Input } from '@/components/ui/input';
     import { Spinner } from '@/components/ui/spinner';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type { ProjectFolderResource } from '@/types';
 
     let {
@@ -42,7 +43,7 @@
     const isEditing = $derived(folder !== null);
     const colorIsValid = $derived(/^#[0-9a-f]{6}$/i.test(color));
     const previewFolder = $derived({
-        name: name || 'フォルダ',
+        name: name || t('Folder'),
         color,
         icon_url: iconPreviewUrl,
     });
@@ -85,14 +86,14 @@
         }
 
         if (!allowedIconTypes.has(file.type)) {
-            error = 'PNG、JPEG、GIF、WebP画像を選択してください';
+            error = t('Please select a PNG, JPEG, GIF, or WebP image.');
             input.value = '';
 
             return;
         }
 
         if (file.size > maxIconBytes) {
-            error = 'アイコン画像は1MB以下にしてください';
+            error = t('Icon image must be 1 MB or smaller.');
             input.value = '';
 
             return;
@@ -125,7 +126,7 @@
         }
 
         if (!colorIsValid) {
-            error = '色は #5865F2 の形式で入力してください';
+            error = t('Color must be in the #5865F2 format.');
 
             return;
         }
@@ -165,8 +166,8 @@
                 exception instanceof HttpError
                     ? exception.messageText()
                     : isEditing
-                      ? 'フォルダの変更に失敗しました'
-                      : 'フォルダの作成に失敗しました';
+                      ? t('Failed to update folder')
+                      : t('Failed to create folder');
         } finally {
             saving = false;
         }
@@ -179,17 +180,19 @@
             <div class="flex items-start justify-between gap-4">
                 <div class="flex flex-col gap-1">
                     <Dialog.DialogTitle>
-                        {isEditing ? 'フォルダを編集' : 'フォルダを作成'}
+                        {isEditing ? t('Edit folder') : t('Create folder')}
                     </Dialog.DialogTitle>
                     <Dialog.DialogDescription>
-                        名前、色、アイコンを設定してプロジェクトを見分けやすくします。
+                        {t(
+                            'Set a name, color, and icon to make projects easier to identify.',
+                        )}
                     </Dialog.DialogDescription>
                 </div>
                 <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label="閉じる"
+                    aria-label={t('Close')}
                     onclick={close}
                 >
                     <X />
@@ -199,23 +202,25 @@
             <Field.FieldGroup>
                 <Field.Field>
                     <Field.FieldLabel for="project-folder-name">
-                        フォルダ名
+                        {t('Folder name')}
                     </Field.FieldLabel>
                     <Input
                         id="project-folder-name"
                         bind:value={name}
                         maxlength={80}
-                        placeholder="例: 社内プロジェクト"
+                        placeholder={t('e.g. Internal projects')}
                         autofocus
                     />
                 </Field.Field>
 
                 <Field.FieldSet>
                     <Field.FieldLegend variant="label">
-                        フォルダの外観
+                        {t('Folder appearance')}
                     </Field.FieldLegend>
                     <Field.FieldDescription>
-                        アイコン画像がない場合は、選択した色のフォルダアイコンを表示します。
+                        {t(
+                            'When no icon image is set, the folder icon uses the selected color.',
+                        )}
                     </Field.FieldDescription>
 
                     <div class="flex items-start gap-4">
@@ -227,7 +232,7 @@
                         <Field.FieldGroup class="min-w-0 flex-1">
                             <Field.Field>
                                 <Field.FieldLabel for="project-folder-color">
-                                    色
+                                    {t('Color')}
                                 </Field.FieldLabel>
                                 <div class="flex items-center gap-2">
                                     <Input
@@ -237,7 +242,7 @@
                                         bind:value={color}
                                     />
                                     <Input
-                                        aria-label="フォルダ色のカラーコード"
+                                        aria-label={t('Folder color hex code')}
                                         bind:value={color}
                                         maxlength={7}
                                         pattern="#[0-9A-Fa-f]{6}"
@@ -248,7 +253,7 @@
 
                             <Field.Field>
                                 <Field.FieldLabel for="project-folder-icon">
-                                    絵文字・アイコン画像
+                                    {t('Emoji or icon image')}
                                 </Field.FieldLabel>
                                 <Input
                                     id="project-folder-icon"
@@ -258,7 +263,9 @@
                                     onchange={selectIcon}
                                 />
                                 <Field.FieldDescription>
-                                    PNG・JPEG・GIF・WebP、16〜512px、最大1MB
+                                    {t(
+                                        'PNG, JPEG, GIF, or WebP; 16-512 px; max 1 MB',
+                                    )}
                                 </Field.FieldDescription>
                                 {#if iconPreviewUrl}
                                     <Button
@@ -267,7 +274,7 @@
                                         size="sm"
                                         onclick={clearIcon}
                                     >
-                                        アイコンを削除
+                                        {t('Remove icon')}
                                     </Button>
                                 {/if}
                             </Field.Field>
@@ -284,7 +291,7 @@
 
             <Dialog.DialogFooter>
                 <Button type="button" variant="outline" onclick={close}>
-                    キャンセル
+                    {t('Cancel')}
                 </Button>
                 <Button
                     type="submit"
@@ -293,7 +300,7 @@
                     {#if saving}
                         <Spinner data-icon="inline-start" />
                     {/if}
-                    {isEditing ? '保存' : '作成'}
+                    {isEditing ? t('Save') : t('Create')}
                 </Button>
             </Dialog.DialogFooter>
         </form>

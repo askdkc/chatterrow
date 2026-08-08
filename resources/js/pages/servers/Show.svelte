@@ -14,6 +14,8 @@
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import { formatDate } from '@/lib/dates';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import type {
         ServerResource,
@@ -55,6 +57,17 @@
     function onBrowse() {
         router.visit('/servers');
     }
+
+    function serverDateRange(): string {
+        return t('Date range: :start - :end', {
+            start: server.starts_on
+                ? formatDate(server.starts_on)
+                : t('Project start date undecided'),
+            end: server.ends_on
+                ? formatDate(server.ends_on)
+                : t('Project end date undecided'),
+        });
+    }
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-[#313338] text-[#dbdee1]">
@@ -88,13 +101,14 @@
             >
                 <span class="flex items-center gap-1">
                     <Users class="h-3.5 w-3.5" />
-                    メンバー {members.length} 人
+                    {t('Member count: :count', {
+                        count: String(members.length),
+                    })}
                 </span>
                 {#if server.starts_on || server.ends_on}
                     <span class="flex items-center gap-1">
                         <CalendarRange class="h-3.5 w-3.5" />
-                        {server.starts_on ?? '開始日未定'} 〜 {server.ends_on ??
-                            '期限未定'}
+                        {serverDateRange()}
                     </span>
                 {/if}
             </div>
@@ -104,10 +118,12 @@
                     class="mx-auto mt-8 max-w-sm rounded-xl bg-[#2b2d31] p-6 text-left"
                 >
                     <h2 class="mb-1 font-semibold">
-                        最初のチャンネルを作成しましょう
+                        {t('Create your first channel')}
                     </h2>
                     <p class="text-sm text-[#80848e]">
-                        チャンネルはタスクとしても機能します。開始日と終了期限を設定できます。
+                        {t(
+                            'Channels function as tasks. You can set a start date and end deadline.',
+                        )}
                     </p>
                     <button
                         type="button"
@@ -115,7 +131,7 @@
                         onclick={() => (showChannelDialog = true)}
                     >
                         <Plus class="h-4 w-4" />
-                        チャンネルを作成
+                        {t('Create channel')}
                     </button>
                 </div>
             {/if}
@@ -126,21 +142,21 @@
                     class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
                 >
                     <ListTodo class="h-4 w-4" />
-                    タスク一覧
+                    {t('Task list')}
                 </a>
                 <a
                     href={`/servers/${server.id}/gantt`}
                     class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
                 >
                     <CalendarRange class="h-4 w-4" />
-                    ガントチャート
+                    {t('Gantt chart')}
                 </a>
                 <a
                     href={`/servers/${server.id}/files`}
                     class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
                 >
                     <FileText class="h-4 w-4" />
-                    ファイル
+                    {t('Files')}
                 </a>
             </div>
         </div>

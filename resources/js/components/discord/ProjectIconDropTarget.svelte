@@ -1,6 +1,7 @@
 <script lang="ts">
     import Upload from 'lucide-svelte/icons/upload';
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
+    import { t } from '@/lib/i18n';
     import { cn } from '@/lib/utils';
     import type { ServerResource } from '@/types';
 
@@ -81,10 +82,10 @@
         'relative shrink-0 rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60',
         dragging && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
     )}
-    aria-label="プロジェクトアイコン画像を選択またはドロップ"
+    aria-label={t('Select or drop a project icon image')}
     title={disabled
         ? undefined
-        : 'クリックして選択、または画像をドラッグ＆ドロップ'}
+        : t('Click to select or drag and drop an image')}
     {disabled}
     onclick={onChoose}
     ondragenter={handleDragEnter}
@@ -99,7 +100,7 @@
             class="absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-xl bg-primary/90 text-[9px] font-semibold text-primary-foreground"
         >
             <Upload class="size-4" />
-            ドロップ
+            {t('Drop')}
         </span>
     {/if}
 </button>

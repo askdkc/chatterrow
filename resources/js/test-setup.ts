@@ -1,3 +1,6 @@
+import { page } from '@inertiajs/svelte';
+import translations from '../../lang/ja.json';
+
 class MemoryStorage implements Storage {
     private values = new Map<string, string>();
 
@@ -25,6 +28,12 @@ class MemoryStorage implements Storage {
         this.values.set(key, String(value));
     }
 }
+
+page.props = {
+    ...page.props,
+    locale: 'ja',
+    translations,
+};
 
 if (typeof globalThis.localStorage === 'undefined') {
     Object.defineProperty(globalThis, 'localStorage', {

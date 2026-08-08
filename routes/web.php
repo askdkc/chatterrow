@@ -14,9 +14,21 @@ use App\Http\Controllers\ServerInvitationController;
 use App\Http\Controllers\StoredFileController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TodoController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+Route::get('language/{locale}', function (Request $request, string $locale) {
+    $supportedLocales = config('app.supported_locales', []);
+
+    abort_unless(is_array($supportedLocales) && array_key_exists($locale, $supportedLocales), 404);
+
+    app()->setLocale($locale);
+    $request->session()->put('locale', $locale);
+
+    return redirect()->back();
+})->name('language.switch');
 
 // Health check for load balancers / provisioning scripts.
 Route::get('up', fn () => response('ok'))->name('health.up');

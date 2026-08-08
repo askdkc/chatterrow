@@ -1,3 +1,5 @@
+import { currentLocale } from './dates';
+
 const DAY_MS = 86_400_000;
 
 export interface GanttRangeTask {
@@ -59,7 +61,7 @@ export function formatEpochDay(
     day: number,
     options: Intl.DateTimeFormatOptions,
 ): string {
-    return new Date(day * DAY_MS).toLocaleDateString('ja-JP', {
+    return new Date(day * DAY_MS).toLocaleDateString(currentLocale(), {
         ...options,
         timeZone: 'UTC',
     });

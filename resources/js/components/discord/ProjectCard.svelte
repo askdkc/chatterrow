@@ -9,6 +9,7 @@
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
     import { Button } from '@/components/ui/button';
     import * as DropdownMenu from '@/components/ui/dropdown-menu';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import type { ProjectFolderResource, ServerResource } from '@/types';
 
@@ -64,7 +65,7 @@
 <div
     class={`group relative transition-opacity ${moving ? 'opacity-60' : ''}`}
     role="group"
-    aria-label={`${server.name}プロジェクトカード`}
+    aria-label={t('Project card for :name', { name: server.name })}
     draggable={!moving}
     data-project-card={server.id}
     ondragstart={startDragging}
@@ -88,16 +89,23 @@
             >
                 <span class="flex items-center gap-1">
                     <Hash class="size-3" />
-                    チャンネル {server.channels_count ?? 0}
+                    {t('Channels: :count', {
+                        count: String(server.channels_count ?? 0),
+                    })}
                 </span>
                 <span class="flex items-center gap-1">
                     <Users class="size-3" />
-                    メンバー {server.members_count ?? 0}
+                    {t('Members: :count', {
+                        count: String(server.members_count ?? 0),
+                    })}
                 </span>
                 {#if server.starts_on || server.ends_on}
                     <span class="flex items-center gap-1">
                         <CalendarRange class="size-3" />
-                        {server.starts_on ?? '?'} 〜 {server.ends_on ?? '未定'}
+                        {t('Date range: :start - :end', {
+                            start: server.starts_on ?? '?',
+                            end: server.ends_on ?? t('Undecided'),
+                        })}
                     </span>
                 {/if}
             </span>
@@ -113,8 +121,10 @@
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={`${server.name}をフォルダへ移動`}
-                        title="フォルダへ移動"
+                        aria-label={t('Move :name to a folder', {
+                            name: server.name,
+                        })}
+                        title={t('Move to folder')}
                         disabled={moving}
                         onclick={(event) => {
                             event.stopPropagation();
@@ -129,7 +139,7 @@
             </DropdownMenu.DropdownMenuTrigger>
             <DropdownMenu.DropdownMenuContent align="end" class="w-56">
                 <DropdownMenu.DropdownMenuLabel>
-                    移動先のフォルダ
+                    {t('Folder destination')}
                 </DropdownMenu.DropdownMenuLabel>
                 <DropdownMenu.DropdownMenuSeparator />
                 <DropdownMenu.DropdownMenuGroup>
@@ -143,7 +153,9 @@
                                     moveToFolder(null, props.onClick);
                                 }}
                             >
-                                <span class="flex-1 text-left">未分類</span>
+                                <span class="flex-1 text-left">
+                                    {t('Uncategorized')}
+                                </span>
                                 {#if server.project_folder_id == null}
                                     <Check data-icon="inline-end" />
                                 {/if}
@@ -179,8 +191,8 @@
             <Button
                 variant="ghost"
                 size="icon"
-                aria-label={`${server.name}の設定`}
-                title="プロジェクト設定"
+                aria-label={t('Settings for :name', { name: server.name })}
+                title={t('Project settings')}
                 onclick={(event) => {
                     event.stopPropagation();
                     onEdit(server);

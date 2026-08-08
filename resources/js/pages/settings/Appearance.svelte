@@ -15,6 +15,7 @@
     import AppearanceTabs from '@/components/AppearanceTabs.svelte';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
+    import LanguageSwitcher from '@/components/LanguageSwitcher.svelte';
     import { t } from '@/lib/i18n';
 </script>
 
@@ -28,5 +29,6 @@
         title={t('Appearance settings')}
         description={t('Update the appearance settings for your account')}
     />
+    <LanguageSwitcher class="w-full sm:max-w-xs" />
     <AppearanceTabs />
 </div>

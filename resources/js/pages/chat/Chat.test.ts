@@ -144,7 +144,7 @@ describe('Chat composer', () => {
         renderChat();
 
         expect(screen.getByText('チャンネル')).toBeTruthy();
-        expect(screen.getByText('2026-08-01 〜 2026-08-07')).toBeTruthy();
+        expect(screen.getByText('2026年8月1日 〜 2026年8月7日')).toBeTruthy();
     });
 
     it('does not send for plain or IME composition Enter', async () => {

@@ -1,5 +1,7 @@
+import { page } from '@inertiajs/svelte';
+
 /**
- * Shared date/time formatting helpers (ja-JP locale).
+ * Shared date/time formatting helpers.
  *
  * These centralise the formatters that previously lived in each component:
  *   - formatDate / formatDateTime  (Tasks, TodoPanel, MessageItem, Files)
@@ -36,7 +38,7 @@ export function timeInputValue(value: string | null | undefined): string {
 interface DateFormatOptions {
     /** Include the year in the output. Default: true. */
     year?: boolean;
-    /** Month style. Default: 'short' (e.g. 8月). */
+    /** Month style. Default: 'short'. */
     month?: 'numeric' | 'short' | 'long';
     /** Fallback text when iso is empty/invalid. Default: ''. */
     fallback?: string;
@@ -57,7 +59,15 @@ function parseOrNull(iso: string | null | undefined): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/** e.g. 2026年8月3日 (year on, month short) or 8月3日 (year off). */
+export function currentLocale(): string | undefined {
+    const locale = page.props.locale;
+
+    return typeof locale === 'string' && locale
+        ? locale.replaceAll('_', '-')
+        : undefined;
+}
+
+/** Format a date with the active application locale. */
 export function localDateTimeIso(date: string, time: string): string | null {
     if (!date) {
         return null;
@@ -80,14 +90,14 @@ export function formatDate(
         return options.fallback ?? '';
     }
 
-    return parsed.toLocaleDateString('ja-JP', {
+    return parsed.toLocaleDateString(currentLocale(), {
         year: options.year === false ? undefined : 'numeric',
         month: options.month ?? 'short',
         day: 'numeric',
     });
 }
 
-/** e.g. 2026年8月3日 14:05 (year on, month short) or 8/3 14:05 (year off, numeric). */
+/** Format a date and time with the active application locale. */
 export function formatDateTime(
     iso: string | null | undefined,
     options: DateFormatOptions = {},
@@ -98,7 +108,7 @@ export function formatDateTime(
         return options.fallback ?? '';
     }
 
-    return parsed.toLocaleString('ja-JP', {
+    return parsed.toLocaleString(currentLocale(), {
         year: options.year === false ? undefined : 'numeric',
         month: options.month ?? 'short',
         day: 'numeric',
@@ -107,7 +117,7 @@ export function formatDateTime(
     });
 }
 
-/** e.g. 14:05 */
+/** Format a time with the active application locale. */
 export function formatTime(iso: string | null | undefined): string {
     const parsed = parseOrNull(iso);
 
@@ -115,7 +125,7 @@ export function formatTime(iso: string | null | undefined): string {
         return '';
     }
 
-    return parsed.toLocaleTimeString('ja-JP', {
+    return parsed.toLocaleTimeString(currentLocale(), {
         hour: '2-digit',
         minute: '2-digit',
     });

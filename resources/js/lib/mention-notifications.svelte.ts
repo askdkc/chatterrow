@@ -2,6 +2,7 @@ import { router } from '@inertiajs/svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { getEcho } from '@/lib/echo';
 import { apiJson } from '@/lib/http';
+import { t } from '@/lib/i18n';
 import type { NotificationIndexResource, NotificationResource } from '@/types';
 
 export type MentionNotificationState = {
@@ -220,7 +221,7 @@ async function loadNotifications(
             state.error =
                 error instanceof Error
                     ? error.message
-                    : '通知の読み込みに失敗しました';
+                    : t('Failed to load notifications');
 
             throw error;
         })

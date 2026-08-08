@@ -15,6 +15,7 @@
     } from '@/components/ui/card';
     import { Spinner } from '@/components/ui/spinner';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type { ProjectInvitationResource, ServerResource } from '@/types';
 
     let {
@@ -55,7 +56,7 @@
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '招待への回答に失敗しました';
+                    : t('Failed to respond to invitation');
         } finally {
             pendingAction = null;
         }
@@ -64,15 +65,16 @@
 
 <Card>
     <CardHeader>
-        <CardTitle>{invitation.server?.name ?? 'プロジェクト'}</CardTitle>
+        <CardTitle>{invitation.server?.name ?? t('Project')}</CardTitle>
         <CardDescription>
-            {invitation.inviter?.name ??
-                'プロジェクト管理者'}さんから参加を招待されています。
+            {t('You have been invited to join the project by :name.', {
+                name: invitation.inviter?.name ?? t('Project administrator'),
+            })}
         </CardDescription>
         <CardAction>
             <Badge variant="secondary">
                 <Mail data-icon="inline-start" />
-                招待
+                {t('Invitation')}
             </Badge>
         </CardAction>
     </CardHeader>
@@ -101,7 +103,7 @@
             {#if pendingAction === 'decline'}
                 <Spinner data-icon="inline-start" />
             {/if}
-            参加しない
+            {t('Decline project invitation')}
         </Button>
         <Button
             type="button"
@@ -111,7 +113,7 @@
             {#if pendingAction === 'accept'}
                 <Spinner data-icon="inline-start" />
             {/if}
-            参加する
+            {t('Accept project invitation')}
         </Button>
     </CardFooter>
 </Card>

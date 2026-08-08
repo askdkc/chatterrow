@@ -23,6 +23,7 @@
     import { Spinner } from '@/components/ui/spinner';
     import { Textarea } from '@/components/ui/textarea';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type {
         ProjectInvitationResource,
         ServerResource,
@@ -149,7 +150,7 @@
 
     function setProjectIconFile(file: File) {
         if (!allowedIconTypes.has(file.type)) {
-            error = 'PNG、JPEG、GIF、WebP画像を選択してください';
+            error = t('Please select a PNG, JPEG, GIF, or WebP image.');
 
             if (projectIconInput) {
                 projectIconInput.value = '';
@@ -159,7 +160,7 @@
         }
 
         if (file.size > maxIconBytes) {
-            error = 'プロジェクトアイコンは1MB以下にしてください';
+            error = t('Project icon must be 1 MB or smaller.');
 
             if (projectIconInput) {
                 projectIconInput.value = '';
@@ -238,12 +239,12 @@
             }
 
             onUpdated?.(data.server);
-            success = 'プロジェクト情報を保存しました';
+            success = t('Project information saved.');
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'プロジェクト情報の保存に失敗しました';
+                    : t('Failed to save project information.');
         } finally {
             savingProject = false;
         }
@@ -266,7 +267,7 @@
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '招待状況の取得に失敗しました';
+                    : t('Failed to load invitation status.');
         } finally {
             loadingInvitations = false;
         }
@@ -297,14 +298,16 @@
             ];
             success =
                 data.delivery === 'email'
-                    ? 'アカウント作成ページへの案内メールを送信しました'
-                    : '招待を送信しました。相手の回答待ちです';
+                    ? t(
+                          'We sent an email with instructions to create an account.',
+                      )
+                    : t('Invitation sent. Waiting for their response.');
             email = '';
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '招待の送信に失敗しました';
+                    : t('Failed to send invitation.');
         } finally {
             addingMember = false;
         }
@@ -327,12 +330,14 @@
             currentInvitations = currentInvitations.map((item) =>
                 item.id === data.invitation.id ? data.invitation : item,
             );
-            success = `${invitation.email} に招待を再送しました`;
+            success = t('Invitation resent to :email.', {
+                email: invitation.email,
+            });
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '招待の再送に失敗しました';
+                    : t('Failed to resend invitation.');
         } finally {
             invitationActionId = null;
         }
@@ -354,12 +359,14 @@
             currentInvitations = currentInvitations.filter(
                 (item) => item.id !== invitation.id,
             );
-            success = `${invitation.email} への招待を削除しました`;
+            success = t('Invitation to :email deleted.', {
+                email: invitation.email,
+            });
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '招待の削除に失敗しました';
+                    : t('Failed to delete invitation.');
         } finally {
             invitationActionId = null;
         }
@@ -382,13 +389,13 @@
                 (item) => item.id !== member.id,
             );
             onMembersUpdated?.(currentMembers);
-            success = `${member.name} を削除しました`;
+            success = t('Removed :name.', { name: member.name });
             memberToRemove = null;
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'メンバーの削除に失敗しました';
+                    : t('Failed to remove member.');
         } finally {
             removingMember = false;
         }
@@ -419,13 +426,17 @@
             onMembersUpdated?.(currentMembers);
             success =
                 role === 'admin'
-                    ? `${member.name}を管理者に設定しました`
-                    : `${member.name}を一般メンバーに変更しました`;
+                    ? t('Set :name as an administrator.', {
+                          name: member.name,
+                      })
+                    : t('Changed :name to a regular member.', {
+                          name: member.name,
+                      });
         } catch (exception) {
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : '管理者権限の変更に失敗しました';
+                    : t('Failed to change administrator permissions.');
         } finally {
             roleActionId = null;
         }
@@ -456,7 +467,7 @@
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'プロジェクトのアーカイブに失敗しました';
+                    : t('Failed to archive project.');
         } finally {
             projectActionPending = false;
         }
@@ -482,7 +493,7 @@
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'プロジェクトの復元に失敗しました';
+                    : t('Failed to restore project.');
         } finally {
             projectActionPending = false;
         }
@@ -509,7 +520,7 @@
             error =
                 exception instanceof HttpError
                     ? exception.messageText()
-                    : 'プロジェクトの削除に失敗しました';
+                    : t('Failed to delete project.');
         } finally {
             projectActionPending = false;
         }
@@ -522,16 +533,16 @@
     >
         <div class="flex items-start justify-between gap-4">
             <div class="flex flex-col gap-1">
-                <Dialog.DialogTitle>プロジェクト設定</Dialog.DialogTitle>
+                <Dialog.DialogTitle>{t('Project settings')}</Dialog.DialogTitle>
                 <Dialog.DialogDescription>
-                    プロジェクト情報と参加メンバーを管理します。
+                    {t('Manage project information and members.')}
                 </Dialog.DialogDescription>
             </div>
             <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="閉じる"
+                aria-label={t('Close')}
                 onclick={closeDialog}
             >
                 <X data-icon="inline-start" />
@@ -543,7 +554,9 @@
                 <Alert.Alert>
                     <ArchiveIcon />
                     <Alert.AlertDescription>
-                        このプロジェクトはアーカイブ済みです。編集や投稿を再開するには復元してください。
+                        {t(
+                            'This project is archived. Restore it to resume editing and posting.',
+                        )}
                     </Alert.AlertDescription>
                 </Alert.Alert>
             {/if}
@@ -570,10 +583,12 @@
                 <Field.FieldGroup class="gap-4">
                     <Field.FieldSet>
                         <Field.FieldLegend variant="label">
-                            プロジェクトアイコン
+                            {t('Project icon')}
                         </Field.FieldLegend>
                         <Field.FieldDescription>
-                            未設定の場合はプロジェクト名の先頭文字を表示します。
+                            {t(
+                                'When no icon is set, the first letter of the project name is shown.',
+                            )}
                         </Field.FieldDescription>
 
                         <div class="flex items-start gap-4">
@@ -590,7 +605,7 @@
                                     <span
                                         class="text-center text-[10px] leading-tight text-muted-foreground"
                                     >
-                                        クリックまたは<br />ドロップ
+                                        {t('Click or')}<br />{t('Drop')}
                                     </span>
                                 {/if}
                             </div>
@@ -600,7 +615,7 @@
                                     data-disabled={!canEdit || undefined}
                                 >
                                     <Field.FieldLabel for="project-icon">
-                                        アイコン画像
+                                        {t('Icon image')}
                                     </Field.FieldLabel>
                                     <Input
                                         id="project-icon"
@@ -611,7 +626,9 @@
                                         onchange={selectProjectIcon}
                                     />
                                     <Field.FieldDescription>
-                                        PNG・JPEG・GIF・WebP、16〜8192px、最大1MB。512px超は自動縮小
+                                        {t(
+                                            'PNG, JPEG, GIF, or WebP; 16-8192 px; max 1 MB. Images over 512 px are resized automatically.',
+                                        )}
                                     </Field.FieldDescription>
                                     {#if canEdit && projectIconPreviewUrl}
                                         <Button
@@ -620,7 +637,7 @@
                                             size="sm"
                                             onclick={clearProjectIcon}
                                         >
-                                            アイコンを削除
+                                            {t('Remove icon')}
                                         </Button>
                                     {/if}
                                 </Field.Field>
@@ -630,7 +647,7 @@
 
                     <Field.Field data-disabled={!canEdit || undefined}>
                         <Field.FieldLabel for="project-name">
-                            プロジェクト名
+                            {t('Project name')}
                         </Field.FieldLabel>
                         <Input
                             id="project-name"
@@ -644,7 +661,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <Field.Field data-disabled={!canEdit || undefined}>
                             <Field.FieldLabel for="project-starts-on">
-                                開始日
+                                {t('Start date')}
                             </Field.FieldLabel>
                             <Input
                                 id="project-starts-on"
@@ -655,7 +672,7 @@
                         </Field.Field>
                         <Field.Field data-disabled={!canEdit || undefined}>
                             <Field.FieldLabel for="project-ends-on">
-                                終了日
+                                {t('End date')}
                             </Field.FieldLabel>
                             <Input
                                 id="project-ends-on"
@@ -669,7 +686,7 @@
 
                     <Field.Field data-disabled={!canEdit || undefined}>
                         <Field.FieldLabel for="project-description">
-                            内容（任意）
+                            {t('Description (optional)')}
                         </Field.FieldLabel>
                         <Textarea
                             id="project-description"
@@ -679,7 +696,9 @@
                             rows={4}
                         />
                         <Field.FieldDescription>
-                            開始日・終了日はカレンダーとガントチャートに反映されます。
+                            {t(
+                                'Start and end dates are reflected in the calendar and Gantt chart.',
+                            )}
                         </Field.FieldDescription>
                     </Field.Field>
                 </Field.FieldGroup>
@@ -693,7 +712,7 @@
                             {#if savingProject}
                                 <Spinner data-icon="inline-start" />
                             {/if}
-                            保存
+                            {t('Save')}
                         </Button>
                     </div>
                 {/if}
@@ -702,9 +721,11 @@
             <Separator />
 
             <Field.FieldSet>
-                <Field.FieldLegend>メンバー</Field.FieldLegend>
+                <Field.FieldLegend>{t('Members')}</Field.FieldLegend>
                 <Field.FieldDescription>
-                    メールアドレスで招待します。未登録の場合はアカウント作成ページをメールで案内します。
+                    {t(
+                        'Invite people by email. If they are not registered, we will email them instructions to create an account.',
+                    )}
                 </Field.FieldDescription>
 
                 {#if canEdit}
@@ -714,7 +735,7 @@
                                 for="member-email"
                                 class="sr-only"
                             >
-                                メンバーのメールアドレス
+                                {t('Member email address')}
                             </Field.FieldLabel>
                             <InputGroup.Root>
                                 <InputGroup.Input
@@ -743,7 +764,7 @@
                                                 data-icon="inline-start"
                                             />
                                         {/if}
-                                        招待
+                                        {t('Invite')}
                                     </Button>
                                 </InputGroup.Addon>
                             </InputGroup.Root>
@@ -753,13 +774,15 @@
 
                 {#if canManage && (loadingInvitations || currentInvitations.length > 0)}
                     <div class="flex flex-col gap-2">
-                        <p class="text-sm font-medium">招待状況</p>
+                        <p class="text-sm font-medium">
+                            {t('Invitation status')}
+                        </p>
                         {#if loadingInvitations}
                             <div
                                 class="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"
                             >
                                 <Spinner />
-                                読み込み中
+                                {t('Loading')}
                             </div>
                         {:else}
                             {#each currentInvitations as invitation (invitation.id)}
@@ -788,15 +811,19 @@
                                             </p>
                                             {#if invitation.status === 'declined'}
                                                 <Badge variant="destructive"
-                                                    >拒否</Badge
+                                                    >{t('Declined')}</Badge
                                                 >
                                             {:else if invitation.registered}
                                                 <Badge variant="outline"
-                                                    >回答待ち</Badge
+                                                    >{t(
+                                                        'Awaiting response',
+                                                    )}</Badge
                                                 >
                                             {:else}
                                                 <Badge variant="secondary"
-                                                    >登録待ち</Badge
+                                                    >{t(
+                                                        'Awaiting registration',
+                                                    )}</Badge
                                                 >
                                             {/if}
                                         </div>
@@ -830,7 +857,7 @@
                                                         data-icon="inline-start"
                                                     />
                                                 {/if}
-                                                再送
+                                                {t('Resend')}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -846,7 +873,7 @@
                                                 <Trash2
                                                     data-icon="inline-start"
                                                 />
-                                                招待を削除
+                                                {t('Delete invitation')}
                                             </Button>
                                         </div>
                                     {/if}
@@ -872,7 +899,8 @@
                                         {member.name}
                                     </p>
                                     {#if isAdministrator(member)}
-                                        <Badge variant="secondary">管理者</Badge
+                                        <Badge variant="secondary"
+                                            >{t('Administrator')}</Badge
                                         >
                                     {/if}
                                 </div>
@@ -909,14 +937,16 @@
                                             />
                                         {/if}
                                         {isAdministrator(member)
-                                            ? '管理者から外す'
-                                            : '管理者にする'}
+                                            ? t('Remove administrator role')
+                                            : t('Make administrator')}
                                     </Button>
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`${member.name}を削除`}
+                                        aria-label={t('Remove :name', {
+                                            name: member.name,
+                                        })}
                                         disabled={roleActionId !== null}
                                         onclick={() =>
                                             (memberToRemove = member)}
@@ -938,9 +968,13 @@
                     aria-labelledby="danger-zone"
                 >
                     <div class="flex flex-col gap-1">
-                        <h3 id="danger-zone" class="font-medium">管理操作</h3>
+                        <h3 id="danger-zone" class="font-medium">
+                            {t('Administrative actions')}
+                        </h3>
                         <p class="text-sm text-muted-foreground">
-                            アーカイブは復元できます。削除するとプロジェクト内のデータはすべて失われます。
+                            {t(
+                                'Archived projects can be restored. Deleting a project permanently removes all of its data.',
+                            )}
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -956,7 +990,7 @@
                                 {:else}
                                     <RotateCcw data-icon="inline-start" />
                                 {/if}
-                                復元
+                                {t('Restore')}
                             </Button>
                         {:else}
                             <Button
@@ -965,7 +999,7 @@
                                 onclick={() => (archiveConfirmationOpen = true)}
                             >
                                 <ArchiveIcon data-icon="inline-start" />
-                                アーカイブ
+                                {t('Archive')}
                             </Button>
                         {/if}
                         <Button
@@ -974,7 +1008,7 @@
                             onclick={() => (deleteConfirmationOpen = true)}
                         >
                             <Trash2 data-icon="inline-start" />
-                            完全に削除
+                            {t('Delete permanently')}
                         </Button>
                     </div>
                 </section>
@@ -984,7 +1018,7 @@
         <div class="mt-6">
             <Dialog.DialogFooter>
                 <Button type="button" variant="outline" onclick={closeDialog}>
-                    閉じる
+                    {t('Close')}
                 </Button>
             </Dialog.DialogFooter>
         </div>
@@ -995,19 +1029,21 @@
     <AlertDialog.Content>
         <AlertDialog.Header>
             <AlertDialog.Title>
-                「{server.name}」をアーカイブしますか？
+                {t('Archive ":name"?', { name: server.name })}
             </AlertDialog.Title>
             <AlertDialog.Description>
-                サイドバーから非表示になり、編集や投稿が停止されます。プロジェクト一覧からいつでも復元できます。
+                {t(
+                    'The project will be hidden from the sidebar and editing and posting will be disabled. You can restore it from the project list at any time.',
+                )}
             </AlertDialog.Description>
         </AlertDialog.Header>
         <AlertDialog.Footer>
-            <AlertDialog.Cancel>キャンセル</AlertDialog.Cancel>
+            <AlertDialog.Cancel>{t('Cancel')}</AlertDialog.Cancel>
             <AlertDialog.Action
                 onclick={archiveProject}
                 disabled={projectActionPending}
             >
-                アーカイブ
+                {t('Archive')}
             </AlertDialog.Action>
         </AlertDialog.Footer>
     </AlertDialog.Content>
@@ -1024,20 +1060,24 @@
     <AlertDialog.Content>
         <AlertDialog.Header>
             <AlertDialog.Title>
-                {memberToRemove?.name ?? 'このメンバー'}を削除しますか？
+                {t('Are you sure you want to remove :name?', {
+                    name: memberToRemove?.name ?? t('this member'),
+                })}
             </AlertDialog.Title>
             <AlertDialog.Description>
-                プロジェクトへアクセスできなくなります。担当中のタスクがある場合は削除できません。
+                {t(
+                    'They will lose access to the project. Members with assigned tasks cannot be removed.',
+                )}
             </AlertDialog.Description>
         </AlertDialog.Header>
         <AlertDialog.Footer>
-            <AlertDialog.Cancel>キャンセル</AlertDialog.Cancel>
+            <AlertDialog.Cancel>{t('Cancel')}</AlertDialog.Cancel>
             <AlertDialog.Action
                 variant="destructive"
                 onclick={removeMember}
                 disabled={removingMember}
             >
-                削除
+                {t('Delete')}
             </AlertDialog.Action>
         </AlertDialog.Footer>
     </AlertDialog.Content>
@@ -1047,20 +1087,22 @@
     <AlertDialog.Content>
         <AlertDialog.Header>
             <AlertDialog.Title>
-                「{server.name}」を完全に削除しますか？
+                {t('Delete ":name" permanently?', { name: server.name })}
             </AlertDialog.Title>
             <AlertDialog.Description>
-                この操作は取り消せません。チャンネル、メッセージ、タスク、ファイルを含むすべてのデータが削除されます。
+                {t(
+                    'This cannot be undone. All data, including channels, messages, tasks, and files, will be deleted.',
+                )}
             </AlertDialog.Description>
         </AlertDialog.Header>
         <AlertDialog.Footer>
-            <AlertDialog.Cancel>キャンセル</AlertDialog.Cancel>
+            <AlertDialog.Cancel>{t('Cancel')}</AlertDialog.Cancel>
             <AlertDialog.Action
                 variant="destructive"
                 onclick={deleteProject}
                 disabled={projectActionPending}
             >
-                完全に削除
+                {t('Delete permanently')}
             </AlertDialog.Action>
         </AlertDialog.Footer>
     </AlertDialog.Content>

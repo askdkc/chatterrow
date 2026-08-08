@@ -23,6 +23,7 @@
         singleChannelTitle,
     } from '@/lib/gantt';
     import { buildGanttPdf } from '@/lib/gantt-pdf';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import { cn } from '@/lib/utils';
     import type {
@@ -133,7 +134,7 @@
 
     const formatRange = (iso: string | null): string => {
         if (!iso) {
-            return '未設定';
+            return t('Not set');
         }
 
         return formatDateOnly(iso, {
@@ -182,7 +183,7 @@
         }
 
         pdfPreviewUrl = URL.createObjectURL(doc.output('blob'));
-        pdfFileName = `${channelHeaderTitle ?? server.name}-ガント.pdf`;
+        pdfFileName = `${channelHeaderTitle ?? server.name}-${t('Gantt')}.pdf`;
     }
 
     function closePdfPreview() {
@@ -216,34 +217,38 @@
             <Link
                 href={`/servers/${server.id}`}
                 class="rounded p-1 transition hover:bg-accent hover:text-accent-foreground"
-                aria-label="プロジェクトへ戻る"
+                aria-label={t('Back to project')}
             >
                 <ArrowLeft class="size-4" />
             </Link>
             <CalendarRange class="size-4 text-brand-accent" />
-            <h1 class="text-base font-bold">ガントチャート</h1>
+            <h1 class="text-base font-bold">{t('Gantt chart')}</h1>
             <div
                 data-gantt-legend
                 class="ml-auto flex items-center gap-3 text-sm text-muted-foreground"
             >
-                <Button variant="ghost" onclick={exportPdf} title="PDF出力">
+                <Button
+                    variant="ghost"
+                    onclick={exportPdf}
+                    title={t('Export PDF')}
+                >
                     <FileDown data-icon="inline-start" />
-                    PDF出力
+                    {t('Export PDF')}
                 </Button>
                 {#if !channelHeaderTitle}
                     <span class="flex items-center gap-1.5">
                         <span class="size-2.5 rounded-sm bg-gantt-channel"
                         ></span>
-                        チャンネル
+                        {t('Channels')}
                     </span>
                 {/if}
                 <span class="flex items-center gap-1.5">
                     <span class="size-2.5 rounded-sm bg-gantt-task"></span>
-                    タスク
+                    {t('Tasks')}
                 </span>
                 <span class="flex items-center gap-1.5">
                     <span class="size-2.5 rounded-sm bg-gantt-complete"></span>
-                    完了
+                    {t('Completed')}
                 </span>
             </div>
         </header>
@@ -294,7 +299,7 @@
                             {channelHeaderTitle}
                         </span>
                     {:else}
-                        タスク
+                        {t('Tasks')}
                     {/if}
                 </div>
                 {#each ticks as day (day)}
@@ -306,13 +311,13 @@
                             day !== today && day % 7 === 0 && 'bg-muted/50',
                         )}
                         style={`grid-column: ${day - rangeStart + 2}; grid-row: 1;`}
-                        title={day === today ? '今日' : undefined}
+                        title={day === today ? t('Today') : undefined}
                     >
                         {#if day === today}
                             <span
                                 class="rounded-md border border-brand-accent bg-background px-1.5 py-0.5 text-[11px] font-semibold leading-none text-brand-accent"
                             >
-                                今日
+                                {t('Today')}
                             </span>
                         {/if}
                         <span>{formatTick(day)}</span>
@@ -364,7 +369,10 @@
                                     ? 'true'
                                     : 'false'}
                                 class={`mx-1 h-6 w-full min-w-0 truncate rounded-md px-2 text-xs font-semibold leading-6 ${barClass(task)}`}
-                                title={`${task.title} (${formatRange(task.start)} 〜 ${formatRange(task.end)})`}
+                                title={t('Date range: :start - :end', {
+                                    start: formatRange(task.start),
+                                    end: formatRange(task.end),
+                                })}
                             >
                                 {task.title}
                             </div>

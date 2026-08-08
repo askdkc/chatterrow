@@ -75,7 +75,7 @@ class MessageReactionController extends Controller
                 'max:32',
                 function (string $attribute, mixed $value, Closure $fail): void {
                     if (! is_string($value) || ! $this->isValidReaction($value)) {
-                        $fail('絵文字または4文字以内の文字ハンコを指定してください。');
+                        $fail(__('Please specify an emoji or a text stamp with up to 4 characters.'));
                     }
                 },
             ],

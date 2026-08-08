@@ -8,6 +8,7 @@
     import { Spinner } from '@/components/ui/spinner';
     import { Textarea } from '@/components/ui/textarea';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type { ServerResource } from '@/types';
 
     let {
@@ -43,7 +44,7 @@
         'image/webp',
     ]);
     const previewServer = $derived({
-        name: name || 'プロジェクト',
+        name: name || t('Project'),
         icon_url: iconPreviewUrl,
     });
 
@@ -84,7 +85,7 @@
 
     function setIconFile(file: File) {
         if (!allowedIconTypes.has(file.type)) {
-            error = 'PNG、JPEG、GIF、WebP画像を選択してください';
+            error = t('Please select a PNG, JPEG, GIF, or WebP image.');
 
             if (iconInput) {
                 iconInput.value = '';
@@ -94,7 +95,7 @@
         }
 
         if (file.size > maxIconBytes) {
-            error = 'プロジェクトアイコンは1MB以下にしてください';
+            error = t('Project icon must be 1 MB or smaller.');
 
             if (iconInput) {
                 iconInput.value = '';
@@ -179,8 +180,8 @@
                 exception instanceof HttpError
                     ? exception.messageText()
                     : isEditing
-                      ? '保存に失敗しました'
-                      : '作成に失敗しました';
+                      ? t('Failed to save project')
+                      : t('Failed to create project');
         } finally {
             saving = false;
         }
@@ -210,17 +211,19 @@
             <div class="flex items-start justify-between gap-4">
                 <div class="flex flex-col gap-1">
                     <Dialog.DialogTitle>
-                        {isEditing ? 'プロジェクト設定' : 'プロジェクトを作成'}
+                        {isEditing
+                            ? t('Project settings')
+                            : t('Create project')}
                     </Dialog.DialogTitle>
                     <Dialog.DialogDescription>
-                        名前、期間、アイコンを設定します。
+                        {t('Set the project name, dates, and icon.')}
                     </Dialog.DialogDescription>
                 </div>
                 <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label="閉じる"
+                    aria-label={t('Close')}
                     onclick={close}
                 >
                     <X />
@@ -230,23 +233,25 @@
             <Field.FieldGroup>
                 <Field.Field>
                     <Field.FieldLabel for="server-name">
-                        プロジェクト名
+                        {t('Project name')}
                     </Field.FieldLabel>
                     <Input
                         id="server-name"
                         bind:value={name}
                         maxlength={80}
-                        placeholder="例: プロジェクトA"
+                        placeholder={t('e.g. Project A')}
                         autofocus
                     />
                 </Field.Field>
 
                 <Field.FieldSet>
                     <Field.FieldLegend variant="label">
-                        プロジェクトアイコン
+                        {t('Project icon')}
                     </Field.FieldLegend>
                     <Field.FieldDescription>
-                        未設定の場合はプロジェクト名の先頭文字を表示します。
+                        {t(
+                            'When no icon is set, the first letter of the project name is shown.',
+                        )}
                     </Field.FieldDescription>
 
                     <div class="flex items-start gap-4">
@@ -259,14 +264,14 @@
                             <span
                                 class="text-center text-[10px] leading-tight text-muted-foreground"
                             >
-                                クリックまたは<br />ドロップ
+                                {t('Click or')}<br />{t('Drop')}
                             </span>
                         </div>
 
                         <Field.FieldGroup class="min-w-0 flex-1">
                             <Field.Field>
                                 <Field.FieldLabel for="server-icon">
-                                    アイコン画像
+                                    {t('Icon image')}
                                 </Field.FieldLabel>
                                 <Input
                                     id="server-icon"
@@ -276,7 +281,9 @@
                                     onchange={selectIcon}
                                 />
                                 <Field.FieldDescription>
-                                    PNG・JPEG・GIF・WebP、16〜8192px、最大1MB。512px超は自動縮小
+                                    {t(
+                                        'PNG, JPEG, GIF, or WebP; 16-8192 px; max 1 MB. Images over 512 px are resized automatically.',
+                                    )}
                                 </Field.FieldDescription>
                                 {#if iconPreviewUrl}
                                     <Button
@@ -285,7 +292,7 @@
                                         size="sm"
                                         onclick={clearIcon}
                                     >
-                                        アイコンを削除
+                                        {t('Remove icon')}
                                     </Button>
                                 {/if}
                             </Field.Field>
@@ -295,7 +302,7 @@
 
                 <Field.Field>
                     <Field.FieldLabel for="server-description">
-                        内容（任意）
+                        {t('Description (optional)')}
                     </Field.FieldLabel>
                     <Textarea
                         id="server-description"
@@ -308,7 +315,7 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     <Field.Field>
                         <Field.FieldLabel for="server-starts-on">
-                            開始日
+                            {t('Start date')}
                         </Field.FieldLabel>
                         <Input
                             id="server-starts-on"
@@ -318,7 +325,7 @@
                     </Field.Field>
                     <Field.Field>
                         <Field.FieldLabel for="server-ends-on">
-                            終了日
+                            {t('End date')}
                         </Field.FieldLabel>
                         <Input
                             id="server-ends-on"
@@ -330,7 +337,9 @@
                 </div>
 
                 <Field.FieldDescription>
-                    開始日・終了日はカレンダーとガントチャートに反映されます。
+                    {t(
+                        'Start and end dates are reflected in the calendar and Gantt chart.',
+                    )}
                 </Field.FieldDescription>
 
                 {#if error}
@@ -342,13 +351,13 @@
 
             <Dialog.DialogFooter>
                 <Button type="button" variant="outline" onclick={close}>
-                    キャンセル
+                    {t('Cancel')}
                 </Button>
                 <Button type="submit" disabled={saving || !name.trim()}>
                     {#if saving}
                         <Spinner data-icon="inline-start" />
                     {/if}
-                    {isEditing ? '保存' : '作成'}
+                    {isEditing ? t('Save') : t('Create')}
                 </Button>
             </Dialog.DialogFooter>
         </form>

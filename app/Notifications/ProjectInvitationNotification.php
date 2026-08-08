@@ -27,21 +27,25 @@ class ProjectInvitationNotification extends Notification
     {
         $this->invitation->loadMissing(['server:id,name', 'inviter:id,name']);
 
+        $projectName = $this->invitation->server->name;
         $inviterName = $this->invitation->invited_by === null
-            ? 'プロジェクト管理者'
+            ? __('Project administrator')
             : $this->invitation->inviter->name;
         $url = $this->hasAccount
             ? route('servers.index')
             : route('register', ['invitation' => $this->plainToken]);
 
         return (new MailMessage)
-            ->subject("「{$this->invitation->server->name}」への招待")
-            ->greeting('プロジェクトへの招待が届きました')
-            ->line("{$inviterName}さんから「{$this->invitation->server->name}」へ招待されています。")
+            ->subject(__('Project invitation for :project', ['project' => $projectName]))
+            ->greeting(__('You have received a project invitation'))
+            ->line(__(':inviter invited you to join :project.', [
+                'inviter' => $inviterName,
+                'project' => $projectName,
+            ]))
             ->line($this->hasAccount
-                ? 'ログイン後、プロジェクト一覧で参加または辞退を選択してください。'
-                : 'アカウントを作成すると、プロジェクト一覧で参加または辞退を選択できます。')
-            ->action($this->hasAccount ? '招待を確認する' : 'アカウントを作成する', $url)
-            ->line('心当たりがない場合は、このメールを無視してください。');
+                ? __('After logging in, choose whether to join or decline the invitation in the project list.')
+                : __('After creating your account, choose whether to join or decline the invitation in the project list.'))
+            ->action($this->hasAccount ? __('Review invitation') : __('Create account'), $url)
+            ->line(__('If you did not expect this invitation, you can ignore this email.'));
     }
 }

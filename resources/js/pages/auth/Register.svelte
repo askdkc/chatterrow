@@ -40,10 +40,14 @@
     <Alert.Alert class="mb-6">
         <Mail />
         <Alert.AlertTitle>
-            「{invitation.server_name}」へ招待されています
+            {t('You have been invited to join :name.', {
+                name: invitation.server_name,
+            })}
         </Alert.AlertTitle>
         <Alert.AlertDescription>
-            アカウント作成後、プロジェクト一覧で参加または辞退を選択してください。
+            {t(
+                'After creating your account, choose whether to accept or decline the invitation in the project list.',
+            )}
         </Alert.AlertDescription>
     </Alert.Alert>
 {/if}

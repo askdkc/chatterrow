@@ -18,15 +18,18 @@
     } from 'lucide-svelte';
     import AppHead from '@/components/AppHead.svelte';
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
+    import LanguageSwitcher from '@/components/LanguageSwitcher.svelte';
+    import { t } from '@/lib/i18n';
     import { toUrl } from '@/lib/utils';
     import { login } from '@/routes';
     import { register } from '@/routes';
     import { index as serversIndex } from '@/routes/servers';
 
     const auth = $derived(page.props.auth);
+    const appName = $derived(page.props.name ?? 'Chatterrow');
 </script>
 
-<AppHead title="茶多楼 chatterrow" />
+<AppHead title={appName} />
 
 <div class="min-h-screen bg-background text-foreground">
     <!-- ── Header ─────────────────────────────────────────── -->
@@ -44,32 +47,35 @@
                     <div
                         class="text-[15px] font-bold tracking-wide text-foreground"
                     >
-                        茶多楼
+                        {appName}
                     </div>
                     <div class="text-[11px] text-foreground/80">chatterrow</div>
                 </div>
             </div>
-            <nav class="flex items-center gap-2">
+            <nav class="flex min-w-0 items-center gap-2">
+                <LanguageSwitcher
+                    class="w-36 max-w-[38vw] shrink-0 sm:w-40 sm:max-w-none"
+                />
                 {#if auth.user}
                     <Link
                         href={toUrl(serversIndex())}
                         class="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:bg-brand-hover"
                     >
                         <Users class="size-4" />
-                        プロジェクト一覧へ
+                        {t('Go to project list')}
                     </Link>
                 {:else}
                     <Link
                         href={toUrl(login())}
                         class="rounded-lg px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
                     >
-                        ログイン
+                        {t('Log in')}
                     </Link>
                     <Link
                         href={toUrl(register())}
                         class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:bg-brand-hover"
                     >
-                        無料で始める
+                        {t('Get started for free')}
                     </Link>
                 {/if}
             </nav>
@@ -94,25 +100,24 @@
                     class="mb-5 inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-xs font-medium text-brand-accent"
                 >
                     <Sparkles class="size-3.5" />
-                    チャットでつながる一元管理グループウェア
+                    {t('A unified team workspace connected by chat')}
                 </div>
                 <h1
                     class="text-4xl leading-tight font-extrabold tracking-tight text-foreground sm:text-5xl"
                 >
-                    業務の「経緯」を
+                    {t('Bring the context behind your work')}
                     <span
                         class="bg-gradient-to-r from-brand-accent to-brand-pink bg-clip-text text-transparent"
                     >
-                        ひとつの場
+                        {t('into one place')}
                     </span>
-                    に集める
                 </h1>
                 <p
                     class="mt-5 max-w-md text-[15px] leading-relaxed font-medium text-foreground/80"
                 >
-                    メールの往復や散らばったファイル、個人チャットの行き来。
-                    茶多楼は会話・決定・ファイル・タスクを同じチャネルに集約し、
-                    「誰が・何を・なぜ」がいつでも追えるチームの土台を作ります。
+                    {t(
+                        'Email threads, scattered files, and private chats. Chatterrow brings conversations, decisions, files, and tasks into the same channels, creating a foundation where teams can always trace who did what and why.',
+                    )}
                 </p>
                 <div class="mt-8 flex flex-wrap items-center gap-3">
                     {#if auth.user}
@@ -120,7 +125,7 @@
                             href={toUrl(serversIndex())}
                             class="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/30 transition hover:bg-brand-hover"
                         >
-                            マイプロジェクトへ
+                            {t('Go to my projects')}
                             <ArrowRight class="size-4" />
                         </Link>
                     {:else}
@@ -128,14 +133,14 @@
                             href={toUrl(register())}
                             class="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/30 transition hover:bg-brand-hover"
                         >
-                            アカウントを作成
+                            {t('Create an account')}
                             <ArrowRight class="size-4" />
                         </Link>
                         <Link
                             href={toUrl(login())}
                             class="rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground transition hover:bg-accent"
                         >
-                            ログイン
+                            {t('Log in')}
                         </Link>
                     {/if}
                 </div>
@@ -144,15 +149,15 @@
                 >
                     <span class="inline-flex items-center gap-1.5">
                         <CheckCircle2 class="size-3.5 text-success" />
-                        チャンネル = 業務 = タスク
+                        {t('Channel = work = task')}
                     </span>
                     <span class="inline-flex items-center gap-1.5">
                         <CheckCircle2 class="size-3.5 text-success" />
-                        期限とリマインダー
+                        {t('Deadlines and reminders')}
                     </span>
                     <span class="inline-flex items-center gap-1.5">
                         <CheckCircle2 class="size-3.5 text-success" />
-                        ファイルプレビュー
+                        {t('File previews')}
                     </span>
                 </div>
             </div>
@@ -170,18 +175,18 @@
                             <div
                                 class="flex size-11 items-center justify-center rounded-2xl bg-brand text-[13px] font-bold text-brand-foreground"
                             >
-                                茶
+                                {t('C')}
                             </div>
                             <div class="h-8 w-0.5 rounded bg-border"></div>
                             <div
                                 class="flex size-11 items-center justify-center rounded-2xl bg-background text-[13px] font-bold text-foreground transition hover:rounded-lg hover:bg-brand hover:text-brand-foreground"
                             >
-                                総
+                                {t('G')}
                             </div>
                             <div
                                 class="flex size-11 items-center justify-center rounded-2xl bg-background text-[13px] font-bold text-foreground"
                             >
-                                企
+                                {t('P')}
                             </div>
                         </div>
                         <!-- channel list -->
@@ -189,19 +194,19 @@
                             <div
                                 class="mb-3 text-[11px] font-bold tracking-wide text-foreground"
                             >
-                                総務部
+                                {t('General Affairs')}
                             </div>
                             <div
                                 class="mb-2 flex items-center gap-1.5 text-xs font-medium text-foreground/80"
                             >
                                 <Hash class="size-3.5" />
-                                全体連絡
+                                {t('Company-wide updates')}
                             </div>
                             <div
                                 class="mb-2 flex items-center gap-1.5 rounded bg-accent px-1 py-0.5 text-xs font-medium text-accent-foreground"
                             >
                                 <Hash class="size-3.5" />
-                                採用スケジュール
+                                {t('Hiring schedule')}
                                 <span
                                     class="ml-auto rounded-full bg-danger px-1.5 text-[9px] font-bold text-brand-foreground"
                                 >
@@ -212,18 +217,18 @@
                                 class="mb-2 flex items-center gap-1.5 text-xs font-medium text-foreground/80"
                             >
                                 <Hash class="size-3.5" />
-                                稟議・決裁
+                                {t('Approvals and decisions')}
                             </div>
                             <div
                                 class="mb-2 flex items-center gap-1.5 text-xs font-medium text-foreground/80"
                             >
                                 <Hash class="size-3.5" />
-                                雑談
+                                {t('Watercooler')}
                             </div>
                             <div
                                 class="mt-4 mb-2 text-[11px] font-bold tracking-wide text-foreground"
                             >
-                                タスク
+                                {t('Tasks')}
                             </div>
                             <div class="flex flex-col gap-1.5">
                                 <div class="rounded-md bg-background p-2">
@@ -236,7 +241,9 @@
                                         <span
                                             class="text-[10px] font-medium text-foreground/80"
                                         >
-                                            一次面接の日程調整
+                                            {t(
+                                                'Schedule first-round interviews',
+                                            )}
                                         </span>
                                     </div>
                                     <div
@@ -255,7 +262,7 @@
                                         <span
                                             class="text-[10px] font-medium text-foreground/80"
                                         >
-                                            求人票の更新
+                                            {t('Update job posting')}
                                         </span>
                                     </div>
                                 </div>
@@ -267,7 +274,7 @@
                                 class="flex items-center gap-1.5 border-b border-border px-4 py-2.5 text-sm font-bold text-card-foreground"
                             >
                                 <Hash class="size-4 text-foreground/80" />
-                                採用スケジュール
+                                {t('Hiring schedule')}
                             </div>
                             <div
                                 class="flex flex-1 flex-col gap-3 overflow-hidden p-4"
@@ -276,7 +283,7 @@
                                     <div
                                         class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-pink-solid text-xs font-bold text-brand-foreground"
                                     >
-                                        佐
+                                        {t('S')}
                                     </div>
                                     <div>
                                         <div
@@ -284,7 +291,7 @@
                                         >
                                             <span
                                                 class="font-semibold text-card-foreground"
-                                                >佐久間</span
+                                                >{t('Sakuma')}</span
                                             >
                                             <span
                                                 class="text-[10px] font-medium text-foreground/80"
@@ -294,9 +301,11 @@
                                         <p
                                             class="mt-0.5 text-[13px] text-card-foreground"
                                         >
-                                            面接日程、火曜に変更しました
+                                            {t(
+                                                'The interview schedule was moved to Tuesday',
+                                            )}
                                             <span class="text-brand-accent">
-                                                @採用チーム</span
+                                                @{t('Recruiting team')}</span
                                             >
                                         </p>
                                         <div
@@ -307,7 +316,9 @@
                                             />
                                             <span
                                                 class="text-[10px] font-medium text-foreground/80"
-                                                >面接スケジュール.xlsx</span
+                                                >{t(
+                                                    'Interview schedule.xlsx',
+                                                )}</span
                                             >
                                         </div>
                                     </div>
@@ -316,7 +327,7 @@
                                     <div
                                         class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-brand-foreground"
                                     >
-                                        高
+                                        {t('T')}
                                     </div>
                                     <div>
                                         <div
@@ -324,7 +335,7 @@
                                         >
                                             <span
                                                 class="font-semibold text-card-foreground"
-                                                >高橋</span
+                                                >{t('Takahashi')}</span
                                             >
                                             <span
                                                 class="text-[10px] font-medium text-foreground/80"
@@ -334,13 +345,17 @@
                                         <p
                                             class="mt-0.5 text-[13px] text-card-foreground"
                                         >
-                                            確認しました。候補者への連絡は明日までに送ります。
+                                            {t(
+                                                'Confirmed. I will contact the candidates by tomorrow.',
+                                            )}
                                         </p>
                                         <div
                                             class="mt-1.5 inline-flex items-center gap-1 rounded bg-brand/15 px-1.5 py-0.5 text-[10px] text-brand-accent"
                                         >
                                             <CheckCircle2 class="size-3" />
-                                            タスク「一次面接の日程調整」完了
+                                            {t(
+                                                'Task "Schedule first-round interviews" completed',
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -351,12 +366,14 @@
                                         class="flex items-center gap-1.5 text-[11px] font-semibold text-brand-accent"
                                     >
                                         <BellRing class="size-3.5" />
-                                        期限リマインダー
+                                        {t('Deadline reminder')}
                                     </div>
                                     <p
                                         class="mt-1 text-[11px] font-medium text-foreground/80"
                                     >
-                                        「求人票の更新」の期限は 8/5（水）です
+                                        {t(
+                                            'The deadline for "Update job posting" is Wednesday, August 5.',
+                                        )}
                                     </p>
                                 </div>
                             </div>
@@ -364,7 +381,7 @@
                                 <div
                                     class="rounded-lg bg-muted px-3 py-2.5 text-[13px] font-medium text-foreground/80"
                                 >
-                                    メッセージを送信
+                                    {t('Send a message')}
                                 </div>
                             </div>
                         </div>
@@ -377,25 +394,27 @@
         </div>
     </section>
 
-    <!-- ── 3つの考え方（記事の思想を反映） ─────────────── -->
+    <!-- ── Principles ───────────────────────────────────── -->
     <section class="border-t border-border bg-muted/40">
         <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
             <div class="mb-12 max-w-2xl">
                 <div
                     class="mb-2 text-xs font-bold tracking-widest text-brand-accent uppercase"
                 >
-                    WHY CHATTERROW
+                    {t('WHY CHATTERROW')}
                 </div>
                 <h2 class="text-2xl font-bold text-foreground sm:text-3xl">
-                    チャットは「連絡の場」から<br class="hidden sm:block" />
-                    「業務の経緯を共有する場」へ
+                    {t('Chat moves beyond simple communication')}<br
+                        class="hidden sm:block"
+                    />
+                    {t('to a place where work context is shared')}
                 </h2>
                 <p
                     class="mt-4 text-sm leading-relaxed font-medium text-foreground/80"
                 >
-                    情報が分散すると、業務の効率は下がり、経緯は失われます。
-                    茶多楼は、チームの知識を組織の財産にするための3つの原則を
-                    機能として組み込んでいます。
+                    {t(
+                        'When information is scattered, work becomes less efficient and context gets lost. Chatterrow builds three principles into the product so team knowledge becomes an organizational asset.',
+                    )}
                 </p>
             </div>
 
@@ -413,14 +432,14 @@
                         01
                     </div>
                     <h3 class="mb-2 text-[15px] font-bold text-card-foreground">
-                        情報を1か所に集める
+                        {t('Gather information in one place')}
                     </h3>
                     <p
                         class="text-[13px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        プロジェクトを組織・業務単位で作り、チャンネルを業務テーマ単位で運用。
-                        相談・進捗・資料が「業務Aチャネル」に集約され、担当者チャットで
-                        完結するもったいない運用を防ぎます。
+                        {t(
+                            'Build projects around organizations and work, and channels around work topics. Advice, progress, and materials gather in the "Work A" channel, preventing valuable context from ending in private chats.',
+                        )}
                     </p>
                 </div>
                 <!-- 2 -->
@@ -436,14 +455,14 @@
                         02
                     </div>
                     <h3 class="mb-2 text-[15px] font-bold text-card-foreground">
-                        会話・決定・ファイルを同じ場に
+                        {t('Keep conversations, decisions, and files together')}
                     </h3>
                     <p
                         class="text-[13px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        会話の流れの中でファイルを共有し、その場でプレビュー。
-                        「最終版」「修正版」の増殖を防ぎ、スレッドで細かい調整も
-                        同じチャネル内に完結させます。
+                        {t(
+                            'Share files in the flow of conversation and preview them immediately. Prevent "final" and "revised" versions from multiplying, and keep detailed adjustments in threads within the same channel.',
+                        )}
                     </p>
                 </div>
                 <!-- 3 -->
@@ -459,31 +478,31 @@
                         03
                     </div>
                     <h3 class="mb-2 text-[15px] font-bold text-card-foreground">
-                        「誰が・何を・なぜ」を残す
+                        {t('Preserve who did what and why')}
                     </h3>
                     <p
                         class="text-[13px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        チャンネル＝タスクとして期限・担当者を明示し、
-                        メンションで宛先を明確に。後から見ても判断の理由が
-                        追える記録を自動的に残します。
+                        {t(
+                            'Make deadlines and owners explicit through channel-based tasks, and clarify recipients with mentions. Automatically preserve a record of the reasoning that can be followed later.',
+                        )}
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ── 機能 ─────────────────────────────────────────── -->
+    <!-- ── Features ─────────────────────────────────────── -->
     <section class="border-t border-border">
         <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
             <div class="mb-12 max-w-2xl">
                 <div
                     class="mb-2 text-xs font-bold tracking-widest text-brand-accent uppercase"
                 >
-                    FEATURES
+                    {t('FEATURES')}
                 </div>
                 <h2 class="text-2xl font-bold text-foreground sm:text-3xl">
-                    一元管理を支える機能
+                    {t('Features that support unified work management')}
                 </h2>
             </div>
 
@@ -493,7 +512,9 @@
                 >
                     <img
                         src="/images/welcome/chat-screen.png"
-                        alt="架空の新商品プロジェクトを題材にしたチャット画面のサンプル"
+                        alt={t(
+                            'Example chat screen based on a fictional new product project',
+                        )}
                         width="1667"
                         height="943"
                         loading="lazy"
@@ -510,12 +531,14 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-bold text-card-foreground">
-                                チャット画面
+                                {t('Chat view')}
                             </h3>
                             <p
                                 class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
                             >
-                                会話、共有ファイル、タスクの進捗を同じ流れで確認できます。
+                                {t(
+                                    'Review conversations, shared files, and task progress in one flow.',
+                                )}
                             </p>
                         </div>
                     </figcaption>
@@ -534,18 +557,22 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-bold text-card-foreground">
-                                ガントチャート画面
+                                {t('Gantt chart view')}
                             </h3>
                             <p
                                 class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
                             >
-                                業務の期間、進捗、依存関係をひとつの時間軸で把握できます。
+                                {t(
+                                    'See work durations, progress, and dependencies on a single timeline.',
+                                )}
                             </p>
                         </div>
                     </figcaption>
                     <img
                         src="/images/welcome/gantt-screen.png"
-                        alt="架空の新商品プロジェクトを題材にしたガントチャート画面のサンプル"
+                        alt={t(
+                            'Example Gantt chart screen based on a fictional new product project',
+                        )}
                         width="1668"
                         height="943"
                         loading="lazy"
@@ -559,7 +586,9 @@
                 >
                     <img
                         src="/images/welcome/file-preview-screen.png"
-                        alt="架空の提案資料を表示したファイルプレビュー画面のサンプル"
+                        alt={t(
+                            'Example file preview screen showing a fictional proposal',
+                        )}
                         width="1665"
                         height="945"
                         loading="lazy"
@@ -576,12 +605,14 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-bold text-card-foreground">
-                                ファイルプレビュー画面
+                                {t('File preview view')}
                             </h3>
                             <p
                                 class="mt-2 text-sm leading-relaxed font-medium text-card-foreground/80"
                             >
-                                会話を離れず、共有された資料をダウンロードせずに確認できます。
+                                {t(
+                                    'Review shared materials without leaving the conversation or downloading them.',
+                                )}
                             </p>
                         </div>
                     </figcaption>
@@ -596,13 +627,14 @@
                         <MessagesSquare class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        スレッド化チャット
+                        {t('Threaded chat')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        本題の流れを遮らず、細かい議論はスレッドで整理。
-                        会話の経緯がチャネルに残ります。
+                        {t(
+                            'Keep the main conversation moving while organizing detailed discussions in threads. The conversation history stays in the channel.',
+                        )}
                     </p>
                 </div>
                 <div class="rounded-2xl border border-border bg-card p-6">
@@ -612,13 +644,14 @@
                         <ListTodo class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        チャンネル = タスク
+                        {t('Channel = task')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        チャンネル自体が業務タスク。開始日・終了期限と ToDo
-                        を内包し、進捗が会話から見えます。
+                        {t(
+                            'Each channel is a work task. It contains start and end dates plus to-dos, so progress remains visible in the conversation.',
+                        )}
                     </p>
                 </div>
                 <div class="rounded-2xl border border-border bg-card p-6">
@@ -628,13 +661,14 @@
                         <GanttChartSquare class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        ガントチャート
+                        {t('Gantt chart')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        全業務の期間・期限をタイムラインで可視化。
-                        チーム全体の負荷と締切をひと目で把握。
+                        {t(
+                            'Visualize each task duration and deadline on a timeline. See the workload and deadlines of the whole team at a glance.',
+                        )}
                     </p>
                 </div>
                 <div class="rounded-2xl border border-border bg-card p-6">
@@ -644,13 +678,14 @@
                         <FileText class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        ファイルプレビュー
+                        {t('File preview')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        画像・動画・PDFはその場で表示。Office 文書は OnlyOffice
-                        でブラウザ内プレビュー、ダウンロード不要。
+                        {t(
+                            'Images, videos, and PDFs appear in place. Office documents preview in the browser with OnlyOffice, so downloading is unnecessary.',
+                        )}
                     </p>
                 </div>
                 <div class="rounded-2xl border border-border bg-card p-6">
@@ -660,13 +695,14 @@
                         <BellRing class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        期限リマインダー
+                        {t('Deadline reminders')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        期限が近づいた業務を自動通知。
-                        伝言メモの付箋から卒業して、締切の見落としを防ぎます。
+                        {t(
+                            'Automatically notify the team as work deadlines approach. Leave sticky-note reminders behind and avoid missed deadlines.',
+                        )}
                     </p>
                 </div>
                 <div class="rounded-2xl border border-border bg-card p-6">
@@ -676,14 +712,14 @@
                         <ShieldCheck class="size-4.5 text-brand-accent" />
                     </div>
                     <h3 class="mb-1.5 text-sm font-bold text-card-foreground">
-                        権限とメンション
+                        {t('Permissions and mentions')}
                     </h3>
                     <p
                         class="text-[12px] leading-relaxed font-medium text-card-foreground/80"
                     >
-                        メンバーは閲覧・投稿、管理者はプロジェクトを管理。
-                        メンションとタグで「誰宛か」を明確にし、
-                        限定的な範囲に情報を閉じません。
+                        {t(
+                            'Members can view and post, while administrators manage projects. Mentions and tags make the intended recipient clear without locking information into a narrow circle.',
+                        )}
                     </p>
                 </div>
             </div>
@@ -695,16 +731,16 @@
         <div class="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:py-24">
             <Zap class="mx-auto mb-5 size-10 text-brand-accent" />
             <h2 class="text-2xl font-bold text-foreground sm:text-3xl">
-                まずは、電話の伝言メモを
+                {t('Start by turning phone messages')}
                 <br class="hidden sm:block" />
-                チャットのチャネルに変えるだけでも
+                {t('into chat channels')}
             </h2>
             <p
                 class="mx-auto mt-4 max-w-md text-sm leading-relaxed font-medium text-foreground/80"
             >
-                迷ったらこの3点。 情報を1か所に / 会話・決定・ファイルを同じ場に
-                / 誰が・何を・なぜを残す。
-                茶多楼はそのすべてをひとつの画面にしています。
+                {t(
+                    'When in doubt, start with these three: keep information in one place, keep conversations, decisions, and files together, and preserve who did what and why. Chatterrow brings all of it into one screen.',
+                )}
             </p>
             <div class="mt-8 flex flex-wrap justify-center gap-3">
                 {#if auth.user}
@@ -712,7 +748,7 @@
                         href={toUrl(serversIndex())}
                         class="inline-flex items-center gap-2 rounded-lg bg-brand px-7 py-3 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/30 transition hover:bg-brand-hover"
                     >
-                        プロジェクト一覧を開く
+                        {t('Open project list')}
                         <ArrowRight class="size-4" />
                     </Link>
                 {:else}
@@ -720,14 +756,14 @@
                         href={toUrl(register())}
                         class="inline-flex items-center gap-2 rounded-lg bg-brand px-7 py-3 text-sm font-semibold text-brand-foreground shadow-lg shadow-brand/30 transition hover:bg-brand-hover"
                     >
-                        アカウントを作成
+                        {t('Create an account')}
                         <ArrowRight class="size-4" />
                     </Link>
                     <Link
                         href={toUrl(login())}
                         class="rounded-lg border border-border px-7 py-3 text-sm font-semibold text-foreground transition hover:bg-accent"
                     >
-                        ログイン
+                        {t('Log in')}
                     </Link>
                 {/if}
             </div>
@@ -742,11 +778,11 @@
             <div class="flex items-center gap-2">
                 <AppLogoIcon class="size-6 rounded-md" />
                 <span class="text-xs font-medium text-foreground/80"
-                    >茶多楼 chatterrow</span
+                    >{appName}</span
                 >
             </div>
             <p class="text-[11px] font-medium text-foreground/80">
-                © 2026 chatterrow — チャットを通じた一元管理グループウェア
+                {t('© 2026 chatterrow - A unified team workspace through chat')}
             </p>
         </div>
     </footer>

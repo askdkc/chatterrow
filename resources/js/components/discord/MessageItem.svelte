@@ -23,8 +23,9 @@
     import { Avatar, AvatarFallback } from '@/components/ui/avatar';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
-    import { formatDate, formatTime } from '@/lib/dates';
+    import { currentLocale, formatDate, formatTime } from '@/lib/dates';
     import { HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import {
         restoreDraftMentions,
         serializeDraftMentions,
@@ -85,7 +86,7 @@
     let previewFile = $state<StoredFileResource | null>(null);
     let onlyofficeFile = $state<StoredFileResource | null>(null);
     let reactingEmojis = $state<string[]>([]);
-    const authorName = $derived(message.user?.name?.trim() || '不明');
+    const authorName = $derived(message.user?.name?.trim() || t('Unknown'));
     const authorInitial = $derived(getAuthorInitial(authorName));
     const authorAvatarTone = $derived(getAvatarTone(authorInitial));
 
@@ -134,7 +135,7 @@
             actionError =
                 error instanceof HttpError
                     ? error.messageText()
-                    : '編集に失敗しました';
+                    : t('Failed to edit message');
         } finally {
             saving = false;
         }
@@ -144,7 +145,7 @@
         if (
             !onDelete ||
             deleting ||
-            !window.confirm('このメッセージを削除しますか？')
+            !window.confirm(t('Delete this message?'))
         ) {
             return;
         }
@@ -158,7 +159,7 @@
             actionError =
                 error instanceof HttpError
                     ? error.messageText()
-                    : '削除に失敗しました';
+                    : t('Failed to delete message');
         } finally {
             deleting = false;
         }
@@ -235,12 +236,15 @@
     }
 
     function reactionTitle(reaction: MessageReactionResource): string {
-        const names = reaction.user_names.join('、');
+        const names = new Intl.ListFormat(currentLocale(), {
+            style: 'long',
+            type: 'conjunction',
+        }).format(reaction.user_names);
         const label = reactionDisplayLabel(reaction.emoji);
 
         return names
-            ? `${names}が${label}でリアクション`
-            : `${label}リアクション`;
+            ? t(':names reacted with :reaction', { names, reaction: label })
+            : t(':reaction reaction', { reaction: label });
     }
 
     async function setReaction(emoji: string, reacted: boolean) {
@@ -265,7 +269,7 @@
             actionError =
                 error instanceof HttpError
                     ? error.messageText()
-                    : 'リアクションの更新に失敗しました';
+                    : t('Failed to update reaction');
         } finally {
             reactingEmojis = reactingEmojis.filter((item) => item !== emoji);
         }
@@ -288,7 +292,7 @@
                     type="button"
                     class="p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-[#dbdee1]"
                     onclick={startEditing}
-                    title="メッセージを編集"
+                    title={t('Edit message')}
                 >
                     <Pencil class="h-3.5 w-3.5" />
                 </button>
@@ -299,7 +303,7 @@
                     class="p-1.5 text-[#b5bac1] transition hover:bg-white/10 hover:text-red-400 disabled:opacity-50"
                     onclick={removeMessage}
                     disabled={deleting}
-                    title="メッセージを削除"
+                    title={t('Delete message')}
                 >
                     {#if deleting}
                         <Loader2 class="h-3.5 w-3.5 animate-spin" />
@@ -314,7 +318,7 @@
     <Avatar
         data-message-avatar
         data-avatar-tone={authorAvatarTone}
-        aria-label={`${authorName}のアイコン`}
+        aria-label={t('Avatar for :name', { name: authorName })}
         class="size-9"
     >
         <AvatarFallback data-message-avatar-fallback>
@@ -367,7 +371,7 @@
                         {:else}
                             <Check class="h-3 w-3" />
                         {/if}
-                        保存
+                        {t('Save')}
                     </button>
                     <button
                         type="button"
@@ -375,7 +379,7 @@
                         onclick={() => (editing = false)}
                     >
                         <X class="h-3 w-3" />
-                        キャンセル
+                        {t('Cancel')}
                     </button>
                 </div>
             </div>
@@ -409,7 +413,9 @@
                     {#if isImage(file)}
                         <button
                             type="button"
-                            aria-label={`${file.original_name}をプレビュー`}
+                            aria-label={t('Preview :name', {
+                                name: file.original_name,
+                            })}
                             onclick={() => openPreview(file)}
                             class="block max-w-72 overflow-hidden rounded-lg"
                         >
@@ -434,7 +440,9 @@
                         >
                             <button
                                 type="button"
-                                aria-label={`${file.original_name}をプレビュー`}
+                                aria-label={t('Preview :name', {
+                                    name: file.original_name,
+                                })}
                                 onclick={() => openPreview(file)}
                                 class="group/preview block w-full text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                             >
@@ -461,19 +469,23 @@
                                             class="size-3.5"
                                             aria-hidden="true"
                                         />
-                                        プレビュー
+                                        {t('Preview')}
                                     </span>
                                 </span>
                             </button>
                             <a
                                 href={file.download_url ?? '#'}
-                                aria-label={`${file.original_name}をダウンロード`}
+                                aria-label={t('Download :name', {
+                                    name: file.original_name,
+                                })}
                                 class="absolute bottom-1.5 right-1.5 rounded p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
                             >
                                 <Download class="h-3.5 w-3.5" />
                             </a>
                             <Badge
-                                title={`${fileTypeLabel(file)}ファイル`}
+                                title={t('File type: :type', {
+                                    type: fileTypeLabel(file),
+                                })}
                                 data-file-kind={typeIcon}
                                 class="pointer-events-none absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-bold tracking-wide shadow-md"
                             >
@@ -518,7 +530,7 @@
             <div
                 class="mt-2 flex min-h-7 flex-wrap items-center gap-1.5"
                 data-message-reactions
-                aria-label="メッセージのリアクション"
+                aria-label={t('Message reactions')}
             >
                 {#each message.reactions ?? [] as reaction (reaction.emoji)}
                     {@const reacted = reactedByCurrentUser(reaction)}
@@ -526,7 +538,15 @@
                         variant={reacted ? 'secondary' : 'outline'}
                         size="sm"
                         class="h-7 gap-1.5 rounded-full px-2.5 text-sm"
-                        aria-label={`${reactionDisplayLabel(reaction.emoji)}リアクション ${reaction.count}件${reacted ? '、自分が追加済み' : ''}`}
+                        aria-label={t(
+                            reacted
+                                ? ':reaction reaction (:count), added by you'
+                                : ':reaction reaction (:count)',
+                            {
+                                reaction: reactionDisplayLabel(reaction.emoji),
+                                count: String(reaction.count),
+                            },
+                        )}
                         aria-pressed={reacted}
                         title={reactionTitle(reaction)}
                         disabled={reactingEmojis.includes(reaction.emoji)}
@@ -563,7 +583,7 @@
                 onclick={onOpenThread}
             >
                 <MessageSquare class="h-3.5 w-3.5" />
-                スレッド
+                {t('Thread')}
                 {#if message.reply_count}
                     <span>{message.reply_count}</span>
                 {/if}

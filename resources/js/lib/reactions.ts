@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n';
+
 export const STAMP_REACTION_PREFIX = 'stamp:';
 export const MAX_STAMP_TEXT_LENGTH = 4;
 export const DEFAULT_STAMP_TEXTS = ['それな', 'すごい', 'たしかに'] as const;
@@ -109,5 +111,5 @@ export function isStampReaction(value: string): boolean {
 export function reactionDisplayLabel(value: string): string {
     const stampText = stampReactionText(value);
 
-    return stampText ? `ハンコ「${stampText}」` : value;
+    return stampText ? t('Stamp reaction: :text', { text: stampText }) : value;
 }

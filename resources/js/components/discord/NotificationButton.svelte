@@ -3,6 +3,7 @@
     import { onDestroy } from 'svelte';
     import NotificationList from '@/components/discord/NotificationList.svelte';
     import * as Popover from '@/components/ui/popover';
+    import { t } from '@/lib/i18n';
     import { mentionNotificationsState } from '@/lib/mention-notifications.svelte';
     import { cn } from '@/lib/utils';
 
@@ -80,8 +81,8 @@
             'group relative mx-2 flex h-10 items-center rounded-xl text-[#dbdee1] transition hover:bg-white/10',
             collapsed ? 'w-12 justify-center' : 'justify-start gap-2 px-3',
         )}
-        aria-label="通知"
-        title="通知"
+        aria-label={t('Notifications')}
+        title={t('Notifications')}
         data-hover-opened={hoverOpened}
         data-hover-close-pending={hoverClosePending}
         onmouseenter={openFromHover}
@@ -89,7 +90,9 @@
     >
         <Bell class="h-5 w-5 shrink-0" />
         {#if !collapsed}
-            <span class="truncate text-sm font-medium">通知</span>
+            <span class="truncate text-sm font-medium"
+                >{t('Notifications')}</span
+            >
         {/if}
         {#if unreadTotal > 0}
             <span
@@ -97,8 +100,9 @@
                     'absolute flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22]',
                     collapsed ? '-top-1 -right-1' : 'top-1 right-2',
                 )}
-                aria-label={`未読通知 ${unreadTotal}件`}
-                >{unreadTotal > 99 ? '99+' : unreadTotal}</span
+                aria-label={t('Unread notifications: :count', {
+                    count: String(unreadTotal),
+                })}>{unreadTotal > 99 ? '99+' : unreadTotal}</span
             >
         {/if}
     </Popover.Trigger>
@@ -113,7 +117,7 @@
         <div
             data-notification-hover-surface
             role="group"
-            aria-label="通知ポップオーバー"
+            aria-label={t('Notification popover')}
             onmouseenter={cancelHoverClose}
             onmouseleave={closeAfterHover}
         >

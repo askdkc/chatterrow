@@ -8,6 +8,7 @@
     import { Input } from '@/components/ui/input';
     import * as InputGroup from '@/components/ui/input-group';
     import * as Popover from '@/components/ui/popover';
+    import { t } from '@/lib/i18n';
     import {
         createStampReaction,
         DEFAULT_STAMP_TEXTS,
@@ -62,16 +63,29 @@
         createStampReaction(text),
     ).filter((value): value is string => value !== null);
     const triggerLabel = $derived(
-        mode === 'reaction' ? 'リアクションを追加' : '絵文字を選ぶ',
+        mode === 'reaction' ? t('Add reaction') : t('Choose an emoji'),
     );
-    const selectionAction = $derived(
-        mode === 'reaction' ? 'リアクションに追加' : '挿入',
-    );
+
+    function emojiSelectionLabel(emoji: string): string {
+        return t(
+            mode === 'reaction' ? 'Add :emoji to reactions' : 'Insert :emoji',
+            { emoji },
+        );
+    }
+
+    function recentEmojiSelectionLabel(emoji: string): string {
+        return t(
+            mode === 'reaction'
+                ? 'Add recent emoji :emoji to reactions'
+                : 'Insert recent emoji :emoji',
+            { emoji },
+        );
+    }
 
     const categories: EmojiCategory[] = [
         {
             id: 'faces',
-            label: '顔と感情',
+            label: t('Faces and emotions'),
             icon: '😀',
             searchTerms: '顔 感情 笑顔 smile face emotion',
             emojis: `😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 ☺️ 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫣 🤭 🫢 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪`.split(
@@ -80,7 +94,7 @@
         },
         {
             id: 'gestures',
-            label: '人とジェスチャー',
+            label: t('People and gestures'),
             icon: '👋',
             searchTerms: '人 手 ジェスチャー person hand gesture',
             emojis: `👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦵 🦶 👂 👃 🧠 🫀 🫁 🦷 👀 👁️ 👅 👄`.split(
@@ -89,7 +103,7 @@
         },
         {
             id: 'animals',
-            label: '動物と自然',
+            label: t('Animals and nature'),
             icon: '🐱',
             searchTerms: '動物 自然 animal nature pet',
             emojis: `🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐻‍❄️ 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🪲 🐞 🦋 🐌 🐢 🐍 🦎 🐙 🦑 🦀 🐠 🐟 🐬 🐳 🌸 🌻 🌞 ⭐ 🌈 🔥`.split(
@@ -98,7 +112,7 @@
         },
         {
             id: 'food',
-            label: '食べ物と飲み物',
+            label: t('Food and drink'),
             icon: '🍎',
             searchTerms: '食べ物 飲み物 food drink fruit',
             emojis: `🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥝 🍅 🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🧄 🧅 🍞 🥐 🥖 🥨 🧀 🥚 🍳 🥞 🧇 🍔 🍟 🍕 🌭 🥪 🌮 🍣 🍜 🍙 🍚 🍛 🍦 🍩 🍪 🎂 🍰 ☕ 🍵 🥤 🍺 🍷`.split(
@@ -107,7 +121,7 @@
         },
         {
             id: 'activities',
-            label: 'アクティビティ',
+            label: t('Activities'),
             icon: '⚽',
             searchTerms: '活動 スポーツ 遊び activity sports game',
             emojis: `⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🪀 🏓 🏸 🏒 🏑 🥍 🏏 🪃 🥅 ⛳ 🪁 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 🏂 🪂 🏋️ 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🚴 🏆 🥇 🎮 🧩 🎨 🎭 🎤 🎸 🎹`.split(
@@ -116,7 +130,7 @@
         },
         {
             id: 'travel',
-            label: '旅行と場所',
+            label: t('Travel and places'),
             icon: '🏠',
             searchTerms: '旅行 場所 乗り物 travel place vehicle home',
             emojis: `🚗 🚕 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚲 🛵 🏍️ 🚂 🚆 🚇 🚄 ✈️ 🚀 🚁 ⛵ 🚤 🛳️ 🗺️ 🗿 🗽 🗼 🏰 🏯 🏟️ 🎡 🎢 🏖️ 🏝️ ⛰️ 🏕️ 🏠 🏡 🏢 🏥 🏫 🏪 ⛩️ 🕌 ⛪ 🌇 🌃 🌉 🌌`.split(
@@ -125,7 +139,7 @@
         },
         {
             id: 'objects',
-            label: 'もの',
+            label: t('Objects'),
             icon: '📝',
             searchTerms: 'もの 道具 object tool memo note',
             emojis: `⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 📷 📹 🎥 📞 📺 📻 ⏰ ⌛ 🔋 💡 🔦 🕯️ 🧯 💸 💰 💎 ⚖️ 🔧 🔨 🛠️ ⛏️ 🔩 ⚙️ 🧰 🔗 🧲 🪜 🧪 🔬 🔭 📡 💊 🩹 🚪 🪑 🚽 🚿 🛁 🔑 🎁 🎈 ✉️ 📦 📅 📌 📎 ✂️ 📝 ✏️ 🔍 🔒`.split(
@@ -134,7 +148,7 @@
         },
         {
             id: 'symbols',
-            label: '記号',
+            label: t('Symbols'),
             icon: '⛔',
             searchTerms: '記号 マーク symbol sign heart',
             emojis: `❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ ⛎ ♀️ ♂️ ⚧️ ▶️ ⏸️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 ✅ ❌ ❗ ❓ 💯 🚫 ⛔ ⚠️ ♻️ ➕ ➖ ➗`.split(
@@ -143,7 +157,7 @@
         },
         {
             id: 'flags',
-            label: '旗',
+            label: t('Flags'),
             icon: '🏁',
             searchTerms: '旗 国 flag country japan',
             emojis: `🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🇯🇵 🇺🇸 🇨🇦 🇲🇽 🇧🇷 🇦🇷 🇬🇧 🇫🇷 🇩🇪 🇮🇹 🇪🇸 🇵🇹 🇳🇱 🇧🇪 🇨🇭 🇦🇹 🇸🇪 🇳🇴 🇩🇰 🇫🇮 🇵🇱 🇺🇦 🇹🇷 🇮🇳 🇨🇳 🇰🇷 🇹🇭 🇻🇳 🇸🇬 🇮🇩 🇵🇭 🇦🇺 🇳🇿 🇿🇦`.split(
@@ -446,7 +460,7 @@
         {#if stampPickerOpen && mode === 'reaction'}
             <section
                 class="animate-in fade-in-0 slide-in-from-bottom-2 flex flex-col gap-2 rounded-2xl border bg-popover p-2 text-popover-foreground shadow-xl duration-150"
-                aria-label="文字ハンコ"
+                aria-label={t('Text stamp')}
             >
                 <form onsubmit={submitStamp}>
                     <Field.FieldGroup class="gap-2">
@@ -455,7 +469,7 @@
                                 for="stamp-reaction-text"
                                 class="sr-only"
                             >
-                                ハンコにする文字
+                                {t('Text for stamp')}
                             </Field.FieldLabel>
                             <InputGroup.Root>
                                 <InputGroup.Input
@@ -464,7 +478,9 @@
                                     bind:value={stampText}
                                     maxlength={MAX_STAMP_TEXT_LENGTH}
                                     autocomplete="off"
-                                    placeholder="文字を入力（4文字まで）"
+                                    placeholder={t(
+                                        'Enter text (up to 4 characters)',
+                                    )}
                                 />
                                 <InputGroup.Addon align="inline-end">
                                     {#if customStampReaction}
@@ -477,7 +493,7 @@
                                         type="submit"
                                         disabled={!customStampReaction}
                                     >
-                                        追加
+                                        {t('Add')}
                                     </InputGroup.Button>
                                 </InputGroup.Addon>
                             </InputGroup.Root>
@@ -485,12 +501,12 @@
 
                         <Field.FieldSet>
                             <Field.FieldLegend class="sr-only">
-                                文字スタンプの色
+                                {t('Text stamp color')}
                             </Field.FieldLegend>
                             <div class="grid grid-cols-2 gap-2">
                                 <Field.Field orientation="horizontal">
                                     <Field.FieldLabel for="stamp-text-color">
-                                        文字色
+                                        {t('Text color')}
                                     </Field.FieldLabel>
                                     <Input
                                         id="stamp-text-color"
@@ -506,7 +522,7 @@
                                     <Field.FieldLabel
                                         for="stamp-background-color"
                                     >
-                                        背景色
+                                        {t('Background color')}
                                     </Field.FieldLabel>
                                     <Input
                                         id="stamp-background-color"
@@ -525,7 +541,7 @@
                                 <Field.FieldLabel
                                     for="stamp-background-transparent"
                                 >
-                                    背景なし
+                                    {t('Transparent background')}
                                 </Field.FieldLabel>
                             </Field.Field>
                         </Field.FieldSet>
@@ -534,7 +550,7 @@
 
                 <div
                     class="grid max-h-48 grid-cols-4 gap-1 overflow-y-auto"
-                    aria-label="登録済みの文字スタンプ"
+                    aria-label={t('Registered text stamps')}
                 >
                     {#each availableStampReactions as stampReaction (stampReaction)}
                         {@const text = stampReactionText(stampReaction)}
@@ -543,7 +559,9 @@
                                 variant="ghost"
                                 size="icon"
                                 class="size-14 rounded-xl"
-                                aria-label={`ハンコ「${text}」をリアクションに追加`}
+                                aria-label={t('Add stamp reaction: :text', {
+                                    text,
+                                })}
                                 onclick={() => selectValue(stampReaction)}
                             >
                                 <StampReaction value={stampReaction} />
@@ -557,14 +575,14 @@
         {#if fullPickerOpen}
             <section
                 class="animate-in fade-in-0 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-popover text-popover-foreground shadow-xl duration-150"
-                aria-label="絵文字一覧"
+                aria-label={t('Emoji list')}
             >
                 <div class="flex items-center gap-3 p-3">
                     <Input
                         type="search"
                         bind:value={searchQuery}
-                        aria-label="絵文字を検索"
-                        placeholder="絵文字を検索"
+                        aria-label={t('Search emojis')}
+                        placeholder={t('Search emojis')}
                         class="h-11 rounded-2xl"
                     />
                     <span class="shrink-0 text-3xl" aria-hidden="true"
@@ -574,7 +592,7 @@
 
                 <nav
                     class="flex items-center gap-1 overflow-x-auto border-b px-2"
-                    aria-label="絵文字カテゴリー"
+                    aria-label={t('Emoji categories')}
                 >
                     {#each categories as category (category.id)}
                         <Button
@@ -586,7 +604,9 @@
                                     !searchQuery &&
                                     'after:bg-primary',
                             )}
-                            aria-label={`${category.label}カテゴリー`}
+                            aria-label={t('Emoji category: :category', {
+                                category: category.label,
+                            })}
                             aria-pressed={activeCategoryId === category.id &&
                                 !searchQuery}
                             onclick={() => chooseCategory(category)}
@@ -605,14 +625,14 @@
                     {#if visibleEmojis.length > 0}
                         <div
                             class="grid grid-cols-8 gap-1"
-                            aria-label="選択可能な絵文字"
+                            aria-label={t('Selectable emojis')}
                         >
                             {#each visibleEmojis as emoji (emoji)}
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     class="rounded-xl text-2xl"
-                                    aria-label={`${emoji}を${selectionAction}`}
+                                    aria-label={emojiSelectionLabel(emoji)}
                                     onclick={() => selectValue(emoji)}
                                     onpointerenter={() =>
                                         (previewEmoji = emoji)}
@@ -625,21 +645,21 @@
                         <div
                             class="flex h-full items-center justify-center text-sm text-muted-foreground"
                         >
-                            一致する絵文字はありません
+                            {t('No matching emojis')}
                         </div>
                     {/if}
                 </div>
 
                 <div
                     class="flex items-center gap-1 overflow-x-auto border-t p-2"
-                    aria-label="最近使った絵文字"
+                    aria-label={t('Recently used emojis')}
                 >
                     {#each recentEmojis.slice(0, 10) as emoji (emoji)}
                         <Button
                             variant="ghost"
                             size="icon"
                             class="shrink-0 rounded-xl text-2xl"
-                            aria-label={`最近使った${emoji}を${selectionAction}`}
+                            aria-label={recentEmojiSelectionLabel(emoji)}
                             onclick={() => selectValue(emoji)}
                             onpointerenter={() => (previewEmoji = emoji)}
                         >
@@ -652,7 +672,7 @@
 
         <div
             class="flex items-center gap-0.5 overflow-x-auto rounded-full border bg-popover p-1 text-popover-foreground shadow-xl"
-            aria-label="クイック絵文字"
+            aria-label={t('Quick emojis')}
         >
             {#each quickEmojis as emoji (emoji)}
                 {#if mode === 'reaction' && emoji === TEXT_STAMP_TRIGGER_EMOJI}
@@ -664,7 +684,7 @@
                             stampPickerOpen &&
                                 'ring-2 ring-primary ring-offset-2',
                         )}
-                        aria-label="文字ハンコを作る"
+                        aria-label={t('Create a text stamp')}
                         aria-expanded={stampPickerOpen}
                         onclick={openStampPicker}
                     >
@@ -675,7 +695,7 @@
                         variant="ghost"
                         size="icon"
                         class="size-8 shrink-0 rounded-full text-[22px]"
-                        aria-label={`${emoji}を${selectionAction}`}
+                        aria-label={emojiSelectionLabel(emoji)}
                         onclick={() => selectValue(emoji)}
                         onpointerenter={() => (previewEmoji = emoji)}
                     >
@@ -690,7 +710,7 @@
                     'ml-auto size-8 shrink-0 rounded-full',
                     fullPickerOpen && 'ring-2 ring-primary ring-offset-2',
                 )}
-                aria-label="すべての絵文字を表示"
+                aria-label={t('Show all emojis')}
                 aria-expanded={fullPickerOpen}
                 onclick={expandPicker}
             >

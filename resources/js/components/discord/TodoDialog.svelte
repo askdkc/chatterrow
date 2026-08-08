@@ -9,6 +9,7 @@
         timeValue,
     } from '@/lib/dates';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type { TodoResource } from '@/types';
 
     let {
@@ -156,8 +157,8 @@
                 exception instanceof HttpError
                     ? exception.messageText()
                     : isEditing
-                      ? '保存に失敗しました'
-                      : '追加に失敗しました';
+                      ? t('Failed to save task.')
+                      : t('Failed to add task.');
         } finally {
             saving = false;
         }
@@ -183,7 +184,7 @@
     <button
         type="button"
         class="absolute inset-0 bg-black/60"
-        aria-label="背景をクリックして閉じる"
+        aria-label={t('Click the background to close')}
         onclick={onClose}
     ></button>
     <div
@@ -194,12 +195,12 @@
     >
         <div class="mb-5 flex items-center justify-between">
             <h2 id="todo-dialog-title" class="text-lg font-bold text-[#dbdee1]">
-                {isEditing ? 'タスクを編集' : 'タスクを作成'}
+                {isEditing ? t('Edit task') : t('Create task')}
             </h2>
             <button
                 type="button"
                 class="rounded p-1 hover:bg-white/10"
-                aria-label="閉じる"
+                aria-label={t('Close')}
                 onclick={onClose}
             >
                 <X class="h-5 w-5 text-[#80848e]" />
@@ -212,13 +213,13 @@
                     for="todo-title"
                     class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                 >
-                    タスク名
+                    {t('Task name')}
                 </label>
                 <input
                     id="todo-title"
                     bind:value={title}
                     type="text"
-                    placeholder="タスク名を入力"
+                    placeholder={t('Enter task name')}
                     class="w-full rounded-md bg-[#383a40] px-3 py-2.5 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 />
             </div>
@@ -226,13 +227,13 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <fieldset>
                     <legend class="mb-1 text-xs font-semibold text-[#b5bac1]">
-                        開始日時
+                        {t('Start date and time')}
                     </legend>
                     <div
                         class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-2"
                     >
                         <label for="todo-starts-on" class="sr-only"
-                            >開始日</label
+                            >{t('Start date')}</label
                         >
                         <input
                             id="todo-starts-on"
@@ -242,7 +243,7 @@
                             class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
                         />
                         <label for="todo-starts-time" class="sr-only"
-                            >開始時刻</label
+                            >{t('Start time')}</label
                         >
                         <TimePicker
                             id="todo-starts-time"
@@ -253,12 +254,14 @@
                 </fieldset>
                 <fieldset>
                     <legend class="mb-1 text-xs font-semibold text-[#b5bac1]">
-                        終了日時
+                        {t('End date and time')}
                     </legend>
                     <div
                         class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-2"
                     >
-                        <label for="todo-due-on" class="sr-only">終了日</label>
+                        <label for="todo-due-on" class="sr-only"
+                            >{t('End date')}</label
+                        >
                         <input
                             id="todo-due-on"
                             bind:value={dueOn}
@@ -268,7 +271,7 @@
                             class="min-w-0 rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
                         />
                         <label for="todo-due-time" class="sr-only"
-                            >終了時刻</label
+                            >{t('End time')}</label
                         >
                         <TimePicker
                             id="todo-due-time"
@@ -284,17 +287,17 @@
                     for="todo-priority"
                     class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                 >
-                    プライオリティ
+                    {t('Priority')}
                 </label>
                 <select
                     id="todo-priority"
                     bind:value={priority}
                     class="w-full rounded-md bg-[#383a40] px-3 py-2.5 text-sm text-[#dbdee1] outline-none focus:ring-1 focus:ring-[#5865f2]"
                 >
-                    <option value="low">低</option>
-                    <option value="normal">通常</option>
-                    <option value="high">高</option>
-                    <option value="urgent">緊急</option>
+                    <option value="low">{t('Low')}</option>
+                    <option value="normal">{t('Normal')}</option>
+                    <option value="high">{t('High')}</option>
+                    <option value="urgent">{t('Urgent')}</option>
                 </select>
             </div>
 
@@ -303,13 +306,13 @@
                     for="todo-details"
                     class="mb-1 block text-xs font-semibold text-[#b5bac1]"
                 >
-                    メモ
+                    {t('Notes')}
                 </label>
                 <textarea
                     id="todo-details"
                     bind:value={details}
                     rows={5}
-                    placeholder="メモを入力"
+                    placeholder={t('Enter notes')}
                     class="max-h-60 min-h-28 w-full resize-y rounded-md bg-[#383a40] px-3 py-2.5 text-[15px] leading-6 text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 ></textarea>
             </div>
@@ -331,7 +334,7 @@
                 class="rounded-md px-4 py-2 text-sm font-medium text-[#b5bac1] transition hover:bg-white/10"
                 onclick={onClose}
             >
-                キャンセル
+                {t('Cancel')}
             </button>
             <button
                 type="button"
@@ -344,7 +347,7 @@
                 {:else if !isEditing}
                     <Plus class="h-4 w-4" />
                 {/if}
-                {isEditing ? '保存' : '作成'}
+                {isEditing ? t('Save') : t('Create')}
             </button>
         </div>
     </div>

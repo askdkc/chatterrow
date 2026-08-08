@@ -717,6 +717,7 @@ setup_macos_onlyoffice() {
         cp "$app_dir/.env.example" "$env_file"
     }
 
+    set_env APP_LOCALE "$APP_LOCALE" "$env_file"
     imagemagick_path="$(resolve_imagemagick_path)" \
         || die "ImageMagick is required; install it with 'brew install imagemagick'"
     "$imagemagick_path" -version >/dev/null 2>&1 \
@@ -995,6 +996,68 @@ prompt_required() {
     printf '%s' "$value"
 }
 
+valid_application_locale() {
+    case "$1" in
+        en|ja|fr|de|zh_CN|zh_TW|es|pt_BR|pt_PT|ko) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+resolve_application_locale() {
+    local selection=""
+
+    if [[ -z "$APP_LOCALE" && ! -t 0 && -f "$APP_DIR/.env" ]]; then
+        APP_LOCALE="$(sed -n 's/^[[:space:]]*APP_LOCALE=//p' "$APP_DIR/.env" | sed -n '1p')"
+        APP_LOCALE="${APP_LOCALE#\"}"
+        APP_LOCALE="${APP_LOCALE%\"}"
+    fi
+
+    if [[ -n "$APP_LOCALE" ]]; then
+        valid_application_locale "$APP_LOCALE" || die \
+            "Unsupported application language: $APP_LOCALE (use en, ja, fr, de, zh_CN, zh_TW, es, pt_BR, pt_PT, or ko)"
+        return 0
+    fi
+
+    if [[ ! -t 0 ]]; then
+        APP_LOCALE="ja"
+        log "No interactive terminal; defaulting application language to ja"
+        return 0
+    fi
+
+    while true; do
+        printf 'Primary application language:\n'
+        printf '  1) English (en)\n'
+        printf '  2) Japanese (ja)\n'
+        printf '  3) French (fr)\n'
+        printf '  4) German (de)\n'
+        printf '  5) Simplified Chinese (zh_CN)\n'
+        printf '  6) Traditional Chinese (zh_TW)\n'
+        printf '  7) Spanish (es)\n'
+        printf '  8) Brazilian Portuguese (pt_BR)\n'
+        printf '  9) European Portuguese (pt_PT)\n'
+        printf ' 10) Korean (ko)\n'
+        if ! read -r -p 'Select language (default: 2): ' selection; then
+            die "Could not read the application language"
+        fi
+
+        case "${selection:-2}" in
+            1|en) APP_LOCALE="en"; break ;;
+            2|ja) APP_LOCALE="ja"; break ;;
+            3|fr) APP_LOCALE="fr"; break ;;
+            4|de) APP_LOCALE="de"; break ;;
+            5|zh_CN) APP_LOCALE="zh_CN"; break ;;
+            6|zh_TW) APP_LOCALE="zh_TW"; break ;;
+            7|es) APP_LOCALE="es"; break ;;
+            8|pt_BR) APP_LOCALE="pt_BR"; break ;;
+            9|pt_PT) APP_LOCALE="pt_PT"; break ;;
+            10|ko) APP_LOCALE="ko"; break ;;
+            *) warn "Please select a listed language or enter its locale code." ;;
+        esac
+    done
+
+    log "Application language: $APP_LOCALE"
+}
+
 announce_passwordless_sudo_option() {
     [[ "$(id -u)" -ne 0 && "$SUDO_NOPASSWD" != "1" ]] || return 0
 
@@ -1010,6 +1073,7 @@ REPO_URL="${REPO_URL:-git@github.com:askdkc/chatterrow.git}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 DATABASE="${DATABASE:-}"
+APP_LOCALE="${APP_LOCALE:-}"
 DB_NAME="${DB_NAME:-chatterrow}"
 DB_USER="${DB_USER:-chatterrow}"
 DB_PASSWORD="${DB_PASSWORD:-}"
@@ -1045,6 +1109,7 @@ Options:
   --domain <domain>          App domain, e.g. chat.example.com (prompted if omitted)
   --email <email>            Let's Encrypt registration / expiry mail
   --database <driver>        App DB: sqlite or postgresql (prompted; default: sqlite)
+  --language <locale>        Primary app language, e.g. ja or en (prompted; default: existing .env value or ja)
   --db-name <name>           PostgreSQL database name (default: chatterrow)
   --db-user <name>           PostgreSQL role name (default: chatterrow)
   --db-password <password>   PostgreSQL password (default: securely generated)
@@ -1061,6 +1126,7 @@ variables, except --no-ssl. Non-interactive runs require --domain and
 
 Ubuntu environment overrides:
   DEPLOY_USER                   Application file owner (default: current user, or root when running as root)
+  APP_LOCALE                    Primary app language (en, ja, fr, de, zh_CN, zh_TW, es, pt_BR, pt_PT, or ko)
   ONLYOFFICE_PORT               Internal OnlyOffice port (default: 8080)
   ONLYOFFICE_JWT_SECRET         Existing secret, at least 32 non-whitespace characters
 
@@ -1080,12 +1146,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --domain|--email|--database|--db-name|--db-user|--db-password|--app-dir|--repo|--onlyoffice-image)
+        --domain|--email|--database|--language|--db-name|--db-user|--db-password|--app-dir|--repo|--onlyoffice-image)
             [[ $# -ge 2 ]] || die "$1 requires a value"
             case "$1" in
                 --domain)        DOMAIN="$2" ;;
                 --email)         EMAIL="$2" ;;
                 --database)      DATABASE="$2" ;;
+                --language)      APP_LOCALE="$2" ;;
                 --db-name)       DB_NAME="$2" ;;
                 --db-user)       DB_USER="$2" ;;
                 --db-password)   DB_PASSWORD="$2" ;;
@@ -1108,6 +1175,7 @@ case "$SUDO_NOPASSWD" in
 esac
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
+    resolve_application_locale
     setup_macos_onlyoffice
     exit 0
 fi
@@ -1141,6 +1209,8 @@ if [[ -z "$DATABASE" ]]; then
         esac
     done
 fi
+
+resolve_application_locale
 
 DATABASE="${DATABASE,,}"
 case "$DATABASE" in
@@ -1234,7 +1304,7 @@ PUBLIC_PORT=443
 [[ $NO_SSL -eq 0 ]] || { PUBLIC_SCHEME="http"; PUBLIC_PORT=80; }
 
 log "Ubuntu $VERSION_ID ($VERSION_CODENAME) on $ARCHITECTURE"
-log "Domain: $DOMAIN | OnlyOffice: ${DOMAIN}${ONLYOFFICE_PUBLIC_PATH} | Database: $DATABASE"
+log "Domain: $DOMAIN | OnlyOffice: ${DOMAIN}${ONLYOFFICE_PUBLIC_PATH} | Database: $DATABASE | Language: $APP_LOCALE"
 
 # --------------------------------------------------- base packages --------
 log "Installing web, database, preview, SSL, and build packages..."
@@ -1594,6 +1664,7 @@ composer markitdown:install
 
 log "Preparing production environment..."
 [[ -f .env ]] || cp .env.example .env
+set_env APP_LOCALE "$APP_LOCALE"
 set_env APP_NAME chatterrow
 set_env APP_ENV production
 set_env APP_DEBUG false

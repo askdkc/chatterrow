@@ -46,7 +46,7 @@ class ServerInvitationController extends Controller
 
         if ($user !== null && $server->members()->whereKey($user->id)->exists()) {
             return response()->json([
-                'message' => 'このユーザーはすでにプロジェクトへ参加しています。',
+                'message' => __('This user is already a member of the project.'),
             ], 422);
         }
 
@@ -54,13 +54,13 @@ class ServerInvitationController extends Controller
 
         if ($existing?->status === ServerInvitation::STATUS_PENDING) {
             return response()->json([
-                'message' => 'このメールアドレスにはすでに招待を送信しています。',
+                'message' => __('An invitation has already been sent to this email address.'),
             ], 409);
         }
 
         if ($existing?->status === ServerInvitation::STATUS_DECLINED) {
             return response()->json([
-                'message' => 'この招待は拒否されています。招待一覧から再送してください。',
+                'message' => __('This invitation was declined. Resend it from the invitation list.'),
             ], 409);
         }
 
@@ -98,7 +98,7 @@ class ServerInvitationController extends Controller
 
         if ($user !== null && $server->members()->whereKey($user->id)->exists()) {
             return response()->json([
-                'message' => 'このユーザーはすでにプロジェクトへ参加しています。',
+                'message' => __('This user is already a member of the project.'),
             ], 422);
         }
 
@@ -136,7 +136,7 @@ class ServerInvitationController extends Controller
 
         if ($invitation->server->archived_at !== null) {
             return response()->json([
-                'message' => 'このプロジェクトはアーカイブされています。',
+                'message' => __('This project is archived.'),
             ], 409);
         }
 
@@ -148,7 +148,7 @@ class ServerInvitationController extends Controller
             abort_unless($lockedInvitation->isFor($user), 404);
 
             if ($lockedInvitation->status !== ServerInvitation::STATUS_PENDING) {
-                abort(409, 'この招待にはすでに回答しています。');
+                abort(409, __('You have already responded to this invitation.'));
             }
 
             if ($lockedInvitation->server->members()->whereKey($user->id)->doesntExist()) {
@@ -183,7 +183,7 @@ class ServerInvitationController extends Controller
             abort_unless($lockedInvitation->isFor($user), 404);
 
             if ($lockedInvitation->status !== ServerInvitation::STATUS_PENDING) {
-                abort(409, 'この招待にはすでに回答しています。');
+                abort(409, __('You have already responded to this invitation.'));
             }
 
             $lockedInvitation->update([

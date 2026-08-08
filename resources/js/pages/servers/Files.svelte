@@ -20,6 +20,7 @@
     import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import type {
         ServerResource,
@@ -172,7 +173,7 @@
             error =
                 e instanceof HttpError
                     ? e.messageText()
-                    : 'アップロードに失敗しました';
+                    : t('Failed to upload files');
         } finally {
             uploading = false;
         }
@@ -242,12 +243,18 @@
         try {
             await uploadFiles(await filesFromDrop(event.dataTransfer));
         } catch {
-            error = 'フォルダの読み込みに失敗しました';
+            error = t('Failed to read folder');
         }
     }
 
     async function removeFile(file: StoredFileResource) {
-        if (!window.confirm(`${file.original_name} を削除しますか？`)) {
+        if (
+            !window.confirm(
+                t('Are you sure you want to remove :name?', {
+                    name: file.original_name,
+                }),
+            )
+        ) {
             return;
         }
 
@@ -258,7 +265,9 @@
             files = files.filter((f) => f.id !== file.id);
         } catch (e) {
             error =
-                e instanceof HttpError ? e.messageText() : '削除に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : t('Failed to delete file');
         }
     }
 
@@ -291,7 +300,7 @@
                 error =
                     e instanceof HttpError
                         ? e.messageText()
-                        : '検索に失敗しました';
+                        : t('Failed to search files');
                 searchResults = [];
             } finally {
                 searching = false;
@@ -353,10 +362,13 @@
             </Link>
             <FileText class="h-4 w-4 text-[#5865f2]" />
             <h1 class="text-[15px] font-bold">
-                {channel ? `ファイル - #${channel.name}` : 'ファイル一覧'}
+                {channel
+                    ? t('Files - #:channel', { channel: channel.name })
+                    : t('File list')}
             </h1>
-            <span class="ml-auto text-xs text-[#80848e]">{files.length} 件</span
-            >
+            <span class="ml-auto text-xs text-[#80848e]">
+                {t('File count: :count', { count: String(files.length) })}
+            </span>
         </header>
 
         <div class="border-b border-black/10 px-4 py-2 dark:border-black/20">
@@ -364,9 +376,11 @@
                 type="search"
                 bind:value={searchQuery}
                 oninput={onSearchInput}
-                placeholder="ファイルの全文を検索（PDF / Word / Excel / PowerPoint）"
+                placeholder={t(
+                    'Search file contents (PDF / Word / Excel / PowerPoint)',
+                )}
                 class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
-                aria-label="ファイル全文検索"
+                aria-label={t('Full-text file search')}
             />
         </div>
 
@@ -376,11 +390,13 @@
             >
                 {#if searchResults.length === 0}
                     <p class="py-4 text-center text-sm text-[#80848e]">
-                        検索結果はありません
+                        {t('No file search results')}
                     </p>
                 {:else}
                     <p class="mb-2 text-xs text-[#80848e]">
-                        {searchResults.length} 件のファイルが一致
+                        {t('Matching files: :count', {
+                            count: String(searchResults.length),
+                        })}
                     </p>
                     <div class="space-y-2">
                         {#each searchResults as result (result.id)}
@@ -420,7 +436,7 @@
 
         <div
             role="region"
-            aria-label="ファイル一覧とアップロードドロップ領域"
+            aria-label={t('File list and upload drop area')}
             class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
             ondragenter={onDragEnter}
             ondragover={onDragOver}
@@ -442,7 +458,7 @@
                         {:else}
                             <Upload class="h-4 w-4" />
                         {/if}
-                        アップロード
+                        {t('Upload')}
                     </button>
                     <input
                         bind:this={uploadInput}
@@ -467,9 +483,11 @@
                         class="flex flex-1 flex-col items-center justify-center text-center"
                     >
                         <FileText class="mb-3 h-12 w-12 text-[#80848e]" />
-                        <p class="font-medium">ファイルがありません</p>
+                        <p class="font-medium">{t('No files')}</p>
                         <p class="mt-1 text-sm text-[#80848e]">
-                            ここにドラッグ&ドロップするか、アップロードボタンから追加できます
+                            {t(
+                                'Drag and drop files here or use the upload button to add them.',
+                            )}
                         </p>
                     </div>
                 {:else}
@@ -486,8 +504,10 @@
                                     type="button"
                                     class="flex aspect-video w-full items-center justify-center overflow-hidden bg-[#232428]"
                                     onclick={() => openPreview(file)}
-                                    title="プレビュー"
-                                    aria-label={`${file.original_name}をプレビュー`}
+                                    title={t('Preview')}
+                                    aria-label={t('Preview :name', {
+                                        name: file.original_name,
+                                    })}
                                 >
                                     {#if file.thumbnail_url}
                                         <img
@@ -529,7 +549,9 @@
 
                                 {#if !isImage(file) && !isVideo(file)}
                                     <Badge
-                                        title={`${fileTypeLabel(file)}ファイル`}
+                                        title={t('File type: :type', {
+                                            type: fileTypeLabel(file),
+                                        })}
                                         data-file-kind={typeIcon}
                                         class="pointer-events-none absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-bold tracking-wide shadow-md"
                                     >
@@ -583,13 +605,13 @@
                                     >
                                         <span class="flex items-center gap-1">
                                             <Eye class="h-3.5 w-3.5" />
-                                            プレビュー
+                                            {t('Preview')}
                                         </span>
                                     </button>
                                     <a
                                         href={file.download_url}
                                         class="rounded-md bg-white/15 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur transition hover:bg-white/25"
-                                        title="ダウンロード"
+                                        title={t('Download')}
                                     >
                                         <Download class="h-3.5 w-3.5" />
                                     </a>
@@ -597,7 +619,7 @@
                                         type="button"
                                         class="rounded-md bg-red-500/80 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-red-500"
                                         onclick={() => removeFile(file)}
-                                        title="削除"
+                                        title={t('Delete')}
                                     >
                                         <Trash2 class="h-3.5 w-3.5" />
                                     </button>
@@ -618,7 +640,7 @@
                         class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#5865f2] bg-[#313338]/95 px-8 py-6 text-lg font-semibold shadow-xl"
                     >
                         <Upload class="h-6 w-6" />
-                        ドロップしてアップロード
+                        {t('Drop files to upload')}
                     </div>
                 </div>
             {/if}

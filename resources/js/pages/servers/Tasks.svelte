@@ -16,6 +16,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
     import { formatDate, formatDateTime } from '@/lib/dates';
+    import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
     import { priorityLabel } from '@/lib/todos';
     import type {
@@ -75,6 +76,17 @@
         return todos.filter((todo) => todo.channel_id === channelId);
     }
 
+    function channelDateRange(channel: ChannelResource): string {
+        return t('Date range: :start - :end', {
+            start: channel.starts_on
+                ? formatDate(channel.starts_on)
+                : t('Channel start date undecided'),
+            end: channel.ends_on
+                ? formatDate(channel.ends_on)
+                : t('Channel end date undecided'),
+        });
+    }
+
     function handleTodoKeydown(event: KeyboardEvent, todo: TodoResource) {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -110,10 +122,14 @@
                 <ArrowLeft class="h-4 w-4" />
             </Link>
             <ListTodo class="h-4 w-4 text-[#5865f2]" />
-            <h1 class="text-[15px] font-bold">タスク一覧</h1>
+            <h1 class="text-[15px] font-bold">{t('Task list')}</h1>
             <span class="ml-auto text-sm font-semibold text-[#4e5058]">
-                {todos.filter((t) => !t.completed_at).length} 未完了 / {todos.length}
-                件
+                {t('Incomplete tasks: :incomplete / :total', {
+                    incomplete: String(
+                        todos.filter((todo) => !todo.completed_at).length,
+                    ),
+                    total: String(todos.length),
+                })}
             </span>
         </header>
 
@@ -122,13 +138,13 @@
                 <h2
                     class="mb-2 text-xs font-bold uppercase tracking-wide text-[#80848e]"
                 >
-                    チャンネル（タスク）
+                    {t('Channels (tasks)')}
                 </h2>
                 {#if channels.length === 0}
                     <p
                         class="rounded-lg bg-[#2b2d31] p-6 text-center text-sm text-[#80848e]"
                     >
-                        チャンネルがありません
+                        {t('No channels')}
                     </p>
                 {:else}
                     <div class="space-y-4">
@@ -160,12 +176,7 @@
                                     >
                                         <span class="flex items-center gap-1">
                                             <CalendarDays class="h-3.5 w-3.5" />
-                                            {channel.starts_on
-                                                ? formatDate(channel.starts_on)
-                                                : '開始未定'} 〜
-                                            {channel.ends_on
-                                                ? formatDate(channel.ends_on)
-                                                : '期限未定'}
+                                            {channelDateRange(channel)}
                                         </span>
                                         <span class="flex items-center gap-1">
                                             <ListTodo class="h-3.5 w-3.5" />
@@ -183,7 +194,9 @@
                                             )}
                                             role="button"
                                             tabindex="0"
-                                            aria-label={`${todo.title}を編集`}
+                                            aria-label={t('Edit :name', {
+                                                name: todo.title,
+                                            })}
                                             onclick={(event) =>
                                                 openTodoFromClick(event, todo)}
                                             onkeydown={(event) =>
@@ -227,7 +240,7 @@
                                                         />
                                                         <span
                                                             class="text-xs text-[#6a6f78] dark:text-[#949ba4]"
-                                                            >開始</span
+                                                            >{t('Start')}</span
                                                         >
                                                         {formatDateTime(
                                                             todo.starts_at,
@@ -243,7 +256,9 @@
                                                         />
                                                         <span
                                                             class="text-xs text-[#6a6f78] dark:text-[#949ba4]"
-                                                            >期限</span
+                                                            >{t(
+                                                                'Deadline',
+                                                            )}</span
                                                         >
                                                         {formatDateTime(
                                                             todo.due_at,
@@ -263,7 +278,7 @@
                                                 >
                                                     <User class="h-3.5 w-3.5" />
                                                     {todo.assignee?.name ??
-                                                        '未割当'}
+                                                        t('Unassigned')}
                                                 </span>
                                             </div>
                                         </div>

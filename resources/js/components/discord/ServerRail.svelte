@@ -6,11 +6,13 @@
     import NotificationButton from '@/components/discord/NotificationButton.svelte';
     import ProjectFolderIcon from '@/components/discord/ProjectFolderIcon.svelte';
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
+    import LanguageSwitcher from '@/components/LanguageSwitcher.svelte';
     import {
         Collapsible,
         CollapsibleContent,
         CollapsibleTrigger,
     } from '@/components/ui/collapsible';
+    import { t } from '@/lib/i18n';
     import { mentionNotificationsState } from '@/lib/mention-notifications.svelte';
     import type { ProjectFolderResource, ServerResource } from '@/types';
 
@@ -98,7 +100,7 @@
 
 <nav
     class={`flex h-full shrink-0 flex-col gap-2 overflow-y-auto bg-[#1e1f22] py-3 transition-[width] duration-200 dark:bg-[#1e1f22] light:bg-[#e3e5e8] ${collapsed ? 'w-[72px] items-center' : 'w-60 items-stretch'}`}
-    aria-label="プロジェクト一覧"
+    aria-label={t('Project list')}
     onmouseenter={expandRail}
     onmouseleave={collapseRail}
 >
@@ -108,11 +110,13 @@
         class={`group relative mx-2 flex h-10 items-center rounded-2xl text-[#dbdee1] transition-all hover:rounded-xl ${collapsed ? 'w-12 justify-center' : 'justify-start gap-2 px-3'} ${!activeServerId ? 'bg-white/80 shadow-sm dark:bg-[#5865f2] dark:text-white' : 'hover:bg-white/70 dark:hover:bg-[#5865f2] dark:hover:text-white'}`}
         class:rounded-xl={!activeServerId}
         onclick={onBrowse}
-        title="プロジェクト一覧"
+        title={t('Project list')}
     >
         <AppLogoIcon class="size-8 rounded-lg" />
         {#if !collapsed}
-            <span class="truncate text-sm font-semibold">プロジェクト一覧</span>
+            <span class="truncate text-sm font-semibold"
+                >{t('Project list')}</span
+            >
         {/if}
     </button>
 
@@ -127,13 +131,17 @@
             <div
                 data-project-folder={group.folder.id}
                 role="group"
-                aria-label={`${group.folder.name}フォルダ項目`}
+                aria-label={t('Folder items for :name', {
+                    name: group.folder.name,
+                })}
                 onmouseenter={() => openFolder(group.folder.id)}
                 onmouseleave={() => closeFolder(group.folder.id)}
             >
                 <CollapsibleTrigger
                     class={`group/folder relative mx-2 flex h-12 items-center rounded-2xl transition-all hover:rounded-xl ${collapsed ? 'w-12 justify-center' : 'w-auto gap-3 px-3'} ${folderHasActiveProject(group.servers) ? 'bg-white/80 shadow-sm dark:bg-white/10' : 'hover:bg-white/60 dark:hover:bg-white/5'}`}
-                    aria-label={`${group.folder.name}フォルダ`}
+                    aria-label={t('Folder :name', {
+                        name: group.folder.name,
+                    })}
                     aria-expanded={openFolderId === group.folder.id &&
                         !collapsed}
                     aria-controls={`project-folder-${group.folder.id}`}
@@ -155,7 +163,9 @@
                         </span>
                         <span
                             class="text-xs tabular-nums text-[#949ba4]"
-                            aria-label={`${group.servers.length}件`}
+                            aria-label={t('Project count: :count', {
+                                count: String(group.servers.length),
+                            })}
                         >
                             {group.servers.length}
                         </span>
@@ -166,7 +176,9 @@
                     {#if folderUnreadCount(group.servers) > 0}
                         <span
                             class={`absolute flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22] ${collapsed ? '-top-1 -right-1' : 'top-0.5 right-0.5'}`}
-                            aria-label={`未読メンション ${folderUnreadCount(group.servers)}件`}
+                            aria-label={t('Unread mentions: :count', {
+                                count: String(folderUnreadCount(group.servers)),
+                            })}
                         >
                             {folderUnreadCount(group.servers) > 99
                                 ? '99+'
@@ -180,11 +192,13 @@
                         id={`project-folder-${group.folder.id}`}
                         class="mx-2 mt-1 flex flex-col gap-1 border-l border-white/10 pl-3"
                         role="group"
-                        aria-label={`${group.folder.name}内のプロジェクト`}
+                        aria-label={t('Projects in :name', {
+                            name: group.folder.name,
+                        })}
                     >
                         {#if group.servers.length === 0}
                             <span class="px-2 py-2 text-xs text-[#949ba4]">
-                                プロジェクトなし
+                                {t('No projects')}
                             </span>
                         {:else}
                             {#each group.servers as server (server.id)}
@@ -208,7 +222,16 @@
                                     {#if notificationState.getServerUnreadCount(server.id) > 0}
                                         <span
                                             class="flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22]"
-                                            aria-label={`未読メンション ${notificationState.getServerUnreadCount(server.id)}件`}
+                                            aria-label={t(
+                                                'Unread mentions: :count',
+                                                {
+                                                    count: String(
+                                                        notificationState.getServerUnreadCount(
+                                                            server.id,
+                                                        ),
+                                                    ),
+                                                },
+                                            )}
                                         >
                                             {notificationState.getServerUnreadCount(
                                                 server.id,
@@ -256,8 +279,12 @@
             {#if notificationState.getServerUnreadCount(server.id) > 0}
                 <span
                     class={`absolute flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22] ${collapsed ? '-top-1 -right-1' : 'top-1 right-1'}`}
-                    title="未読メンション"
-                    aria-label={`未読メンション ${notificationState.getServerUnreadCount(server.id)}件`}
+                    title={t('Unread mentions')}
+                    aria-label={t('Unread mentions: :count', {
+                        count: String(
+                            notificationState.getServerUnreadCount(server.id),
+                        ),
+                    })}
                 >
                     {notificationState.getServerUnreadCount(server.id) > 99
                         ? '99+'
@@ -271,23 +298,28 @@
         type="button"
         class={`group relative flex h-9 items-center rounded-lg bg-[#313338] text-[#23a559] transition-all hover:bg-[#23a559] hover:text-white ${collapsed ? 'w-12 justify-center self-center' : 'w-48 justify-center gap-1.5 self-center px-3'}`}
         onclick={onAddServer}
-        title="プロジェクトを作成"
+        title={t('Create project')}
     >
         <Plus class="h-5 w-5" />
         {#if !collapsed}
-            <span class="text-sm font-medium">プロジェクトを作成</span>
+            <span class="text-sm font-medium">{t('Create project')}</span>
         {/if}
     </button>
 
-    <div class="mt-auto w-full">
+    <div class="mt-auto flex w-full flex-col gap-2 px-2">
+        <LanguageSwitcher
+            compact={collapsed}
+            dark
+            class={collapsed ? 'mx-auto' : 'w-full'}
+        />
         <a
             href="/settings/profile"
-            class={`mx-2 flex h-12 items-center rounded-2xl bg-[#313338] text-[#dbdee1] transition-all hover:rounded-xl hover:bg-white/70 dark:hover:bg-[#5865f2] dark:hover:text-white ${collapsed ? 'w-12 justify-center' : 'justify-start gap-2 px-3'}`}
-            title="設定"
+            class={`flex h-12 items-center rounded-2xl bg-[#313338] text-[#dbdee1] transition-all hover:rounded-xl hover:bg-white/70 dark:hover:bg-[#5865f2] dark:hover:text-white ${collapsed ? 'w-12 justify-center self-center' : 'justify-start gap-2 px-3'}`}
+            title={t('Settings')}
         >
             <Settings class="h-6 w-6" />
             {#if !collapsed}
-                <span class="text-sm font-medium">設定</span>
+                <span class="text-sm font-medium">{t('Settings')}</span>
             {/if}
         </a>
     </div>

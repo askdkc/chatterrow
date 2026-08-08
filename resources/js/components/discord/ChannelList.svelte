@@ -11,6 +11,7 @@
         CornerDownRight,
         Settings,
     } from 'lucide-svelte';
+    import { t } from '@/lib/i18n';
     import { mentionNotificationsState } from '@/lib/mention-notifications.svelte';
     import { safeMentionText } from '@/lib/mentions';
     import type {
@@ -52,7 +53,7 @@
                 .trim()
                 .split('\n')[0] ||
             message.attachments?.[0]?.original_name ||
-            '無題のスレッド'
+            t('Untitled thread')
         );
     }
 
@@ -65,7 +66,7 @@
 
 <aside
     class="flex w-60 shrink-0 flex-col bg-[#2b2d31] text-[#949ba4] dark:bg-[#2b2d31] light:bg-[#f2f3f5]"
-    aria-label="チャンネル一覧"
+    aria-label={t('Channel list')}
 >
     <button
         type="button"
@@ -82,14 +83,14 @@
                 class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide"
             >
                 <ChevronDown class="h-3 w-3" />
-                チャンネル
+                {t('Channels')}
             </span>
             {#if onAddChannel}
                 <button
                     type="button"
                     class="rounded p-1 transition hover:bg-white/10 hover:text-white"
                     onclick={onAddChannel}
-                    title="チャンネルを作成"
+                    title={t('Create channel')}
                 >
                     <Plus class="h-4 w-4" />
                 </button>
@@ -117,7 +118,7 @@
                             {#if notificationState.getChannelUnreadCount(channel.id) > 0}
                                 <span
                                     class="inline-flex min-w-4 items-center justify-center rounded-full bg-[#f0b232] px-1 text-[10px] font-bold leading-4 text-[#1e1f22]"
-                                    title="未読メンション"
+                                    title={t('Unread mentions')}
                                 >
                                     {notificationState.getChannelUnreadCount(
                                         channel.id,
@@ -127,7 +128,7 @@
                             {#if channel.starts_on || channel.ends_on}
                                 <span
                                     class="size-2 shrink-0 rounded-full bg-brand"
-                                    title="チャンネル期間設定あり"
+                                    title={t('Channel has date range')}
                                 ></span>
                             {/if}
                         </span>
@@ -137,8 +138,10 @@
                     <button
                         type="button"
                         class="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 rounded p-1 text-[#80848e] opacity-0 transition hover:bg-white/10 hover:text-[#dbdee1] group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                        aria-label={`${channel.name}の設定`}
-                        title="チャンネル設定"
+                        aria-label={t('Settings for :name', {
+                            name: channel.name,
+                        })}
+                        title={t('Channel settings')}
                         onclick={(event) => handleEditChannel(event, channel)}
                     >
                         <Settings class="h-4 w-4" />
@@ -149,7 +152,7 @@
             {#if channel.id === activeChannelId && threads.length > 0}
                 <div
                     class="relative mx-4 mb-2 ml-6 border-l-2 border-[#4e5058] pl-2"
-                    aria-label="スレッド一覧"
+                    aria-label={t('Thread list')}
                 >
                     {#each threads as thread (thread.id)}
                         <button
@@ -160,7 +163,9 @@
                                     : ''
                             }`}
                             onclick={() => onOpenThread?.(thread)}
-                            aria-label={`スレッド「${threadTitle(thread)}」を開く`}
+                            aria-label={t('Open thread ":name"', {
+                                name: threadTitle(thread),
+                            })}
                             title={threadTitle(thread)}
                         >
                             <CornerDownRight
@@ -182,7 +187,7 @@
 
         {#if channels.length === 0}
             <p class="px-4 py-2 text-sm text-[#80848e]">
-                チャンネルがありません
+                {t('No channels')}
             </p>
         {/if}
     </div>
@@ -194,21 +199,21 @@
             class="flex items-center gap-2 rounded-md px-2 py-1.5 text-[15px] font-medium transition hover:bg-white/10 hover:text-[#dbdee1]"
         >
             <ListTodo class="h-5 w-5" />
-            タスク一覧
+            {t('Task list')}
         </Link>
         <Link
             href={`/servers/${server.id}/gantt`}
             class="flex items-center gap-2 rounded-md px-2 py-1.5 text-[15px] font-medium transition hover:bg-white/10 hover:text-[#dbdee1]"
         >
             <CalendarRange class="h-5 w-5" />
-            ガントチャート
+            {t('Gantt chart')}
         </Link>
         <Link
             href={`/servers/${server.id}/files`}
             class="flex items-center gap-2 rounded-md px-2 py-1.5 text-[15px] font-medium transition hover:bg-white/10 hover:text-[#dbdee1]"
         >
             <FileText class="h-5 w-5" />
-            ファイル
+            {t('Files')}
         </Link>
     </div>
 
@@ -218,7 +223,7 @@
             class="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide"
         >
             <Users class="h-3.5 w-3.5" />
-            メンバー {members.length}
+            {t('Members: :count', { count: String(members.length) })}
         </div>
         <div class="flex flex-wrap gap-1">
             {#each members as member (member.id)}

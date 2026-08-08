@@ -18,7 +18,7 @@
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
     import { formatDateTime } from '@/lib/dates';
     import { apiFetch, apiJson, HttpError } from '@/lib/http';
-    import { priorityLabel } from '@/lib/todos';
+    import { t } from '@/lib/i18n';
     import type { TodoResource, UserResource } from '@/types';
 
     let {
@@ -103,7 +103,9 @@
             todos = todos.map((t) => (t.id === todo.id ? data.todo : t));
         } catch (e) {
             error =
-                e instanceof HttpError ? e.messageText() : '更新に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : t('Failed to update task.');
         }
     }
 
@@ -120,12 +122,29 @@
             hoveredTodoIds = hoveredTodoIds.filter((id) => id !== todo.id);
         } catch (e) {
             error =
-                e instanceof HttpError ? e.messageText() : '削除に失敗しました';
+                e instanceof HttpError
+                    ? e.messageText()
+                    : t('Failed to delete task.');
         }
     }
 
     function assigneeName(id: number | null): string {
-        return members.find((m) => m.id === id)?.name ?? '未割当';
+        return members.find((m) => m.id === id)?.name ?? t('Unassigned');
+    }
+
+    function priorityLabel(priority: TodoResource['priority']): string {
+        switch (priority) {
+            case 'low':
+                return t('Low');
+            case 'normal':
+                return t('Normal');
+            case 'high':
+                return t('High');
+            case 'urgent':
+                return t('Urgent');
+            default:
+                return t('Normal');
+        }
     }
 </script>
 
@@ -138,39 +157,45 @@
         <ListTodo class="h-4 w-4 shrink-0 text-[#80848e]" />
         {#if !collapsed}
             <span class="shrink-0 whitespace-nowrap text-sm font-bold"
-                >タスク</span
+                >{t('Tasks')}</span
             >
             <button
                 type="button"
                 class="ml-auto flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium whitespace-nowrap text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] disabled:cursor-default disabled:opacity-40"
                 aria-label={allTodosExpanded
-                    ? 'タスクをすべて折りたたむ'
-                    : 'タスクをすべて展開'}
+                    ? t('Collapse all tasks')
+                    : t('Expand all tasks')}
                 title={allTodosExpanded
-                    ? 'タスクをすべて折りたたむ'
-                    : 'タスクをすべて展開'}
+                    ? t('Collapse all tasks')
+                    : t('Expand all tasks')}
                 disabled={todos.length === 0}
                 onclick={toggleAllTodoDetails}
             >
                 {#if allTodosExpanded}
                     <ChevronsUp class="h-3.5 w-3.5" />
-                    全て閉じる
+                    {t('Collapse all')}
                 {:else}
                     <ChevronsDown class="h-3.5 w-3.5" />
-                    全て展開
+                    {t('Expand all')}
                 {/if}
             </button>
             <span
                 class="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-xs"
             >
-                {todos.filter((t) => !t.completed_at).length} 未完了
+                {t('Incomplete: :count', {
+                    count: String(todos.filter((t) => !t.completed_at).length),
+                })}
             </span>
         {/if}
         <button
             type="button"
             class={`shrink-0 rounded p-1 text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1] ${collapsed ? '' : 'ml-1'}`}
-            aria-label={collapsed ? 'タスクを展開' : 'タスクを折りたたむ'}
-            title={collapsed ? 'タスクを展開' : 'タスクを折りたたむ'}
+            aria-label={collapsed
+                ? t('Expand task panel')
+                : t('Collapse task panel')}
+            title={collapsed
+                ? t('Expand task panel')
+                : t('Collapse task panel')}
             onclick={() => (collapsed = !collapsed)}
         >
             {#if collapsed}
@@ -195,7 +220,7 @@
         <div class="flex-1 overflow-y-auto p-3">
             {#if todos.length === 0}
                 <p class="py-6 text-center text-sm text-[#80848e]">
-                    タスクがありません
+                    {t('No tasks')}
                 </p>
             {/if}
 
@@ -215,7 +240,7 @@
                                 toggleTodo(todo);
                             }}
                             class="mt-0.5 shrink-0"
-                            title="完了切替"
+                            title={t('Toggle completion')}
                         >
                             {#if todo.completed_at}
                                 <CheckCircle2 class="h-5 w-5 text-[#23a559]" />
@@ -228,7 +253,7 @@
                         <button
                             type="button"
                             class="min-w-0 flex-1 text-left"
-                            aria-label={`${todo.title}を編集`}
+                            aria-label={t('Edit :name', { name: todo.title })}
                             onclick={() => openTodo(todo)}
                         >
                             <p
@@ -242,13 +267,17 @@
                             type="button"
                             class="shrink-0 rounded p-1 text-[#80848e] transition hover:bg-white/10 hover:text-[#dbdee1]"
                             aria-label={isTodoCollapsed(todo.id)
-                                ? `${todo.title}の詳細を展開`
-                                : `${todo.title}の詳細を折りたたむ`}
+                                ? t('Expand details for :name', {
+                                      name: todo.title,
+                                  })
+                                : t('Collapse details for :name', {
+                                      name: todo.title,
+                                  })}
                             aria-expanded={!isTodoCollapsed(todo.id)}
                             aria-controls={`todo-details-${todo.id}`}
                             title={isTodoCollapsed(todo.id)
-                                ? '詳細を展開'
-                                : '詳細を折りたたむ'}
+                                ? t('Expand details')
+                                : t('Collapse details')}
                             onclick={() => toggleTodoDetails(todo.id)}
                         >
                             {#if isTodoCollapsed(todo.id)}
@@ -261,8 +290,8 @@
                             type="button"
                             class="shrink-0 rounded p-1 text-[#80848e] opacity-0 transition hover:bg-white/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
                             onclick={() => removeTodo(todo)}
-                            title="削除"
-                            aria-label={`${todo.title}を削除`}
+                            title={t('Delete')}
+                            aria-label={t('Delete :name', { name: todo.title })}
                         >
                             <Trash2 class="h-3.5 w-3.5" />
                         </button>
@@ -274,7 +303,9 @@
                             class="ml-7 cursor-pointer"
                             role="button"
                             tabindex="0"
-                            aria-label={`${todo.title}の詳細を編集`}
+                            aria-label={t('Edit details for :name', {
+                                name: todo.title,
+                            })}
                             onclick={() => openTodo(todo)}
                             onkeydown={(event) =>
                                 handleTodoKeydown(event, todo)}
@@ -294,7 +325,7 @@
                                         class="flex items-center gap-1 text-[#6a6f78] dark:text-[#949ba4]"
                                     >
                                         <Clock3 class="h-3 w-3" />
-                                        開始日
+                                        {t('Start date')}
                                     </span>
                                     <span
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
@@ -304,7 +335,7 @@
                                                   year: false,
                                                   month: 'numeric',
                                               })
-                                            : '未設定'}
+                                            : t('Not set')}
                                     </span>
                                 </div>
                                 <div
@@ -314,7 +345,7 @@
                                         class="flex items-center gap-1 text-[#6a6f78] dark:text-[#949ba4]"
                                     >
                                         <CalendarDays class="h-3 w-3" />
-                                        終了日
+                                        {t('End date')}
                                     </span>
                                     <span
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
@@ -324,7 +355,7 @@
                                                   year: false,
                                                   month: 'numeric',
                                               })
-                                            : '未設定'}
+                                            : t('Not set')}
                                     </span>
                                 </div>
                                 <div
@@ -334,7 +365,7 @@
                                         class="flex items-center gap-1 text-[#6a6f78] dark:text-[#949ba4]"
                                     >
                                         <Flag class="h-3 w-3" />
-                                        プライオリティ
+                                        {t('Priority')}
                                     </span>
                                     <span
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
@@ -349,7 +380,7 @@
                                         class="flex items-center gap-1 text-[#6a6f78] dark:text-[#949ba4]"
                                     >
                                         <User class="h-3 w-3" />
-                                        担当者
+                                        {t('Assignee')}
                                     </span>
                                     <span
                                         class="mt-0.5 block text-sm font-semibold text-[#4e5058] dark:text-[#dbdee1]"
@@ -371,7 +402,7 @@
                 onclick={() => (showCreateDialog = true)}
             >
                 <Plus class="h-4 w-4" />
-                タスクを追加
+                {t('Add task')}
             </button>
         </div>
     {/if}

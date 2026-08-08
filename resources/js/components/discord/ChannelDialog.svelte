@@ -2,6 +2,7 @@
     import { X, Loader2 } from 'lucide-svelte';
     import { dateValue } from '@/lib/dates';
     import { apiJson, HttpError } from '@/lib/http';
+    import { t } from '@/lib/i18n';
     import type { ChannelResource, ServerResource } from '@/types';
 
     let {
@@ -70,8 +71,8 @@
                 e instanceof HttpError
                     ? e.messageText()
                     : isEditing
-                      ? '保存に失敗しました'
-                      : '作成に失敗しました';
+                      ? t('Failed to save channel')
+                      : t('Failed to create channel');
         } finally {
             saving = false;
         }
@@ -90,7 +91,7 @@
     <button
         type="button"
         class="absolute inset-0 bg-black/60"
-        aria-label="背景をクリックして閉じる"
+        aria-label={t('Click the background to close')}
         onclick={onClose}
     ></button>
     <div
@@ -104,13 +105,13 @@
                 id="channel-dialog-title"
                 class="text-lg font-bold text-[#dbdee1]"
             >
-                {isEditing ? 'チャンネル設定' : 'チャンネルを作成'}
+                {isEditing ? t('Channel settings') : t('Create channel')}
             </h2>
             <button
                 type="button"
                 class="rounded p-1 hover:bg-white/10"
                 onclick={onClose}
-                aria-label="閉じる"
+                aria-label={t('Close')}
             >
                 <X class="h-5 w-5 text-[#80848e]" />
             </button>
@@ -121,13 +122,13 @@
                 <label
                     for="channel-name"
                     class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >チャンネル名</label
+                    >{t('Channel name')}</label
                 >
                 <input
                     id="channel-name"
                     bind:value={name}
                     type="text"
-                    placeholder="例: プロジェクト進行"
+                    placeholder={t('e.g. Project progress')}
                     class="w-full rounded-md bg-[#383a40] px-3 py-2 text-sm text-[#dbdee1] outline-none placeholder:text-[#6d6f78] focus:ring-1 focus:ring-[#5865f2]"
                 />
             </div>
@@ -135,7 +136,7 @@
                 <label
                     for="channel-description"
                     class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                    >説明（任意）</label
+                    >{t('Channel description (optional)')}</label
                 >
                 <textarea
                     id="channel-description"
@@ -149,7 +150,7 @@
                     <label
                         for="channel-starts-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                        >開始日</label
+                        >{t('Start date')}</label
                     >
                     <input
                         id="channel-starts-on"
@@ -162,7 +163,7 @@
                     <label
                         for="channel-ends-on"
                         class="mb-1 block text-xs font-semibold text-[#b5bac1]"
-                        >終了期限</label
+                        >{t('End deadline')}</label
                     >
                     <input
                         id="channel-ends-on"
@@ -173,7 +174,9 @@
                 </div>
             </div>
             <p class="text-xs text-[#80848e]">
-                チャンネルはタスクとして機能します。開始日と終了期限を設定できます。
+                {t(
+                    'Channels function as tasks. You can set a start date and end deadline.',
+                )}
             </p>
 
             {#if error}
@@ -193,7 +196,7 @@
                 class="rounded-md px-4 py-2 text-sm font-medium text-[#b5bac1] transition hover:bg-white/10"
                 onclick={onClose}
             >
-                キャンセル
+                {t('Cancel')}
             </button>
             <button
                 type="button"
@@ -204,7 +207,7 @@
                 {#if saving}
                     <Loader2 class="h-4 w-4 animate-spin" />
                 {/if}
-                {isEditing ? '保存' : '作成'}
+                {isEditing ? t('Save') : t('Create')}
             </button>
         </div>
     </div>

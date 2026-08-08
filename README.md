@@ -1,5 +1,9 @@
 # 茶多楼 chatterrow
 
+## 翻訳
+
+[English](docs/README_en.md) | [日本語](README.md) | [Français](docs/README_fr.md) | [Deutsch](docs/README_de.md) | [简体中文](docs/README_zh_CN.md) | [繁體中文](docs/README_zh_TW.md) | [Español](docs/README_es.md) | [Português (Brasil)](docs/README_pt_BR.md) | [Português (Portugal)](docs/README_pt_PT.md) | [한국어](docs/README_ko.md)
+
 ## 業務の一元管理を支える機能をチャットに詰め込みました
 <img width="100%" alt="Chatterrow サービス紹介" src="./docs/assets/chatterrow-introduction.gif" />
 

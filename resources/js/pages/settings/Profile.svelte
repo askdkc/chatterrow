@@ -18,6 +18,7 @@
     import DeleteUser from '@/components/DeleteUser.svelte';
     import Heading from '@/components/Heading.svelte';
     import InputError from '@/components/InputError.svelte';
+    import LanguageSwitcher from '@/components/LanguageSwitcher.svelte';
     import TextLink from '@/components/TextLink.svelte';
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';
@@ -38,6 +39,8 @@
         title={t('Profile')}
         description={t('Update your name and email address')}
     />
+
+    <LanguageSwitcher class="w-full sm:max-w-xs" />
 
     <Form
         {...ProfileController.update.form()}

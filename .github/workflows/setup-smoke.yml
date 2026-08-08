@@ -37,7 +37,7 @@ jobs:
         run: |
           bash -n setup.sh
           shellcheck -x -S error setup.sh
-          ./setup.sh --help >/dev/null
+          ./setup.sh --help | grep -Fq -- '--language <locale>'
 
   ubuntu:
     name: Ubuntu ${{ matrix.version }} systemd smoke test
@@ -127,9 +127,12 @@ jobs:
             GIT_CONFIG_GLOBAL="$git_config_global" ./setup.sh \
               --domain chatterrow.test \
               --database sqlite \
+              --language fr \
               --app-dir /var/www/chatterrow \
               --repo file:///workspace/chatterrow \
               --no-ssl
+
+            grep -qx 'APP_LOCALE=fr' /var/www/chatterrow/.env
 
             token="ci-acme-${RANDOM}${RANDOM}"
             challenge="/var/www/letsencrypt/.well-known/acme-challenge/$token"

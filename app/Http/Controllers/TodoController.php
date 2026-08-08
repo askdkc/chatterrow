@@ -159,7 +159,7 @@ class TodoController extends Controller
 
         if ($startsAt !== null && $dueAt !== null && $dueAt->lessThan($startsAt)) {
             throw ValidationException::withMessages([
-                'due_at' => ['終了日時は開始日時以降にしてください。'],
+                'due_at' => [__('The end date and time must be on or after the start date and time.')],
             ]);
         }
     }
@@ -197,7 +197,7 @@ class TodoController extends Controller
 
         if ($membership === null) {
             throw ValidationException::withMessages([
-                'assignee_id' => ['The selected assignee is not a member of this server.'],
+                'assignee_id' => [__('The selected assignee is not a member of this server.')],
             ]);
         }
     }

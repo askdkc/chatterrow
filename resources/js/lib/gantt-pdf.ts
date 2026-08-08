@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { t } from '@/lib/i18n';
 import { epochDay, formatEpochDay } from './gantt';
 
 export interface GanttPdfTask {
@@ -58,7 +59,9 @@ async function loadJapaneseFont(): Promise<string | null> {
         .then((response) => {
             if (!response.ok) {
                 throw new Error(
-                    `Japanese PDF font failed to load: ${response.status}`,
+                    t('Failed to load PDF font: :status', {
+                        status: String(response.status),
+                    }),
                 );
             }
 
@@ -117,14 +120,23 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
     doc.setFont(japaneseFont ? JAPANESE_FONT_NAME : 'helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...COLORS.muted);
-    const period = `${formatEpochDay(options.rangeStart, { month: 'short', day: 'numeric' })} 〜 ${formatEpochDay(options.rangeEnd, { month: 'short', day: 'numeric' })}`;
+    const period = t('Date range: :start - :end', {
+        start: formatEpochDay(options.rangeStart, {
+            month: 'short',
+            day: 'numeric',
+        }),
+        end: formatEpochDay(options.rangeEnd, {
+            month: 'short',
+            day: 'numeric',
+        }),
+    });
     doc.text(period, tableX, MARGIN + 12);
 
     const drawLegend = (): void => {
         const items = [
-            { label: 'チャンネル', color: COLORS.channel },
-            { label: 'タスク', color: COLORS.todo },
-            { label: '完了', color: COLORS.completed },
+            { label: t('Channels'), color: COLORS.channel },
+            { label: t('Tasks'), color: COLORS.todo },
+            { label: t('Completed'), color: COLORS.completed },
         ];
         let x = tableX + tableW;
 
@@ -187,8 +199,11 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
 
         for (let day = options.rangeStart; day <= options.rangeEnd; day += 1) {
             const x = dayX(day);
-            const date = new Date(day * 86_400_000);
-            const label = `${date.getUTCMonth() + 1}/${date.getUTCDate()}(${'日月火水木金土'.charAt(date.getUTCDay())})`;
+            const label = formatEpochDay(day, {
+                month: 'numeric',
+                day: 'numeric',
+                weekday: 'short',
+            });
             const isToday = options.today === day;
 
             if (isToday) {

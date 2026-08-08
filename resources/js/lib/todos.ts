@@ -1,12 +1,13 @@
+import { t } from '@/lib/i18n';
 import type { TodoResource } from '@/types';
 
-const priorityLabels: Record<TodoResource['priority'], string> = {
-    low: '低',
-    normal: '通常',
-    high: '高',
-    urgent: '緊急',
+const priorityKeys: Record<TodoResource['priority'], string> = {
+    low: 'Low',
+    normal: 'Normal',
+    high: 'High',
+    urgent: 'Urgent',
 };
 
 export function priorityLabel(priority: TodoResource['priority']): string {
-    return priorityLabels[priority];
+    return t(priorityKeys[priority]);
 }

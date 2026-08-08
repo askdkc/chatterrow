@@ -34,8 +34,7 @@
         sizeClass,
         className,
     )}
-    style:color={displayColor}
-    style:background-color={`${displayColor}26`}
+    style={`--folder-color: ${displayColor}; background-color: ${displayColor}26`}
     data-project-folder-icon
     data-folder-color={displayColor}
     aria-hidden="true"
@@ -51,3 +50,13 @@
         <Folder class={iconSizeClass} />
     {/if}
 </span>
+
+<style>
+    [data-project-folder-icon] {
+        color: var(--folder-color);
+    }
+
+    :global(html:not(.dark)) [data-project-folder-icon] {
+        color: color-mix(in srgb, var(--folder-color) 45%, #111827);
+    }
+</style>
