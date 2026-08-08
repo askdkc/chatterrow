@@ -1,10 +1,7 @@
 # 茶多楼 chatterrow
 
 ## Business management features packed into chat for unified operations
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/f7032613-194f-46b6-ac77-cfb1a4f2f1a3" />
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/619f867d-9598-4628-8e94-89eac10558d1" />
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/981ccc86-ae70-4122-bfb3-93a6d01cce29" />
-
+<img width="100%" alt="Chatterrow サービス紹介" src="./assets/chatterrow.gif" />
 
 Built with Laravel 13, Inertia 3, and Svelte 5, this is project-based groupware with a Discord-style UI.
 
