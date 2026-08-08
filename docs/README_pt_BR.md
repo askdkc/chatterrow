@@ -1,10 +1,7 @@
 # 茶多楼 chatterrow
 
 ## Reunimos no chat os recursos que apoiam o gerenciamento centralizado do trabalho
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/f7032613-194f-46b6-ac77-cfb1a4f2f1a3" />
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/619f867d-9598-4628-8e94-89eac10558d1" />
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/981ccc86-ae70-4122-bfb3-93a6d01cce29" />
-
+<img width="100%" alt="Chatterrow サービス紹介" src="./assets/chatterrow.gif" />
 
 Construído com Laravel 13, Inertia 3 e Svelte 5, é um groupware baseado em projetos com uma interface no estilo do Discord.
 
