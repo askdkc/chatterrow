@@ -215,6 +215,7 @@ class GroupwarePagePropsTest extends TestCase
                 ->has('members', 2)
                 ->has('tasks')
                 ->where('tasks.0.channel_id', $this->channel->id)
+                ->where('channel.id', $this->channel->id)
                 ->has('auth.servers', 1));
     }
 

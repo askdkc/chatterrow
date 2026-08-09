@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { currentLocale } from '@/lib/dates';
 import { t } from '@/lib/i18n';
-import { epochDay, formatEpochDay } from './gantt';
+import { epochDay, formatEpochDay, monthSegments } from './gantt';
 
 export interface GanttPdfTask {
     id: string;
@@ -26,7 +26,7 @@ const PAGE_W = 297;
 const PAGE_H = 210;
 const MARGIN = 10;
 const HEADER_H = 18;
-const DATE_ROW_H = 9;
+const MONTH_ROW_H = 9;
 const ROW_H = 9;
 const LABEL_W = 72;
 const GRID_LINE_W = 0.2;
@@ -40,7 +40,8 @@ const COLORS: Record<string, Rgb> = {
     completed: [35, 165, 89],
     grid: [185, 190, 200],
     gridStrong: [145, 152, 165],
-    weekend: [243, 244, 247],
+    monthEven: [249, 250, 253],
+    monthOdd: [242, 246, 252],
     text: [30, 34, 40],
     muted: [110, 115, 125],
 };
@@ -137,16 +138,18 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         doc.setFont(fontProfile.name, 'normal');
     }
 
-    const dayCount = options.rangeEnd - options.rangeStart + 1;
+    const months = monthSegments(options.rangeStart, options.rangeEnd);
     const tableX = MARGIN;
     const tableY = MARGIN + HEADER_H;
     const tableW = PAGE_W - MARGIN * 2;
     const chartX = tableX + LABEL_W;
     const chartW = tableW - LABEL_W;
-    const dayW = chartW / dayCount;
-    const maxRows = Math.floor((PAGE_H - MARGIN - tableY - DATE_ROW_H) / ROW_H);
+    const monthW = chartW / months.length;
+    const maxRows = Math.floor(
+        (PAGE_H - MARGIN - tableY - MONTH_ROW_H) / ROW_H,
+    );
     const visibleTasks = options.tasks.slice(0, maxRows);
-    const tableH = DATE_ROW_H + visibleTasks.length * ROW_H;
+    const tableH = MONTH_ROW_H + visibleTasks.length * ROW_H;
 
     doc.setFont(pdfFont ? fontProfile.name : 'helvetica', 'normal');
     doc.setFontSize(16);
@@ -190,8 +193,27 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         }
     };
 
-    const dayX = (day: number): number =>
-        chartX + (day - options.rangeStart) * dayW;
+    const xForDay = (day: number): number => {
+        if (day <= options.rangeStart) {
+            return chartX;
+        }
+
+        if (day > options.rangeEnd) {
+            return chartX + chartW;
+        }
+
+        const monthIndex = months.findIndex(
+            (month) => day >= month.startDay && day <= month.endDay,
+        );
+        const month = months[monthIndex];
+        const monthDayCount = month.endDay - month.startDay + 1;
+
+        return (
+            chartX +
+            monthIndex * monthW +
+            ((day - month.startDay) / monthDayCount) * monthW
+        );
+    };
 
     const drawTableFrame = (): void => {
         doc.setDrawColor(...COLORS.gridStrong);
@@ -201,20 +223,18 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         doc.setDrawColor(...COLORS.grid);
         doc.setLineWidth(GRID_LINE_W);
 
-        for (let day = options.rangeStart; day <= options.rangeEnd; day += 1) {
-            const date = new Date(day * 86_400_000);
-            const weekday = date.getUTCDay();
+        months.forEach((_, index) => {
+            const x = chartX + index * monthW;
 
-            if (weekday === 0 || weekday === 6) {
-                doc.setFillColor(...COLORS.weekend);
-                doc.rect(dayX(day), tableY, dayW, tableH, 'F');
-            }
-
-            doc.line(dayX(day), tableY, dayX(day), tableY + tableH);
-        }
+            doc.setFillColor(
+                ...(index % 2 === 0 ? COLORS.monthEven : COLORS.monthOdd),
+            );
+            doc.rect(x, tableY, monthW, tableH, 'F');
+            doc.line(x, tableY, x, tableY + tableH);
+        });
 
         for (let row = 1; row < visibleTasks.length; row += 1) {
-            const y = tableY + DATE_ROW_H + row * ROW_H;
+            const y = tableY + MONTH_ROW_H + row * ROW_H;
             doc.line(tableX, y, tableX + tableW, y);
         }
 
@@ -223,41 +243,70 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         doc.line(chartX, tableY, chartX, tableY + tableH);
         doc.line(
             tableX,
-            tableY + DATE_ROW_H,
+            tableY + MONTH_ROW_H,
             tableX + tableW,
-            tableY + DATE_ROW_H,
+            tableY + MONTH_ROW_H,
         );
     };
 
-    const drawDateRow = (): void => {
-        doc.setFontSize(5.5);
+    const drawMonthRow = (): void => {
+        doc.setFontSize(months.length > 12 ? 5.5 : 7);
         doc.setTextColor(...COLORS.muted);
 
-        for (let day = options.rangeStart; day <= options.rangeEnd; day += 1) {
-            const x = dayX(day);
-            const label = formatEpochDay(day, {
-                month: 'numeric',
-                day: 'numeric',
-                weekday: 'short',
-            });
-            const isToday = options.today === day;
+        months.forEach((month, index) => {
+            const x = chartX + index * monthW;
+            const isOnlyMonth = months.length === 1;
+            const isFirstMonth = index === 0;
+            const isLastMonth = index === months.length - 1;
+            const label =
+                isFirstMonth || isLastMonth
+                    ? formatEpochDay(
+                          isFirstMonth ? options.rangeStart : options.rangeEnd,
+                          {
+                              month: 'numeric',
+                              day: 'numeric',
+                          },
+                      )
+                    : formatEpochDay(month.startDay, {
+                          year: 'numeric',
+                          month: 'short',
+                      });
 
-            if (isToday) {
+            if (
+                options.today !== undefined &&
+                options.today >= month.startDay &&
+                options.today <= month.endDay
+            ) {
                 doc.setDrawColor(...COLORS.channel);
                 doc.setLineWidth(0.3);
-                doc.rect(x, tableY, dayW, DATE_ROW_H);
+                doc.rect(x, tableY, monthW, MONTH_ROW_H);
                 doc.setLineWidth(GRID_LINE_W);
             }
 
-            doc.text(label, x + dayW / 2, tableY + DATE_ROW_H / 2 + 1, {
-                align: 'center',
-            });
-        }
+            if (isOnlyMonth && options.rangeStart !== options.rangeEnd) {
+                doc.text(label, x + 2, tableY + MONTH_ROW_H / 2 + 1, {
+                    align: 'left',
+                });
+                doc.text(
+                    formatEpochDay(options.rangeEnd, {
+                        month: 'numeric',
+                        day: 'numeric',
+                    }),
+                    x + monthW - 2,
+                    tableY + MONTH_ROW_H / 2 + 1,
+                    { align: 'right' },
+                );
+            } else {
+                doc.text(label, x + monthW / 2, tableY + MONTH_ROW_H / 2 + 1, {
+                    align: 'center',
+                });
+            }
+        });
     };
 
     const drawTasks = (): void => {
         visibleTasks.forEach((task, index) => {
-            const rowY = tableY + DATE_ROW_H + index * ROW_H;
+            const rowY = tableY + MONTH_ROW_H + index * ROW_H;
 
             doc.setFont(pdfFont ? fontProfile.name : 'helvetica', 'normal');
             doc.setFontSize(7);
@@ -274,9 +323,9 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
                 return;
             }
 
-            const startX = Math.max(dayX(epochDay(task.start)), chartX);
+            const startX = Math.max(xForDay(epochDay(task.start)), chartX);
             const endX = Math.min(
-                dayX(epochDay(task.end)) + dayW,
+                xForDay(epochDay(task.end) + 1),
                 chartX + chartW,
             );
             const barX = startX + 0.6;
@@ -304,7 +353,7 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
     };
 
     drawTableFrame();
-    drawDateRow();
+    drawMonthRow();
     drawLegend();
     drawTasks();
 

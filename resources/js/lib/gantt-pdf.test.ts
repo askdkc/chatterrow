@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { epochDay } from './gantt';
+import { epochDay, monthSegments } from './gantt';
 import { buildGanttPdf, pdfFontProfile } from './gantt-pdf';
 
 const fontPath = join(
@@ -10,6 +10,25 @@ const fontPath = join(
 );
 
 describe('buildGanttPdf', () => {
+    it('creates one timeline segment per calendar month', () => {
+        expect(
+            monthSegments(epochDay('2026-08-06'), epochDay('2026-10-31')),
+        ).toEqual([
+            {
+                startDay: epochDay('2026-08-06'),
+                endDay: epochDay('2026-08-31'),
+            },
+            {
+                startDay: epochDay('2026-09-01'),
+                endDay: epochDay('2026-09-30'),
+            },
+            {
+                startDay: epochDay('2026-10-01'),
+                endDay: epochDay('2026-10-31'),
+            },
+        ]);
+    });
+
     it.each([
         ['ja', '/fonts/SourceHanSansJP-Regular.ttf', 'SourceHanSansJP'],
         ['zh_CN', '/fonts/SourceHanSansCN-VF.ttf', 'SourceHanSansCN'],

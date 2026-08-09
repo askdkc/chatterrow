@@ -26,8 +26,8 @@ const server: ServerResource = {
     id: 1,
     name: 'Design Project',
     description: null,
-    starts_on: '2026-08-03',
-    ends_on: '2026-08-07',
+    starts_on: '2026-08-01',
+    ends_on: '2026-08-14',
     created_by: 1,
 };
 
@@ -148,5 +148,62 @@ describe('Gantt readability', () => {
                 ?.classList,
         ).toContain('bg-gantt-complete');
         expect(screen.getByRole('button', { name: 'PDF出力' })).toBeTruthy();
+    });
+
+    it('uses the project period for a server-wide gantt with one channel', () => {
+        render(Gantt, {
+            props: {
+                server,
+                tasks: tasks.slice(0, 2),
+                channels: channels.slice(0, 1),
+                members: [],
+            },
+        });
+
+        expect(document.querySelectorAll('[data-gantt-tick]')).toHaveLength(14);
+    });
+
+    it('uses the channel period for a channel-scoped gantt', () => {
+        render(Gantt, {
+            props: {
+                server,
+                channel: channels[0],
+                tasks: tasks.slice(0, 2),
+                channels: channels.slice(0, 1),
+                members: [],
+            },
+        });
+
+        expect(document.querySelectorAll('[data-gantt-tick]')).toHaveLength(5);
+    });
+
+    it('alternates the background for each project month', () => {
+        render(Gantt, {
+            props: {
+                server: {
+                    ...server,
+                    starts_on: '2026-08-01',
+                    ends_on: '2026-10-31',
+                },
+                tasks,
+                channels,
+                members: [],
+            },
+        });
+
+        const monthCells = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-gantt-month]'),
+        );
+
+        expect(monthCells).toHaveLength(92);
+        expect(monthCells[0]?.classList.contains('bg-muted/10')).toBe(true);
+        expect(
+            monthCells[31]?.classList.contains('bg-brand/5') &&
+                monthCells[31]?.classList.contains('border-l-2'),
+        ).toBe(true);
+        expect(
+            monthCells[61]?.classList.contains('bg-muted/10') &&
+                monthCells[61]?.classList.contains('border-l-2'),
+        ).toBe(true);
     });
 });

@@ -21,7 +21,7 @@
         getGanttRange,
         groupGanttTasks,
         gridColumn,
-        singleChannelTitle,
+        monthSegments,
     } from '@/lib/gantt';
     import { buildGanttPdf } from '@/lib/gantt-pdf';
     import { t } from '@/lib/i18n';
@@ -36,11 +36,13 @@
 
     let {
         server,
+        channel,
         tasks,
         channels,
         members,
     }: {
         server: ServerResource;
+        channel?: ChannelResource | null;
         tasks: GanttTask[];
         channels: ChannelResource[];
         members: UserResource[];
@@ -53,15 +55,12 @@
     );
     let showMemberDialog = $state(false);
 
-    const channelTask = $derived(
-        tasks.find((task) => task.type === 'channel') ?? null,
-    );
-    const channelHeaderTitle = $derived(singleChannelTitle(tasks));
+    const channelHeaderTitle = $derived(channel?.name ?? null);
     const hasChannelRange = $derived(
-        Boolean(channelHeaderTitle && channelTask?.start && channelTask.end),
+        Boolean(channel?.starts_on && channel.ends_on),
     );
-    const channelStart = $derived(channelTask?.start ?? '');
-    const channelEnd = $derived(channelTask?.end ?? '');
+    const channelStart = $derived(channel?.starts_on ?? '');
+    const channelEnd = $derived(channel?.ends_on ?? '');
     const visibleTasks = $derived(
         hasChannelRange
             ? tasks.filter((task) => task.type !== 'channel')
@@ -76,6 +75,24 @@
     const rangeStart = $derived(range.start);
     const rangeEnd = $derived(range.end);
     const dayCount = $derived(rangeEnd - rangeStart + 1);
+    const months = $derived(monthSegments(rangeStart, rangeEnd));
+
+    const monthIndexForDay = (day: number): number => {
+        const index = months.findIndex(
+            (month) => day >= month.startDay && day <= month.endDay,
+        );
+
+        return Math.max(index, 0);
+    };
+
+    const monthBackgroundClass = (day: number): string =>
+        monthIndexForDay(day) % 2 === 0 ? 'bg-muted/10' : 'bg-brand/5';
+
+    const isMonthStart = (day: number): boolean => {
+        const index = monthIndexForDay(day);
+
+        return index > 0 && months[index].startDay === day;
+    };
 
     // Ticks: weekly for <=120 days, monthly beyond.
     const ticks = $derived.by(() => {
@@ -270,7 +287,15 @@
                     <div class="border-r border-border/70"></div>
                     {#each Array.from( { length: dayCount } ) as _, dayIndex (dayIndex)}
                         <div
-                            class="border-l border-border/70"
+                            data-gantt-month={monthIndexForDay(
+                                rangeStart + dayIndex,
+                            )}
+                            class={cn(
+                                'border-l border-border/70',
+                                monthBackgroundClass(rangeStart + dayIndex),
+                                isMonthStart(rangeStart + dayIndex) &&
+                                    'border-l-2 border-border',
+                            )}
                             style={`grid-column: ${dayIndex + 2};`}
                         ></div>
                     {/each}
@@ -306,11 +331,14 @@
                 </div>
                 {#each ticks as day (day)}
                     <div
+                        data-gantt-tick
                         class={cn(
                             'sticky top-0 z-10 flex h-12 items-center justify-center whitespace-nowrap border-b border-l border-border bg-card px-1 text-sm font-semibold text-muted-foreground',
+                            day !== today && day % 7 === 0 && 'bg-muted/50',
+                            monthBackgroundClass(day),
+                            isMonthStart(day) && 'border-l-2 border-border',
                             day === today &&
                                 'flex-col gap-0.5 bg-brand/15 py-1 text-brand-accent',
-                            day !== today && day % 7 === 0 && 'bg-muted/50',
                         )}
                         style={`grid-column: ${day - rangeStart + 2}; grid-row: 1;`}
                         title={day === today ? t('Today') : undefined}

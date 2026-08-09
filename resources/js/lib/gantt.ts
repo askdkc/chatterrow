@@ -7,6 +7,11 @@ export interface GanttRangeTask {
     end: string | null;
 }
 
+export interface GanttMonthSegment {
+    startDay: number;
+    endDay: number;
+}
+
 export function singleChannelTitle(
     tasks: { type: 'channel' | 'todo'; title: string }[],
 ): string | null {
@@ -55,6 +60,45 @@ export function epochDay(value: string | Date): number {
         Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()) /
             DAY_MS,
     );
+}
+
+const utcDay = (year: number, month: number, day: number): number =>
+    Math.floor(Date.UTC(year, month, day) / DAY_MS);
+
+export function monthSegments(
+    rangeStart: number,
+    rangeEnd: number,
+): GanttMonthSegment[] {
+    if (rangeEnd < rangeStart) {
+        return [];
+    }
+
+    const firstDate = new Date(rangeStart * DAY_MS);
+    const lastDate = new Date(rangeEnd * DAY_MS);
+    let year = firstDate.getUTCFullYear();
+    let month = firstDate.getUTCMonth();
+    const lastYear = lastDate.getUTCFullYear();
+    const lastMonth = lastDate.getUTCMonth();
+    const segments: GanttMonthSegment[] = [];
+
+    while (year < lastYear || (year === lastYear && month <= lastMonth)) {
+        const monthStart = utcDay(year, month, 1);
+        const nextMonthStart = utcDay(year, month + 1, 1);
+
+        segments.push({
+            startDay: Math.max(rangeStart, monthStart),
+            endDay: Math.min(rangeEnd, nextMonthStart - 1),
+        });
+
+        month += 1;
+
+        if (month === 12) {
+            month = 0;
+            year += 1;
+        }
+    }
+
+    return segments;
 }
 
 export function formatEpochDay(
