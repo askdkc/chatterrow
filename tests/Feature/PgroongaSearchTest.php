@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\StoredFile;
 use App\Models\User;
 use App\Support\MarkdownSearchIndex;
+use App\Support\SearchQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Group;
@@ -152,19 +153,53 @@ class PgroongaSearchTest extends TestCase
         }
     }
 
-    public function test_diagnostic_plan_can_use_the_message_pgroonga_index(): void
+    public function test_diagnostic_plans_confirm_pgroonga_indexes_are_used(): void
     {
-        $plan = DB::transaction(function (): string {
-            DB::statement('SET LOCAL enable_seqscan = off');
+        Message::factory()->create([
+            'server_id' => $this->server->id,
+            'channel_id' => $this->channel->id,
+            'body' => 'roonga message',
+        ]);
+        $file = StoredFile::factory()->create([
+            'server_id' => $this->server->id,
+            'uploaded_by' => $this->member->id,
+            'original_name' => 'pgroonga-plan.pdf',
+            'markdown_status' => 'ready',
+            'markdown_path' => 'pgroonga-plan.md',
+        ]);
 
-            $row = DB::selectOne(
-                'EXPLAIN (FORMAT JSON) SELECT id FROM messages WHERE body &@~ ?',
-                ['"roonga"'],
-            );
+        app(MarkdownSearchIndex::class)->index($file->id, 'roonga markdown document');
 
-            return json_encode($row, JSON_THROW_ON_ERROR);
-        });
+        $groongaQuery = SearchQuery::from('roonga')->postgresGroongaQuery();
+        $plans = [
+            'messages_body_pgroonga_idx' => DB::transaction(function () use ($groongaQuery): string {
+                DB::statement('SET LOCAL enable_seqscan = off');
 
-        $this->assertStringContainsString('messages_body_pgroonga_idx', strtolower($plan));
+                $row = DB::selectOne(
+                    'EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) SELECT id FROM messages WHERE body &@~ ?',
+                    [$groongaQuery],
+                );
+
+                return json_encode($row, JSON_THROW_ON_ERROR);
+            }),
+            'markdown_doc_contents_content_pgroonga_idx' => DB::transaction(function () use ($groongaQuery): string {
+                DB::statement('SET LOCAL enable_seqscan = off');
+
+                $row = DB::selectOne(
+                    'EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) SELECT stored_file_id FROM markdown_doc_contents WHERE content &@~ ?',
+                    [$groongaQuery],
+                );
+
+                return json_encode($row, JSON_THROW_ON_ERROR);
+            }),
+        ];
+
+        foreach ($plans as $indexName => $plan) {
+            $normalizedPlan = strtolower($plan);
+
+            $this->assertStringContainsString($indexName, $normalizedPlan);
+            $this->assertStringContainsString('actual rows', $normalizedPlan);
+            $this->assertStringContainsString('output', $normalizedPlan);
+        }
     }
 }
