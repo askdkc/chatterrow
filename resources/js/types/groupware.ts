@@ -114,6 +114,31 @@ export interface MessageResource {
     is_reminder?: boolean;
 }
 
+export interface SearchSnippetSegment {
+    type: 'text' | 'hit';
+    text: string;
+}
+
+export interface GlobalSearchResult {
+    type: 'message' | 'file';
+    id: number;
+    message_id?: number;
+    stored_file_id?: number;
+    server_id: number;
+    channel_id: number | null;
+    server: { id: number; name: string };
+    channel: { id: number; name: string } | null;
+    author?: { id: number; name: string } | null;
+    original_name?: string;
+    mime_type?: string | null;
+    size?: number | null;
+    created_at: string | null;
+    snippet: SearchSnippetSegment[];
+    url: string;
+    stream_url?: string;
+    download_url?: string;
+}
+
 export interface NotificationResource {
     id: number;
     kind: MentionKind;

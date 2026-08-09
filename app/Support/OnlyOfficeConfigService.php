@@ -55,6 +55,7 @@ class OnlyOfficeConfigService
         $resolved = $this->documentTypeResolver->resolve($storedFile);
         $version = $this->documentVersion->key($storedFile);
         $fileType = $resolved['fileType'];
+        [$editorLanguage, $editorRegion] = $this->editorLocale();
 
         $config = [
             'type' => 'embedded',
@@ -81,8 +82,8 @@ class OnlyOfficeConfigService
             ],
             'editorConfig' => [
                 'mode' => 'view',
-                'lang' => 'ja',
-                'region' => 'ja-JP',
+                'lang' => $editorLanguage,
+                'region' => $editorRegion,
                 'user' => [
                     'id' => hash('sha256', "chatterrow-onlyoffice-user-v1\0".(string) (auth()->id() ?? 'anonymous')),
                     'name' => Str::limit((string) (auth()->user()->name ?? 'Viewer'), 128, ''),
@@ -141,5 +142,22 @@ class OnlyOfficeConfigService
         return is_array($parts)
             && in_array(Str::lower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
             && trim((string) ($parts['host'] ?? '')) !== '';
+    }
+
+    /** @return array{string, string} */
+    private function editorLocale(): array
+    {
+        return match (app()->getLocale()) {
+            'zh_CN' => ['zh-CN', 'zh-CN'],
+            'zh_TW' => ['zh-TW', 'zh-TW'],
+            'pt_BR' => ['pt-BR', 'pt-BR'],
+            'pt_PT' => ['pt-PT', 'pt-PT'],
+            'ja' => ['ja-JP', 'ja-JP'],
+            'ko' => ['ko-KR', 'ko-KR'],
+            'fr' => ['fr', 'fr-FR'],
+            'de' => ['de', 'de-DE'],
+            'es' => ['es', 'es-ES'],
+            default => ['en', 'en-US'],
+        };
     }
 }

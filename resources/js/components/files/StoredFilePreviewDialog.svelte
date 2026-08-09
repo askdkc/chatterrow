@@ -42,6 +42,7 @@
         DialogDescription,
         DialogTitle,
     } from '@/components/ui/dialog';
+    import { currentLocale } from '@/lib/dates';
     import { t } from '@/lib/i18n';
 
     type PreviewFile = {
@@ -155,7 +156,7 @@
             viewer.options = {
                 preset: preset.default,
                 rendererMode: 'replace',
-                locale: 'ja-JP',
+                locale: currentLocale() ?? 'en-US',
                 theme: 'system',
                 styleIsolation: 'shadow',
                 pdf: {

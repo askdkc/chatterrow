@@ -32,6 +32,7 @@
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoPanel from '@/components/discord/TodoPanel.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { Button } from '@/components/ui/button';
     import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
@@ -1026,7 +1027,8 @@
                     })}
                 </span>
             {/if}
-            <div class="ml-auto flex items-center gap-1">
+            <GlobalSearch class="ml-auto" />
+            <div class="flex items-center gap-1">
                 <button
                     type="button"
                     class="flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium transition hover:bg-white/10"

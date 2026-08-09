@@ -9,6 +9,7 @@
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
     import { t } from '@/lib/i18n';
@@ -56,6 +57,7 @@
             </Button>
             <h1 class="text-[15px] font-bold">{t('Archived projects')}</h1>
             <Badge variant="secondary">{servers.length}</Badge>
+            <GlobalSearch class="ml-auto" />
         </header>
 
         <div class="mx-auto w-full max-w-3xl flex-1 p-6">

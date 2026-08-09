@@ -8,6 +8,48 @@ require_once dirname(__DIR__, 2).'/scripts/patch-onlyoffice-font-catalog.php';
 
 class OnlyOfficeFontCatalogPatcherTest extends TestCase
 {
+    public function test_it_builds_regional_office_alias_profiles(): void
+    {
+        $profiles = [
+            'zh_CN' => ['Source Han Sans CN', 'Microsoft YaHei', 'Noto Serif CJK SC', 'SimSun', 'SourceHanSansCN'],
+            'zh_TW' => ['Source Han Sans TW', 'Microsoft JhengHei', 'Noto Serif CJK TC', 'MingLiU', 'SourceHanSansTW'],
+            'ko' => ['Source Han Sans KR', 'Malgun Gothic', 'Noto Serif CJK KR', 'Batang', 'SourceHanSansKR'],
+        ];
+
+        foreach ($profiles as $locale => [$sans, $sansAlias, $serif, $serifAlias, $sansFile]) {
+            $profile = onlyOfficeCjkFontProfile($locale);
+
+            $this->assertContains($sansAlias, $profile['aliases'][$sans]);
+            $this->assertContains($serifAlias, $profile['aliases'][$serif]);
+            $this->assertSame($sans, $profile['fallbackFamilies']['NanumGothic']);
+            $this->assertStringEndsWith(
+                "/{$sansFile}-Regular.otf",
+                $profile['fallbackFiles']['NanumGothic']['regular'],
+            );
+        }
+    }
+
+    public function test_it_patches_a_simplified_chinese_catalog(): void
+    {
+        $profile = onlyOfficeCjkFontProfile('zh_CN');
+        $catalog = $this->catalog([
+            ['Source Han Sans CN', '/fonts/SourceHanSansCN-Regular.otf'],
+            ['Source Han Sans CN Light', '/fonts/SourceHanSansCN-Light.otf'],
+            ['Noto Serif CJK SC', '/fonts/NotoSerifCJKsc-Regular.otf'],
+            ['NanumGothic', '/core/NanumGothic.ttf'],
+            ['Droid Sans Fallback', '/core/DroidSansFallbackFull.ttf'],
+        ], '');
+
+        [$patched] = patchOnlyOfficeSelectionCatalog($catalog, $profile);
+        $records = $this->parseCatalog($patched);
+
+        $this->assertContains('Microsoft YaHei', $records[0]['aliases']);
+        $this->assertContains('Microsoft YaHei Light', $records[1]['aliases']);
+        $this->assertContains('SimSun', $records[2]['aliases']);
+        $this->assertStringEndsWith('SourceHanSansCN-Regular.otf', $records[3]['path']);
+        $this->assertStringEndsWith('NotoSerifCJKsc-Regular.otf', $records[4]['path']);
+    }
+
     public function test_it_adds_office_aliases_and_remaps_converter_fallback_files(): void
     {
         $rangeTable = pack('V', 1)."NanumGothic\0".pack('VV', 0x3041, 0x3093);

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { epochDay } from './gantt';
-import { buildGanttPdf } from './gantt-pdf';
+import { buildGanttPdf, pdfFontProfile } from './gantt-pdf';
 
 const fontPath = join(
     process.cwd(),
@@ -10,6 +10,15 @@ const fontPath = join(
 );
 
 describe('buildGanttPdf', () => {
+    it.each([
+        ['ja', '/fonts/SourceHanSansJP-Regular.ttf', 'SourceHanSansJP'],
+        ['zh_CN', '/fonts/SourceHanSansCN-VF.ttf', 'SourceHanSansCN'],
+        ['zh-TW', '/fonts/SourceHanSansTW-VF.ttf', 'SourceHanSansTW'],
+        ['ko', '/fonts/SourceHanSansKR-VF.ttf', 'SourceHanSansKR'],
+    ])('selects the regional PDF font for %s', (locale, url, name) => {
+        expect(pdfFontProfile(locale)).toEqual({ url, name });
+    });
+
     it('produces a single landscape A4 page from gantt data', async () => {
         const rangeStart = epochDay('2026-08-02');
         const rangeEnd = epochDay('2026-08-14');

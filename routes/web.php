@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChannelController;
 use App\Http\Controllers\ChatPageController;
 use App\Http\Controllers\FileIndexController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\MessageReactionController;
 use App\Http\Controllers\NotificationController;
@@ -39,6 +40,10 @@ Route::get('dashboard', fn () => redirect()->route('servers.index'))
     ->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('search', GlobalSearchController::class)
+        ->middleware('throttle:global-search')
+        ->name('search');
+
     Route::get('servers', [ServerController::class, 'index'])->name('servers.index');
     Route::post('servers', [ServerController::class, 'store'])->name('servers.store');
     Route::get('servers/archived', [ServerController::class, 'archived'])->name('servers.archived');

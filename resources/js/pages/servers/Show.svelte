@@ -14,6 +14,7 @@
     import ProjectIcon from '@/components/discord/ProjectIcon.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { formatDate } from '@/lib/dates';
     import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
@@ -87,77 +88,87 @@
         onManageMembers={() => (showMemberDialog = true)}
     />
 
-    <main class="flex min-w-0 flex-1 flex-col items-center justify-center p-8">
-        <div class="text-center">
-            <ProjectIcon {server} size="hero" class="mx-auto mb-4" />
-            <h1 class="text-xl font-bold text-[#dbdee1]">{server.name}</h1>
-            {#if server.description}
-                <p class="mt-2 max-w-md text-sm text-[#80848e]">
-                    {server.description}
-                </p>
-            {/if}
-            <div
-                class="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-[#80848e]"
-            >
-                <span class="flex items-center gap-1">
-                    <Users class="h-3.5 w-3.5" />
-                    {t('Member count: :count', {
-                        count: String(members.length),
-                    })}
-                </span>
-                {#if server.starts_on || server.ends_on}
-                    <span class="flex items-center gap-1">
-                        <CalendarRange class="h-3.5 w-3.5" />
-                        {serverDateRange()}
-                    </span>
-                {/if}
-            </div>
-
-            {#if channels.length === 0}
-                <div
-                    class="mx-auto mt-8 max-w-sm rounded-xl bg-[#2b2d31] p-6 text-left"
-                >
-                    <h2 class="mb-1 font-semibold">
-                        {t('Create your first channel')}
-                    </h2>
-                    <p class="text-sm text-[#80848e]">
-                        {t(
-                            'Channels function as tasks. You can set a start date and end deadline.',
-                        )}
+    <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header
+            class="flex h-12 shrink-0 items-center gap-3 border-b border-black/10 bg-[#313338] px-4 dark:border-black/20"
+        >
+            <h1 class="text-[15px] font-bold">{server.name}</h1>
+            <GlobalSearch class="ml-auto" />
+        </header>
+        <div
+            class="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-8"
+        >
+            <div class="text-center">
+                <ProjectIcon {server} size="hero" class="mx-auto mb-4" />
+                <h1 class="text-xl font-bold text-[#dbdee1]">{server.name}</h1>
+                {#if server.description}
+                    <p class="mt-2 max-w-md text-sm text-[#80848e]">
+                        {server.description}
                     </p>
-                    <button
-                        type="button"
-                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
-                        onclick={() => (showChannelDialog = true)}
-                    >
-                        <Plus class="h-4 w-4" />
-                        {t('Create channel')}
-                    </button>
+                {/if}
+                <div
+                    class="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-[#80848e]"
+                >
+                    <span class="flex items-center gap-1">
+                        <Users class="h-3.5 w-3.5" />
+                        {t('Member count: :count', {
+                            count: String(members.length),
+                        })}
+                    </span>
+                    {#if server.starts_on || server.ends_on}
+                        <span class="flex items-center gap-1">
+                            <CalendarRange class="h-3.5 w-3.5" />
+                            {serverDateRange()}
+                        </span>
+                    {/if}
                 </div>
-            {/if}
 
-            <div class="mt-8 flex items-center justify-center gap-3">
-                <a
-                    href={`/servers/${server.id}/tasks`}
-                    class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
-                >
-                    <ListTodo class="h-4 w-4" />
-                    {t('Task list')}
-                </a>
-                <a
-                    href={`/servers/${server.id}/gantt`}
-                    class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
-                >
-                    <CalendarRange class="h-4 w-4" />
-                    {t('Gantt chart')}
-                </a>
-                <a
-                    href={`/servers/${server.id}/files`}
-                    class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
-                >
-                    <FileText class="h-4 w-4" />
-                    {t('Files')}
-                </a>
+                {#if channels.length === 0}
+                    <div
+                        class="mx-auto mt-8 max-w-sm rounded-xl bg-[#2b2d31] p-6 text-left"
+                    >
+                        <h2 class="mb-1 font-semibold">
+                            {t('Create your first channel')}
+                        </h2>
+                        <p class="text-sm text-[#80848e]">
+                            {t(
+                                'Channels function as tasks. You can set a start date and end deadline.',
+                            )}
+                        </p>
+                        <button
+                            type="button"
+                            class="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+                            onclick={() => (showChannelDialog = true)}
+                        >
+                            <Plus class="h-4 w-4" />
+                            {t('Create channel')}
+                        </button>
+                    </div>
+                {/if}
+
+                <div class="mt-8 flex items-center justify-center gap-3">
+                    <a
+                        href={`/servers/${server.id}/tasks`}
+                        class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
+                    >
+                        <ListTodo class="h-4 w-4" />
+                        {t('Task list')}
+                    </a>
+                    <a
+                        href={`/servers/${server.id}/gantt`}
+                        class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
+                    >
+                        <CalendarRange class="h-4 w-4" />
+                        {t('Gantt chart')}
+                    </a>
+                    <a
+                        href={`/servers/${server.id}/files`}
+                        class="flex items-center gap-2 rounded-md bg-[#2b2d31] px-4 py-2 text-sm font-medium transition hover:bg-[#383a40]"
+                    >
+                        <FileText class="h-4 w-4" />
+                        {t('Files')}
+                    </a>
+                </div>
             </div>
         </div>
     </main>

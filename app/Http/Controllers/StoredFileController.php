@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Server;
 use App\Models\StoredFile;
 use App\Support\MarkdownSearchIndex;
+use App\Support\SearchBackendUnavailable;
+use App\Support\SearchQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use RuntimeException;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
@@ -115,25 +119,46 @@ class StoredFileController extends Controller
 
         $validated = $request->validate([
             'q' => ['required', 'string', 'max:200'],
+            'channel_id' => ['nullable', 'integer'],
         ]);
+        $channelId = isset($validated['channel_id']) ? (int) $validated['channel_id'] : null;
 
-        $results = app(MarkdownSearchIndex::class)
-            ->search($server->id, $validated['q'])
-            ->map(fn (stdClass $row) => [
-                'id' => $row->id,
-                'original_name' => $row->original_name,
-                'mime_type' => $row->mime_type,
-                'size' => $row->size,
-                'preview_status' => $row->preview_status,
-                'created_at' => $row->created_at,
-                'snippet' => $row->snippet,
-                'stream_url' => route('servers.files.stream', [$server->id, $row->id]),
-                'download_url' => route('servers.files.download', [$server->id, $row->id]),
-                'thumbnail_url' => $row->preview_status === 'ready'
-                    ? route('servers.files.thumbnail', [$server->id, $row->id])
-                    : null,
-            ])
-            ->values();
+        if ($channelId !== null) {
+            $channel = $server->channels()->whereKey($channelId)->firstOrFail();
+            Gate::authorize('view', $channel);
+        }
+
+        try {
+            SearchQuery::from($validated['q']);
+
+            $results = app(MarkdownSearchIndex::class)
+                ->search($server->id, $validated['q'], channelId: $channelId)
+                ->map(fn (stdClass $row) => [
+                    'id' => $row->id,
+                    'original_name' => $row->original_name,
+                    'mime_type' => $row->mime_type,
+                    'size' => $row->size,
+                    'preview_status' => $row->preview_status,
+                    'created_at' => $row->created_at,
+                    'snippet' => $row->snippet,
+                    'snippet_segments' => $row->snippet_segments ?? [],
+                    'stream_url' => route('servers.files.stream', [$server->id, $row->id]),
+                    'download_url' => route('servers.files.download', [$server->id, $row->id]),
+                    'thumbnail_url' => $row->preview_status === 'ready'
+                        ? route('servers.files.thumbnail', [$server->id, $row->id])
+                        : null,
+                ])
+                ->values();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['q' => $exception->getMessage()]);
+        } catch (SearchBackendUnavailable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'Search is temporarily unavailable.',
+                'results' => [],
+            ], 503);
+        }
 
         return response()->json(['results' => $results]);
     }

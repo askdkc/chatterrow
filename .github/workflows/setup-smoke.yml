@@ -40,15 +40,21 @@ jobs:
           ./setup.sh --help | grep -Fq -- '--language <locale>'
 
   ubuntu:
-    name: Ubuntu ${{ matrix.version }} systemd smoke test
+    name: Ubuntu ${{ matrix.version }} ${{ matrix.database }} systemd smoke test
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '24.04'
-          - '26.04'
+        include:
+          - version: '24.04'
+            database: sqlite
+          - version: '26.04'
+            database: sqlite
+          - version: '24.04'
+            database: postgresql
+          - version: '26.04'
+            database: postgresql
 
     steps:
       - name: Checkout code
@@ -67,7 +73,7 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          container_name="chatterrow-setup-${{ matrix.version }}"
+          container_name="chatterrow-setup-${{ matrix.version }}-${{ matrix.database }}"
           cleanup() {
             docker exec "$container_name" bash -lc '
               systemctl is-system-running || true
@@ -126,13 +132,20 @@ jobs:
 
             GIT_CONFIG_GLOBAL="$git_config_global" ./setup.sh \
               --domain chatterrow.test \
-              --database sqlite \
+              --database ${{ matrix.database }} \
               --language fr \
               --app-dir /var/www/chatterrow \
               --repo file:///workspace/chatterrow \
               --no-ssl
 
-            grep -qx 'APP_LOCALE=fr' /var/www/chatterrow/.env
+            grep -qx "APP_LOCALE=fr" /var/www/chatterrow/.env
+
+            if [[ "${{ matrix.database }}" == "postgresql" ]]; then
+              grep -qx "DB_CONNECTION=pgsql" /var/www/chatterrow/.env
+              extension_version="$(sudo -u postgres psql -d chatterrow -Atqc \
+                "SELECT extversion FROM pg_extension WHERE extname = \$\$pgroonga\$\$")"
+              [[ -n "$extension_version" ]]
+            fi
 
             token="ci-acme-${RANDOM}${RANDOM}"
             challenge="/var/www/letsencrypt/.well-known/acme-challenge/$token"

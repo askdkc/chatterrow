@@ -15,6 +15,7 @@
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import TodoDialog from '@/components/discord/TodoDialog.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { formatDate, formatDateTime } from '@/lib/dates';
     import { t } from '@/lib/i18n';
     import { isProjectAdministrator } from '@/lib/project-permissions';
@@ -123,7 +124,8 @@
             </Link>
             <ListTodo class="h-4 w-4 text-[#5865f2]" />
             <h1 class="text-[15px] font-bold">{t('Task list')}</h1>
-            <span class="ml-auto text-sm font-semibold text-[#4e5058]">
+            <GlobalSearch class="ml-auto" />
+            <span class="text-sm font-semibold text-[#4e5058]">
                 {t('Incomplete tasks: :incomplete / :total', {
                     incomplete: String(
                         todos.filter((todo) => !todo.completed_at).length,

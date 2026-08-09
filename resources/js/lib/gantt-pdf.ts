@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { currentLocale } from '@/lib/dates';
 import { t } from '@/lib/i18n';
 import { epochDay, formatEpochDay } from './gantt';
 
@@ -44,18 +45,51 @@ const COLORS: Record<string, Rgb> = {
     muted: [110, 115, 125],
 };
 
-const JAPANESE_FONT_URL = '/fonts/SourceHanSansJP-Regular.ttf';
-const JAPANESE_FONT_NAME = 'SourceHanSansJP';
+interface PdfFontProfile {
+    url: string;
+    name: string;
+}
 
-let japaneseFontPromise: Promise<string | null> | null = null;
+const PDF_FONT_PROFILES: Record<string, PdfFontProfile> = {
+    ja: {
+        url: '/fonts/SourceHanSansJP-Regular.ttf',
+        name: 'SourceHanSansJP',
+    },
+    'zh-CN': {
+        url: '/fonts/SourceHanSansCN-VF.ttf',
+        name: 'SourceHanSansCN',
+    },
+    'zh-TW': {
+        url: '/fonts/SourceHanSansTW-VF.ttf',
+        name: 'SourceHanSansTW',
+    },
+    ko: {
+        url: '/fonts/SourceHanSansKR-VF.ttf',
+        name: 'SourceHanSansKR',
+    },
+};
 
-async function loadJapaneseFont(): Promise<string | null> {
+const fontPromises = new Map<string, Promise<string | null>>();
+
+export function pdfFontProfile(locale = currentLocale()): PdfFontProfile {
+    const normalized = locale?.replaceAll('_', '-') ?? 'ja';
+
+    return PDF_FONT_PROFILES[normalized] ?? PDF_FONT_PROFILES.ja;
+}
+
+async function loadPdfFont(profile: PdfFontProfile): Promise<string | null> {
     if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
         return null;
     }
 
-    japaneseFontPromise ??= window
-        .fetch(JAPANESE_FONT_URL)
+    let promise = fontPromises.get(profile.url);
+
+    if (promise) {
+        return promise;
+    }
+
+    promise = window
+        .fetch(profile.url)
         .then((response) => {
             if (!response.ok) {
                 throw new Error(
@@ -79,8 +113,9 @@ async function loadJapaneseFont(): Promise<string | null> {
 
             return btoa(binary);
         });
+    fontPromises.set(profile.url, promise);
 
-    return japaneseFontPromise;
+    return promise;
 }
 
 export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
@@ -90,15 +125,16 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         format: 'a4',
         compress: true,
     });
-    const japaneseFont =
+    const fontProfile = pdfFontProfile();
+    const pdfFont =
         options.fontData === undefined
-            ? await loadJapaneseFont()
+            ? await loadPdfFont(fontProfile)
             : options.fontData;
 
-    if (japaneseFont) {
-        doc.addFileToVFS(JAPANESE_FONT_URL, japaneseFont);
-        doc.addFont(JAPANESE_FONT_URL, JAPANESE_FONT_NAME, 'normal');
-        doc.setFont(JAPANESE_FONT_NAME, 'normal');
+    if (pdfFont) {
+        doc.addFileToVFS(fontProfile.url, pdfFont);
+        doc.addFont(fontProfile.url, fontProfile.name, 'normal');
+        doc.setFont(fontProfile.name, 'normal');
     }
 
     const dayCount = options.rangeEnd - options.rangeStart + 1;
@@ -112,12 +148,12 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
     const visibleTasks = options.tasks.slice(0, maxRows);
     const tableH = DATE_ROW_H + visibleTasks.length * ROW_H;
 
-    doc.setFont(japaneseFont ? JAPANESE_FONT_NAME : 'helvetica', 'normal');
+    doc.setFont(pdfFont ? fontProfile.name : 'helvetica', 'normal');
     doc.setFontSize(16);
     doc.setTextColor(...COLORS.text);
     doc.text(options.title, tableX, MARGIN + 7);
 
-    doc.setFont(japaneseFont ? JAPANESE_FONT_NAME : 'helvetica', 'normal');
+    doc.setFont(pdfFont ? fontProfile.name : 'helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...COLORS.muted);
     const period = t('Date range: :start - :end', {
@@ -223,10 +259,7 @@ export async function buildGanttPdf(options: GanttPdfOptions): Promise<jsPDF> {
         visibleTasks.forEach((task, index) => {
             const rowY = tableY + DATE_ROW_H + index * ROW_H;
 
-            doc.setFont(
-                japaneseFont ? JAPANESE_FONT_NAME : 'helvetica',
-                'normal',
-            );
+            doc.setFont(pdfFont ? fontProfile.name : 'helvetica', 'normal');
             doc.setFontSize(7);
             doc.setTextColor(...COLORS.text);
             const title =

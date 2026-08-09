@@ -405,33 +405,163 @@ endpoint_returns_ok() {
     [[ "$response" == "ok" || "$response" == "OK" ]]
 }
 
-setup_onlyoffice_japanese_fonts() {
+install_pgroonga_repository() {
+    [[ "$DATABASE" == "pgsql" ]] || return 0
+
+    local source_package="/tmp/groonga-apt-source-${VERSION_CODENAME}.deb"
+    local source_url="https://packages.groonga.org/ubuntu/groonga-apt-source-latest-${VERSION_CODENAME}.deb"
+
+    log "Installing the Groonga APT source for PostgreSQL ${PG_MAJOR}..."
+    rm -f "$source_package"
+    wget -q -O "$source_package" "$source_url" \
+        || die "Could not download the Groonga APT source package for Ubuntu ${VERSION_CODENAME}"
+    apt_get_with_lock_wait install -y -V "$source_package" \
+        || die "Could not install the Groonga APT source package"
+    rm -f "$source_package"
+
+    if [[ "$VERSION_ID" == "26.04" ]]; then
+        apt_get_with_lock_wait install -y postgresql-common
+        sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+            || die "Could not configure the PostgreSQL Global Development Group repository"
+    fi
+
+    apt_get_with_lock_wait update -y
+}
+
+setup_regional_pdf_font() {
+    local app_dir="$1" locale="$2"
+    local font_name font_url expected_sha256 target actual_sha256 temp_file
+
+    case "$locale" in
+        zh_CN)
+            font_name="SourceHanSansCN-VF.ttf"
+            expected_sha256="25a01e41b5cc99893eb35a6cd2cc7611841dc19eb03cbaf7f0c1de8210f2ba0b"
+            ;;
+        zh_TW)
+            font_name="SourceHanSansTW-VF.ttf"
+            expected_sha256="cf6889f4c0f1adeaf814ca3e98cc692d9e2d706501cf7545b9b58f6e3966b6ac"
+            ;;
+        ko)
+            font_name="SourceHanSansKR-VF.ttf"
+            expected_sha256="35af3f67cf8c9c6cacd138a6a251b34317af1c601dfef4bc0ef4b64f7aa7a705"
+            ;;
+        *) return 0 ;;
+    esac
+
+    command -v shasum >/dev/null || die "shasum is required to verify PDF fonts"
+    target="$app_dir/public/fonts/$font_name"
+    font_url="https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/Variable/TTF/Subset/$font_name"
+    actual_sha256="$(shasum -a 256 "$target" 2>/dev/null | awk '{print $1}' || true)"
+    if [[ "$actual_sha256" == "$expected_sha256" ]]; then
+        log "Verified regional PDF font is already installed: $font_name"
+        return 0
+    fi
+
+    mkdir -p "$app_dir/public/fonts"
+    temp_file="$(mktemp "${TMPDIR:-/tmp}/chatterrow-pdf-font.XXXXXX")" \
+        || die "Could not create a temporary PDF font file"
+    log "Downloading verified Source Han Sans $locale font for PDF export..."
+    if ! curl -fL --retry 3 --retry-delay 2 --output "$temp_file" "$font_url"; then
+        rm -f "$temp_file"
+        die "Could not download $font_name"
+    fi
+
+    actual_sha256="$(shasum -a 256 "$temp_file" | awk '{print $1}')"
+    if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+        rm -f "$temp_file"
+        die "$font_name checksum mismatch"
+    fi
+
+    chmod 0644 "$temp_file"
+    mv -f "$temp_file" "$target"
+    log "Installed regional PDF font: $target"
+}
+
+setup_onlyoffice_cjk_fonts() {
     local container_name="$1"
     local app_dir="$2"
+    local locale="$3"
     local font_dir="/var/www/onlyoffice/Data/custom-fonts"
     local catalog_patcher="$app_dir/scripts/patch-onlyoffice-font-catalog.php"
     local font_tmp_dir="" catalog_tmp_dir="" actual_sha256 installed_sha256 fonts_changed font_index
-    local -a font_names=(
-        "SourceHanSansJP-Light.otf"
-        "SourceHanSansJP-Regular.otf"
-        "SourceHanSansJP-Bold.otf"
-        "NotoSerifCJKjp-Regular.otf"
-        "NotoSerifCJKjp-Bold.otf"
+    local language_name language_tag sans_family sans_file sans_alias serif_family serif_file serif_alias source_region serif_region catalog_version
+    local -a font_names=() font_urls=() font_sha256=()
+
+    case "$locale" in
+        ja)
+            language_name="Japanese"; language_tag="ja"
+            sans_family="Source Han Sans JP"; sans_file="SourceHanSansJP"
+            serif_family="Noto Serif CJK JP"; serif_file="NotoSerifCJKjp"
+            sans_alias="Yu Gothic"; serif_alias="Yu Mincho"
+            source_region="JP"; serif_region="Japanese"
+            font_sha256=(
+                "add5669f3ebb69ce21cff87a8a4c28388406fb07bd81b23d06c23d6461454988"
+                "40d1b760d1135539f6b6e0ee2b9f415de6d97576f7676840b06306c7c190c074"
+                "3a2722f94c97a53b172579a10ef8fc34b3fa8a6bb4f7947a2ec709ab647fb755"
+                "d9854c7a8ef170b5a7932558856fd64eb8de0b007cd823fed6f9f514ad2803d3"
+                "861a2b2c0e24b23745c262be8c3fdef63f12628f0492fb120ee51aa55c503af8"
+            )
+            ;;
+        zh_CN)
+            language_name="Simplified Chinese"; language_tag="zh-cn"
+            sans_family="Source Han Sans CN"; sans_file="SourceHanSansCN"
+            serif_family="Noto Serif CJK SC"; serif_file="NotoSerifCJKsc"
+            sans_alias="Microsoft YaHei"; serif_alias="SimSun"
+            source_region="CN"; serif_region="SimplifiedChinese"
+            font_sha256=(
+                "c406ec4c795fe71ec443a8a55570d7df53dea560ea93d4117eadab6e2b19680d"
+                "e2bc8a2e7f37474b774fff8db758681ece40bb6947a90d571bce9dd60671a8e4"
+                "62383707c086a32f3afd5e293f34c7eff64c7fea31f579fdc6cbe34d920519a6"
+                "2a2eae2628df83556c54018c41e20fa532c1b862c5256ae8b3f23feb918d12ca"
+                "8af07d4b6c2e82bcc72a30e066eaf295f11b9424f4aad2eaa9fe0e9c3b38fc73"
+            )
+            ;;
+        zh_TW)
+            language_name="Traditional Chinese"; language_tag="zh-tw"
+            sans_family="Source Han Sans TW"; sans_file="SourceHanSansTW"
+            serif_family="Noto Serif CJK TC"; serif_file="NotoSerifCJKtc"
+            sans_alias="Microsoft JhengHei"; serif_alias="MingLiU"
+            source_region="TW"; serif_region="TraditionalChinese"
+            font_sha256=(
+                "01b91bd5e24949e797e200c52deb97a263e1c6104b618c8c0f014d35c70299ab"
+                "5034bc32aa64bc93ce673fe05752724bb31fc6757c6bc1d23e925052c54fd2ac"
+                "a586990078d8fe4e97202e38fa3c2e0a61ce54009affdd9e2cfe59351ad3f5c7"
+                "234301038e76e7c35c43113785024700c4e4fe7bdce1d1fbbc42fca7e6683798"
+                "a4441a76dbf56719600c5dcbd5b5e5a068a20944cc41c959487a657133576ee6"
+            )
+            ;;
+        ko)
+            language_name="Korean"; language_tag="ko"
+            sans_family="Source Han Sans KR"; sans_file="SourceHanSansKR"
+            serif_family="Noto Serif CJK KR"; serif_file="NotoSerifCJKkr"
+            sans_alias="Malgun Gothic"; serif_alias="Batang"
+            source_region="KR"; serif_region="Korean"
+            font_sha256=(
+                "1df92a4f2587bd4214eaabf52cc1946c5b85e43e1f6a8bf9ed87ef882af7578d"
+                "d8299926a5284f7461b46fa0617cc05d4f1fce8f034ffff78084225ce8b38071"
+                "f678def86be3d973e85fb0e34513b93b9ec7d6a478380d93fe79d43d1ad9f797"
+                "77b4b741f864d27f15e90f275b17106dde90b2ad28f82bab72dc95805db5fb42"
+                "10cc03741178ad6d2747df8497d911e34b167d0474a826fb9d866c402cbe3d8f"
+            )
+            ;;
+        *) return 0 ;;
+    esac
+
+    font_names=(
+        "${sans_file}-Light.otf"
+        "${sans_file}-Regular.otf"
+        "${sans_file}-Bold.otf"
+        "${serif_file}-Regular.otf"
+        "${serif_file}-Bold.otf"
     )
-    local -a font_urls=(
-        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Light.otf"
-        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Regular.otf"
-        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/JP/SourceHanSansJP-Bold.otf"
-        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Regular.otf"
-        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/Japanese/NotoSerifCJKjp-Bold.otf"
+    font_urls=(
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Light.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Regular.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Bold.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/${serif_region}/${serif_file}-Regular.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/${serif_region}/${serif_file}-Bold.otf"
     )
-    local -a font_sha256=(
-        "add5669f3ebb69ce21cff87a8a4c28388406fb07bd81b23d06c23d6461454988"
-        "40d1b760d1135539f6b6e0ee2b9f415de6d97576f7676840b06306c7c190c074"
-        "3a2722f94c97a53b172579a10ef8fc34b3fa8a6bb4f7947a2ec709ab647fb755"
-        "d9854c7a8ef170b5a7932558856fd64eb8de0b007cd823fed6f9f514ad2803d3"
-        "861a2b2c0e24b23745c262be8c3fdef63f12628f0492fb120ee51aa55c503af8"
-    )
+    catalog_version="source-han-sans-2.005r-noto-serif-cjk-2.003-${locale}-v2"
 
     fonts_changed=0
 
@@ -448,7 +578,7 @@ setup_onlyoffice_japanese_fonts() {
         [[ "$installed_sha256" != "${font_sha256[$font_index]}" ]] || continue
 
         if [[ -z "$font_tmp_dir" ]]; then
-            log "Downloading verified Source Han Sans JP and Noto Serif CJK JP fonts for OnlyOffice..."
+            log "Downloading verified $sans_family and $serif_family fonts for OnlyOffice..."
             font_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-onlyoffice-fonts.XXXXXX")" \
                 || die "Could not create a temporary font directory"
         fi
@@ -492,76 +622,75 @@ setup_onlyoffice_japanese_fonts() {
     fi
 
     if [[ $fonts_changed -eq 0 ]]; then
-        log "Verified Japanese fonts are already installed in OnlyOffice"
+        log "Verified $language_name fonts are already installed in OnlyOffice"
     fi
 
     container exec "$container_name" sh -lc '
         set -eu
 
+        locale="$1"
+        language_tag="$2"
+        sans_family="$3"
+        sans_file="$4"
+        serif_family="$5"
+        serif_file="$6"
         font_dir=/var/www/onlyoffice/Data/custom-fonts
-        config_file="$font_dir/chatterrow-japanese-fonts.conf"
-        config_tmp="$font_dir/.chatterrow-japanese-fonts.conf.tmp"
+        config_file="$font_dir/chatterrow-cjk-fonts.conf"
+        config_tmp="$font_dir/.chatterrow-cjk-fonts.conf.tmp"
 
-        cat > "$config_tmp" <<EOF
+        write_alias() {
+            printf "  <alias binding=\"same\"><family>%s</family><prefer><family>%s</family></prefer></alias>\n" "$1" "$2"
+        }
+
+        write_light_match() {
+            printf "%s\n" \
+                "  <match target=\"pattern\">" \
+                "    <test name=\"family\" qual=\"any\" compare=\"eq\"><string>$1</string></test>" \
+                "    <edit name=\"family\" mode=\"assign\" binding=\"same\"><string>$sans_family</string></edit>" \
+                "    <edit name=\"weight\" mode=\"assign\" binding=\"same\"><const>light</const></edit>" \
+                "  </match>"
+        }
+
+        {
+            cat <<EOF
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
   <dir>/var/www/onlyoffice/Data/custom-fonts</dir>
-  <match target="pattern">
-    <test name="family" qual="any" compare="eq"><string>游ゴシック Light</string></test>
-    <edit name="family" mode="assign" binding="same"><string>Source Han Sans JP</string></edit>
-    <edit name="weight" mode="assign" binding="same"><const>light</const></edit>
-  </match>
-  <match target="pattern">
-    <test name="family" qual="any" compare="eq"><string>Yu Gothic Light</string></test>
-    <edit name="family" mode="assign" binding="same"><string>Source Han Sans JP</string></edit>
-    <edit name="weight" mode="assign" binding="same"><const>light</const></edit>
-  </match>
-  <alias binding="same">
-    <family>游明朝</family>
-    <prefer><family>Noto Serif CJK JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>Yu Mincho</family>
-    <prefer><family>Noto Serif CJK JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>游ゴシック</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>游ゴシック Light</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>Yu Gothic</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>Yu Gothic Light</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>Meiryo</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>MS Gothic</family>
-    <prefer><family>Source Han Sans JP</family></prefer>
-  </alias>
-  <alias binding="same">
-    <family>MS Mincho</family>
-    <prefer><family>Noto Serif CJK JP</family></prefer>
-  </alias>
-</fontconfig>
 EOF
+            case "$locale" in
+                ja)
+                    write_light_match "游ゴシック Light"
+                    write_light_match "Yu Gothic Light"
+                    for alias in "游ゴシック" "Yu Gothic" Meiryo "MS Gothic"; do write_alias "$alias" "$sans_family"; done
+                    for alias in "游明朝" "Yu Mincho" "MS Mincho"; do write_alias "$alias" "$serif_family"; done
+                    ;;
+                zh_CN)
+                    write_light_match "Microsoft YaHei Light"
+                    for alias in "Microsoft YaHei" "Microsoft YaHei UI" SimHei DengXian; do write_alias "$alias" "$sans_family"; done
+                    for alias in SimSun NSimSun FangSong KaiTi; do write_alias "$alias" "$serif_family"; done
+                    ;;
+                zh_TW)
+                    write_light_match "Microsoft JhengHei Light"
+                    for alias in "Microsoft JhengHei" "Microsoft JhengHei UI"; do write_alias "$alias" "$sans_family"; done
+                    for alias in MingLiU PMingLiU; do write_alias "$alias" "$serif_family"; done
+                    ;;
+                ko)
+                    write_light_match "Malgun Gothic Semilight"
+                    for alias in "Malgun Gothic" Gulim GulimChe Dotum DotumChe; do write_alias "$alias" "$sans_family"; done
+                    for alias in Batang BatangChe Gungsuh GungsuhChe; do write_alias "$alias" "$serif_family"; done
+                    ;;
+            esac
+            printf "%s\n" "</fontconfig>"
+        } > "$config_tmp"
         if ! cmp -s "$config_tmp" "$config_file"; then
             mv -f "$config_tmp" "$config_file"
         else
             rm -f "$config_tmp"
         fi
 
-        config_link=/etc/fonts/conf.d/65-chatterrow-japanese-fonts.conf
+        rm -f /etc/fonts/conf.d/65-chatterrow-japanese-fonts.conf
+        config_link=/etc/fonts/conf.d/65-chatterrow-cjk-fonts.conf
         current_link="$(readlink "$config_link" 2>/dev/null || true)"
         if [ "$current_link" != "$config_file" ]; then
             ln -sfn "$config_file" "$config_link"
@@ -580,15 +709,15 @@ EOF
             fi
         done
 
-        chmod 0644 "$font_dir"/SourceHanSansJP-Light.otf \
-            "$font_dir"/SourceHanSansJP-Regular.otf \
-            "$font_dir"/SourceHanSansJP-Bold.otf \
-            "$font_dir"/NotoSerifCJKjp-Regular.otf \
-            "$font_dir"/NotoSerifCJKjp-Bold.otf
+        chmod 0644 "$font_dir/$sans_file-Light.otf" \
+            "$font_dir/$sans_file-Regular.otf" \
+            "$font_dir/$sans_file-Bold.otf" \
+            "$font_dir/$serif_file-Regular.otf" \
+            "$font_dir/$serif_file-Bold.otf"
 
         fc-cache -f
-        fc-match "游明朝:lang=ja" | grep -q "NotoSerifCJKjp-Regular.otf"
-        fc-match "游ゴシック Light:lang=ja" | grep -q "SourceHanSansJP-Light.otf"
+        fc-match "$sans_family:lang=$language_tag" | grep -q "$sans_file-Regular.otf"
+        fc-match "$serif_family:lang=$language_tag" | grep -q "$serif_file-Regular.otf"
 
         document_root=/var/www/onlyoffice/documentserver
         all_fonts=/var/www/onlyoffice/documentserver/server/FileConverter/bin/AllFonts.js
@@ -614,11 +743,12 @@ EOF
             --use-system="true" \
             --use-system-user-fonts="false"
 
-        grep -q "Source Han Sans JP" "$all_fonts"
-        grep -q "Noto Serif CJK JP" "$all_fonts"
-        grep -a -q "SourceHanSansJP-Regular.otf" "$font_selection"
-        grep -a -q "NotoSerifCJKjp-Regular.otf" "$font_selection"
-    ' || die "Could not register Japanese fonts in $container_name"
+        grep -q "$sans_family" "$all_fonts"
+        grep -q "$serif_family" "$all_fonts"
+        grep -a -q "$sans_file-Regular.otf" "$font_selection"
+        grep -a -q "$serif_file-Regular.otf" "$font_selection"
+    ' chatterrow "$locale" "$language_tag" "$sans_family" "$sans_file" "$serif_family" "$serif_file" \
+        || die "Could not register $language_name fonts in $container_name"
 
     catalog_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-onlyoffice-catalog.XXXXXX")" \
         || die "Could not create a temporary OnlyOffice catalog directory"
@@ -640,6 +770,7 @@ EOF
         --selection="$catalog_tmp_dir/font_selection.bin" \
         --all-fonts="$catalog_tmp_dir/AllFonts.server.js" \
         --all-fonts-web="$catalog_tmp_dir/AllFonts.web.js" \
+        --locale="$locale" \
         || ! container copy "$catalog_tmp_dir/font_selection.bin" \
             "${container_name}:/tmp/chatterrow-font_selection.bin" \
         || ! container copy "$catalog_tmp_dir/AllFonts.server.js" \
@@ -648,7 +779,7 @@ EOF
             "${container_name}:/tmp/chatterrow-AllFonts.web.js"; then
         rm -f "$catalog_tmp_dir"/*
         rmdir "$catalog_tmp_dir" 2>/dev/null || true
-        die "Could not patch the OnlyOffice Japanese font catalog"
+        die "Could not patch the OnlyOffice $language_name font catalog"
     fi
 
     rm -f "$catalog_tmp_dir"/*
@@ -657,6 +788,11 @@ EOF
     container exec "$container_name" sh -lc '
         set -eu
 
+        sans_alias="$1"
+        serif_alias="$2"
+        sans_file="$3"
+        serif_file="$4"
+        catalog_version="$5"
         document_root=/var/www/onlyoffice/documentserver
         converter_bin="$document_root/server/FileConverter/bin"
         all_fonts="$converter_bin/AllFonts.js"
@@ -674,10 +810,10 @@ EOF
         export LD_LIBRARY_PATH="$converter_bin:${LD_LIBRARY_PATH:-}"
         "$converter_bin/x2t" -create-js-cache
 
-        grep -q "Yu Gothic" "$all_fonts"
-        grep -q "Yu Mincho" "$all_fonts"
-        grep -a -q "$font_dir/SourceHanSansJP-Regular.otf" "$font_selection"
-        grep -a -q "$font_dir/NotoSerifCJKjp-Regular.otf" "$font_selection"
+        grep -q "$sans_alias" "$all_fonts"
+        grep -q "$serif_alias" "$all_fonts"
+        grep -a -q "$font_dir/$sans_file-Regular.otf" "$font_selection"
+        grep -a -q "$font_dir/$serif_file-Regular.otf" "$font_selection"
 
         chown -R ds:ds "$document_root/sdkjs" \
             "$converter_bin" \
@@ -686,7 +822,7 @@ EOF
             "$document_root/sdkjs/common/AllFonts.js.gz" \
             "$document_root"/sdkjs/common/Images/*.gz \
             "$document_root/sdkjs/slide/themes/themes.js.gz"
-        printf "%s\n" source-han-sans-jp-2.005r-noto-serif-cjk-jp-2.003-v1 \
+        printf "%s\n" "$catalog_version" \
             > "$font_dir/.chatterrow-font-catalog-version"
 
         if pgrep -x supervisord >/dev/null; then
@@ -694,7 +830,148 @@ EOF
             supervisorctl restart ds:converter
         fi
         documentserver-flush-cache.sh
-    ' || die "Could not activate the OnlyOffice Japanese font catalog in $container_name"
+    ' chatterrow "$sans_alias" "$serif_alias" "$sans_file" "$serif_file" "$catalog_version" \
+        || die "Could not activate the OnlyOffice $language_name font catalog in $container_name"
+}
+
+setup_ubuntu_regional_onlyoffice_fonts() {
+    local locale="$1" target_dir="/usr/share/fonts/opentype/chatterrow"
+    local sans_file source_region serif_file serif_region language_name
+    local temp_dir index actual_sha256 installed_sha256
+    local -a font_names=() font_urls=() font_sha256=()
+
+    case "$locale" in
+        zh_CN)
+            language_name="Simplified Chinese"
+            sans_file="SourceHanSansCN"; source_region="CN"
+            serif_file="NotoSerifCJKsc"; serif_region="SimplifiedChinese"
+            font_sha256=(
+                "c406ec4c795fe71ec443a8a55570d7df53dea560ea93d4117eadab6e2b19680d"
+                "e2bc8a2e7f37474b774fff8db758681ece40bb6947a90d571bce9dd60671a8e4"
+                "62383707c086a32f3afd5e293f34c7eff64c7fea31f579fdc6cbe34d920519a6"
+                "2a2eae2628df83556c54018c41e20fa532c1b862c5256ae8b3f23feb918d12ca"
+                "8af07d4b6c2e82bcc72a30e066eaf295f11b9424f4aad2eaa9fe0e9c3b38fc73"
+            )
+            ;;
+        zh_TW)
+            language_name="Traditional Chinese"
+            sans_file="SourceHanSansTW"; source_region="TW"
+            serif_file="NotoSerifCJKtc"; serif_region="TraditionalChinese"
+            font_sha256=(
+                "01b91bd5e24949e797e200c52deb97a263e1c6104b618c8c0f014d35c70299ab"
+                "5034bc32aa64bc93ce673fe05752724bb31fc6757c6bc1d23e925052c54fd2ac"
+                "a586990078d8fe4e97202e38fa3c2e0a61ce54009affdd9e2cfe59351ad3f5c7"
+                "234301038e76e7c35c43113785024700c4e4fe7bdce1d1fbbc42fca7e6683798"
+                "a4441a76dbf56719600c5dcbd5b5e5a068a20944cc41c959487a657133576ee6"
+            )
+            ;;
+        ko)
+            language_name="Korean"
+            sans_file="SourceHanSansKR"; source_region="KR"
+            serif_file="NotoSerifCJKkr"; serif_region="Korean"
+            font_sha256=(
+                "1df92a4f2587bd4214eaabf52cc1946c5b85e43e1f6a8bf9ed87ef882af7578d"
+                "d8299926a5284f7461b46fa0617cc05d4f1fce8f034ffff78084225ce8b38071"
+                "f678def86be3d973e85fb0e34513b93b9ec7d6a478380d93fe79d43d1ad9f797"
+                "77b4b741f864d27f15e90f275b17106dde90b2ad28f82bab72dc95805db5fb42"
+                "10cc03741178ad6d2747df8497d911e34b167d0474a826fb9d866c402cbe3d8f"
+            )
+            ;;
+        *) return 0 ;;
+    esac
+
+    font_names=(
+        "${sans_file}-Light.otf" "${sans_file}-Regular.otf" "${sans_file}-Bold.otf"
+        "${serif_file}-Regular.otf" "${serif_file}-Bold.otf"
+    )
+    font_urls=(
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Light.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Regular.otf"
+        "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/SubsetOTF/${source_region}/${sans_file}-Bold.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/${serif_region}/${serif_file}-Regular.otf"
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/${serif_region}/${serif_file}-Bold.otf"
+    )
+
+    sudo install -d -o root -g root -m 0755 "$target_dir"
+    temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-ubuntu-cjk-fonts.XXXXXX")" \
+        || die "Could not create a temporary CJK font directory"
+
+    for index in "${!font_names[@]}"; do
+        installed_sha256="$(sudo sha256sum "$target_dir/${font_names[$index]}" 2>/dev/null | awk '{print $1}' || true)"
+        [[ "$installed_sha256" != "${font_sha256[$index]}" ]] || continue
+
+        log "Downloading verified ${font_names[$index]} for Ubuntu OnlyOffice..."
+        if ! curl -fL --retry 3 --retry-delay 2 \
+            --output "$temp_dir/${font_names[$index]}" "${font_urls[$index]}"; then
+            rm -f "$temp_dir"/*
+            rmdir "$temp_dir" 2>/dev/null || true
+            die "Could not download ${font_names[$index]}"
+        fi
+        actual_sha256="$(shasum -a 256 "$temp_dir/${font_names[$index]}" | awk '{print $1}')"
+        if [[ "$actual_sha256" != "${font_sha256[$index]}" ]]; then
+            rm -f "$temp_dir"/*
+            rmdir "$temp_dir" 2>/dev/null || true
+            die "${font_names[$index]} checksum mismatch"
+        fi
+        sudo install -o root -g root -m 0644 "$temp_dir/${font_names[$index]}" "$target_dir/${font_names[$index]}"
+    done
+
+    rm -f "$temp_dir"/*
+    rmdir "$temp_dir"
+    sudo fc-cache -f
+    log "Installed verified $language_name fonts for Ubuntu OnlyOffice"
+}
+
+patch_ubuntu_onlyoffice_cjk_catalog() {
+    local locale="$1" patcher="$2" font_dir="/usr/share/fonts/opentype/chatterrow"
+    local document_root="/var/www/onlyoffice/documentserver" converter_bin catalog_tmp_dir
+    local font_selection all_fonts all_fonts_web
+
+    case "$locale" in zh_CN|zh_TW|ko) ;; *) return 0 ;; esac
+    command -v documentserver-generate-allfonts.sh >/dev/null \
+        || die "Could not find documentserver-generate-allfonts.sh"
+    [[ -f "$patcher" ]] || die "Could not find $patcher"
+
+    log "Regenerating the Ubuntu OnlyOffice catalog for $locale..."
+    sudo documentserver-generate-allfonts.sh
+
+    converter_bin="$document_root/server/FileConverter/bin"
+    font_selection="$converter_bin/font_selection.bin"
+    all_fonts="$converter_bin/AllFonts.js"
+    all_fonts_web="$document_root/sdkjs/common/AllFonts.js"
+    catalog_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chatterrow-ubuntu-font-catalog.XXXXXX")" \
+        || die "Could not create a temporary OnlyOffice catalog directory"
+    sudo cp "$font_selection" "$catalog_tmp_dir/font_selection.bin"
+    sudo cp "$all_fonts" "$catalog_tmp_dir/AllFonts.server.js"
+    sudo cp "$all_fonts_web" "$catalog_tmp_dir/AllFonts.web.js"
+    sudo chown "$(id -u):$(id -g)" "$catalog_tmp_dir"/*
+
+    if ! php "$patcher" \
+        --selection="$catalog_tmp_dir/font_selection.bin" \
+        --all-fonts="$catalog_tmp_dir/AllFonts.server.js" \
+        --all-fonts-web="$catalog_tmp_dir/AllFonts.web.js" \
+        --locale="$locale" \
+        --font-dir="$font_dir"; then
+        rm -f "$catalog_tmp_dir"/*
+        rmdir "$catalog_tmp_dir" 2>/dev/null || true
+        die "Could not patch the Ubuntu OnlyOffice $locale font catalog"
+    fi
+
+    sudo install -o ds -g ds -m 0644 "$catalog_tmp_dir/font_selection.bin" "$font_selection"
+    sudo install -o ds -g ds -m 0644 "$catalog_tmp_dir/AllFonts.server.js" "$all_fonts"
+    sudo install -o ds -g ds -m 0644 "$catalog_tmp_dir/AllFonts.web.js" "$all_fonts_web"
+    rm -f "$catalog_tmp_dir"/*
+    rmdir "$catalog_tmp_dir"
+
+    sudo env LD_LIBRARY_PATH="$converter_bin:${LD_LIBRARY_PATH:-}" \
+        "$converter_bin/x2t" -create-js-cache
+    sudo rm -f "$document_root"/fonts/*.gz \
+        "$document_root"/sdkjs/common/AllFonts.js.gz \
+        "$document_root"/sdkjs/common/Images/*.gz \
+        "$document_root"/sdkjs/slide/themes/themes.js.gz
+    sudo supervisorctl restart ds:docservice
+    sudo supervisorctl restart ds:converter
+    sudo documentserver-flush-cache.sh
 }
 
 setup_macos_onlyoffice() {
@@ -718,6 +995,7 @@ setup_macos_onlyoffice() {
     }
 
     set_env APP_LOCALE "$APP_LOCALE" "$env_file"
+    setup_regional_pdf_font "$app_dir" "$APP_LOCALE"
     imagemagick_path="$(resolve_imagemagick_path)" \
         || die "ImageMagick is required; install it with 'brew install imagemagick'"
     "$imagemagick_path" -version >/dev/null 2>&1 \
@@ -897,7 +1175,7 @@ setup_macos_onlyoffice() {
         --env JWT_SECRET
         --env "JWT_HEADER=AuthorizationJwt"
         --env "JWT_IN_BODY=true"
-        # setup_onlyoffice_japanese_fonts generates only the font catalog.
+        # setup_onlyoffice_cjk_fonts generates only the font catalog.
         # The image default also regenerates presentation themes, which can
         # stall indefinitely under Apple Container on arm64.
         --env "GENERATE_FONTS=false"
@@ -950,7 +1228,7 @@ setup_macos_onlyoffice() {
 
     for _ in {1..60}; do
         if curl -fsS "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -Eq 'true|ok'; then
-            setup_onlyoffice_japanese_fonts "$ONLYOFFICE_CONTAINER_NAME" "$app_dir"
+            setup_onlyoffice_cjk_fonts "$ONLYOFFICE_CONTAINER_NAME" "$app_dir" "$APP_LOCALE"
 
             # Font catalog generation restarts the document and converter
             # services. Wait for DocumentServer to become ready again.
@@ -962,7 +1240,7 @@ setup_macos_onlyoffice() {
             done
             curl -fsS "http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}/healthcheck" 2>/dev/null \
                 | grep -Eq 'true|ok' \
-                || die "OnlyOffice did not recover after Japanese font generation"
+                || die "OnlyOffice did not recover after CJK font generation"
 
             log "OnlyOffice DocumentServer is ready on http://127.0.0.1:${MACOS_ONLYOFFICE_PORT}"
 
@@ -1253,7 +1531,14 @@ fi
 # ----------------------------------------------------------- preflight -----
 . /etc/os-release
 case "$VERSION_ID" in
-    24.04|26.04) ;;
+    24.04)
+        PG_MAJOR=16
+        PGROONGA_PACKAGE="postgresql-16-pgroonga"
+        ;;
+    26.04)
+        PG_MAJOR=18
+        PGROONGA_PACKAGE="postgresql-18-pgdg-pgroonga"
+        ;;
     *) die "Unsupported Ubuntu version: $VERSION_ID (supported: 24.04, 26.04)" ;;
 esac
 
@@ -1310,10 +1595,22 @@ log "Domain: $DOMAIN | OnlyOffice: ${DOMAIN}${ONLYOFFICE_PUBLIC_PATH} | Database
 log "Installing web, database, preview, SSL, and build packages..."
 apt_get_with_lock_wait update -y
 apt_get_with_lock_wait install -y \
-    curl gnupg ca-certificates lsb-release software-properties-common ubuntu-keyring
+    curl gnupg ca-certificates lsb-release software-properties-common ubuntu-keyring wget
 sudo add-apt-repository -y --no-update universe
 apt_get_with_lock_wait update -y
 apt_get_with_lock_wait install -y nginx-extras
+
+install_pgroonga_repository
+
+declare -a POSTGRES_PACKAGES=(postgresql postgresql-client postgresql-contrib)
+if [[ "$DATABASE" == "pgsql" ]]; then
+    POSTGRES_PACKAGES=(
+        "postgresql-${PG_MAJOR}"
+        "postgresql-client-${PG_MAJOR}"
+        "postgresql-contrib-${PG_MAJOR}"
+        "$PGROONGA_PACKAGE"
+    )
+fi
 
 apt_get_with_lock_wait install -y \
     apt-transport-https ca-certificates curl gnupg lsb-release \
@@ -1321,7 +1618,7 @@ apt_get_with_lock_wait install -y \
     supervisor certbot python3-certbot-nginx \
     unattended-upgrades \
     python3 python3-venv \
-    postgresql postgresql-client postgresql-contrib \
+    "${POSTGRES_PACKAGES[@]}" \
     redis-server rabbitmq-server \
     poppler-utils imagemagick ghostscript \
     fonts-dejavu-core fonts-liberation fonts-noto-cjk sqlite3
@@ -1366,12 +1663,21 @@ echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select t
 apt_get_with_lock_wait install -y ttf-mscorefonts-installer || \
     warn "Microsoft core fonts could not be installed; continuing with open fonts"
 
-# Japanese fonts are required for ONLYOFFICE previews and the file viewer.
-if fc-list :lang=ja 2>/dev/null | grep -q .; then
-    log "Japanese fonts available: $(fc-list :lang=ja family 2>/dev/null | sort -u | paste -sd, - | cut -c1-160)"
-else
-    warn "No Japanese fonts detected; Office previews may render incorrectly"
+# Ubuntu's fonts-noto-cjk package contains locale-specific CJK faces and is
+# installed before ONLYOFFICE so its post-install font catalog sees them.
+case "$APP_LOCALE" in
+    ja) CJK_FONT_LANG="ja"; CJK_FONT_FAMILY="Noto Sans CJK JP" ;;
+    zh_CN) CJK_FONT_LANG="zh-cn"; CJK_FONT_FAMILY="Noto Sans CJK SC" ;;
+    zh_TW) CJK_FONT_LANG="zh-tw"; CJK_FONT_FAMILY="Noto Sans CJK TC" ;;
+    ko) CJK_FONT_LANG="ko"; CJK_FONT_FAMILY="Noto Sans CJK KR" ;;
+    *) CJK_FONT_LANG=""; CJK_FONT_FAMILY="" ;;
+esac
+if [[ -n "$CJK_FONT_LANG" ]]; then
+    fc-match "$CJK_FONT_FAMILY:lang=$CJK_FONT_LANG" | grep -q "NotoSansCJK" \
+        || die "$CJK_FONT_FAMILY is required for $APP_LOCALE OnlyOffice previews"
+    log "$CJK_FONT_FAMILY is available for OnlyOffice previews"
 fi
+setup_ubuntu_regional_onlyoffice_fonts "$APP_LOCALE"
 
 # --------------------------------------------------------- PHP 8.5 --------
 # Ubuntu 24.04 ships PHP 8.3, so use the maintained ondrej/php repository for
@@ -1447,8 +1753,21 @@ sudo systemctl enable --now postgresql
 mapfile -t PG_CLUSTERS < <(pg_lsclusters --no-header)
 [[ "${#PG_CLUSTERS[@]}" -eq 1 ]] || die "Expected exactly one PostgreSQL cluster; found ${#PG_CLUSTERS[@]}. Remove unused clusters or configure PostgreSQL manually."
 read -r PG_VERSION PG_CLUSTER PG_PORT PG_STATUS PG_OWNER PG_DATA PG_LOG <<< "${PG_CLUSTERS[0]}"
+if [[ "$DATABASE" == "pgsql" && "$PG_VERSION" != "$PG_MAJOR" ]]; then
+    die "Expected PostgreSQL major ${PG_MAJOR} for PGroonga, found cluster major ${PG_VERSION}"
+fi
 PG_SERVICE="postgresql@${PG_VERSION}-${PG_CLUSTER}"
 [[ "$PG_STATUS" == "online" ]] || sudo systemctl start "$PG_SERVICE"
+
+if [[ "$DATABASE" == "pgsql" ]]; then
+    dpkg-query -W -f='${db:Status-Status}' "$PGROONGA_PACKAGE" 2>/dev/null | grep -qx 'installed' \
+        || die "PGroonga package was not installed: $PGROONGA_PACKAGE"
+    PGROONGA_AVAILABLE="$(sudo -u postgres psql -p "$PG_PORT" -Atqc \
+        "SELECT default_version FROM pg_available_extensions WHERE name = 'pgroonga'")"
+    [[ -n "$PGROONGA_AVAILABLE" ]] \
+        || die "PGroonga is not available to PostgreSQL ${PG_VERSION}"
+    log "PGroonga package available: $PGROONGA_AVAILABLE"
+fi
 
 # Chatterrow, PHP, and OnlyOffice share the host, so PostgreSQL receives a
 # conservative fraction rather than dedicated-database-server values.
@@ -1585,6 +1904,20 @@ SELECT format('ALTER DATABASE %I OWNER TO %I', :'db_name', :'db_user') \gexec
 SQL
 fi
 
+if [[ "$DATABASE" == "pgsql" ]]; then
+    log "Creating the PGroonga extension before Laravel migrations..."
+    sudo -u postgres psql \
+        -p "$PG_PORT" \
+        -d "$DB_NAME" \
+        --set=ON_ERROR_STOP=1 \
+        -c 'CREATE EXTENSION IF NOT EXISTS pgroonga;'
+    PGROONGA_EXTENSION_VERSION="$(sudo -u postgres psql -p "$PG_PORT" -d "$DB_NAME" -Atqc \
+        "SELECT extversion FROM pg_extension WHERE extname = 'pgroonga'")"
+    [[ -n "$PGROONGA_EXTENSION_VERSION" ]] \
+        || die "PGroonga extension could not be created in $DB_NAME"
+    log "PGroonga extension ready: $PGROONGA_EXTENSION_VERSION"
+fi
+
 # ---------------------------------------------------- ONLYOFFICE Docs ------
 if dpkg-query -W -f='${db:Status-Status}' onlyoffice-documentserver 2>/dev/null | grep -qx 'installed'; then
     log "ONLYOFFICE Document Server already installed"
@@ -1633,6 +1966,22 @@ for _ in {1..30}; do
 done
 [[ $ONLYOFFICE_READY -eq 1 ]] || die "ONLYOFFICE health check failed on 127.0.0.1:$ONLYOFFICE_PORT"
 
+patch_ubuntu_onlyoffice_cjk_catalog \
+    "$APP_LOCALE" "$SCRIPT_DIR/scripts/patch-onlyoffice-font-catalog.php"
+if [[ "$APP_LOCALE" =~ ^(zh_CN|zh_TW|ko)$ ]]; then
+    ONLYOFFICE_READY=0
+    for _ in {1..30}; do
+        if curl -fsS --connect-timeout 2 --max-time 5 \
+            "http://127.0.0.1:${ONLYOFFICE_PORT}/healthcheck" 2>/dev/null | grep -q 'true'; then
+            ONLYOFFICE_READY=1
+            break
+        fi
+        sleep 2
+    done
+    [[ $ONLYOFFICE_READY -eq 1 ]] \
+        || die "ONLYOFFICE did not recover after the $APP_LOCALE font catalog update"
+fi
+
 # --------------------------------------------------------- app deploy ------
 log "Deploying chatterrow into $APP_DIR..."
 sudo mkdir -p "$APP_DIR"
@@ -1650,6 +1999,7 @@ else
 fi
 
 cd "$APP_DIR"
+setup_regional_pdf_font "$APP_DIR" "$APP_LOCALE"
 
 # Keep both deployment commands and web/worker processes able to update
 # Laravel runtime paths across repeat deployments.

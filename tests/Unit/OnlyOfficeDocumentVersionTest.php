@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 class OnlyOfficeDocumentVersionTest extends TestCase
 {
-    public function test_it_uses_the_static_japanese_font_cache_generation(): void
+    public function test_it_uses_the_regional_cjk_font_cache_generation(): void
     {
         $file = new StoredFile;
         $file->id = 31;
@@ -16,7 +16,7 @@ class OnlyOfficeDocumentVersionTest extends TestCase
         $file->size = 152364;
 
         $expected = hash('sha256', implode("\0", [
-            'chatterrow-onlyoffice-document-v3-source-han-noto-cjk',
+            'chatterrow-onlyoffice-document-v4-regional-cjk-fonts',
             '31',
             'uploads/example.docx',
             '152364',

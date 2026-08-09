@@ -193,4 +193,14 @@ class MarkdownSearchTest extends TestCase
             ->getJson(route('servers.files.search', [$this->server, 'q' => 'anything']))
             ->assertForbidden();
     }
+
+    public function test_file_search_enforces_the_shared_term_limit(): void
+    {
+        $query = implode(' ', array_fill(0, 13, 'term'));
+
+        $this->actingAs($this->member)
+            ->getJson(route('servers.files.search', [$this->server, 'q' => $query]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('q');
+    }
 }

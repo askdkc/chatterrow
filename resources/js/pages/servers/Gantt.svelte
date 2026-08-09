@@ -11,6 +11,7 @@
     import MemberDialog from '@/components/discord/MemberDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import GanttPdfPreviewDialog from '@/components/files/GanttPdfPreviewDialog.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { Button } from '@/components/ui/button';
     import {
         epochDay,
@@ -223,9 +224,10 @@
             </Link>
             <CalendarRange class="size-4 text-brand-accent" />
             <h1 class="text-base font-bold">{t('Gantt chart')}</h1>
+            <GlobalSearch class="ml-auto" />
             <div
                 data-gantt-legend
-                class="ml-auto flex items-center gap-3 text-sm text-muted-foreground"
+                class="flex items-center gap-3 text-sm text-muted-foreground"
             >
                 <Button
                     variant="ghost"

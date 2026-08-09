@@ -1,5 +1,6 @@
 <script lang="ts">
     import Breadcrumbs from '@/components/Breadcrumbs.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { SidebarTrigger } from '@/components/ui/sidebar';
     import type { BreadcrumbItem } from '@/types';
 
@@ -19,4 +20,5 @@
             <Breadcrumbs {breadcrumbs} />
         {/if}
     </div>
+    <GlobalSearch class="ml-auto" />
 </header>

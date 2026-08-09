@@ -15,6 +15,7 @@
     import ProjectInvitationCard from '@/components/discord/ProjectInvitationCard.svelte';
     import ServerDialog from '@/components/discord/ServerDialog.svelte';
     import ServerRail from '@/components/discord/ServerRail.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import * as AlertDialog from '@/components/ui/alert-dialog';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
@@ -284,9 +285,10 @@
 
     <main class="flex min-w-0 flex-1 flex-col overflow-y-auto">
         <header
-            class="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-black/10 bg-[#313338] px-6 dark:border-black/20"
+            class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-3 border-b border-black/10 bg-[#313338] px-6 dark:border-black/20"
         >
             <h1 class="text-[15px] font-bold">{t('Project list')}</h1>
+            <GlobalSearch class="ml-auto" />
             <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" onclick={createFolder}>
                     <FolderPlus data-icon="inline-start" />

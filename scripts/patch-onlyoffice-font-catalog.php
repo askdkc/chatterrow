@@ -3,58 +3,107 @@
 declare(strict_types=1);
 
 /**
- * Add Japanese Office aliases and fallback mappings to an ONLYOFFICE v2
- * font catalog.
+ * Add locale-appropriate CJK Office aliases and fallback mappings to an
+ * ONLYOFFICE v2 font catalog.
  *
  * ONLYOFFICE does not use fontconfig aliases while converting OOXML files.
  * The aliases therefore have to exist in both font_selection.bin (server-side
  * conversion) and AllFonts.js (browser-side rendering).
  */
-const ONLYOFFICE_FONT_ALIASES = [
-    'Source Han Sans JP' => [
-        'Yu Gothic',
-        'Yu Gothic UI',
-        'YuGothic',
-        'Meiryo',
-        'Meiryo UI',
-        'MS Gothic',
-        'MS PGothic',
-        '游ゴシック',
-        '游ゴシック体',
-        'メイリオ',
-        'ＭＳ ゴシック',
-        'ＭＳ Ｐゴシック',
-    ],
-    'Source Han Sans JP Light' => [
-        'Yu Gothic Light',
-        '游ゴシック Light',
-    ],
-    'Noto Serif CJK JP' => [
-        'Yu Mincho',
-        'YuMincho',
-        'MS Mincho',
-        'MS PMincho',
-        '游明朝',
-        'ＭＳ 明朝',
-        'ＭＳ Ｐ明朝',
-    ],
-];
+/**
+ * @return array{
+ *   aliases: array<string, array<int, string>>,
+ *   fallbackFamilies: array<string, string>,
+ *   fallbackFiles: array<string, array{regular: string, bold: string}>
+ * }
+ */
+function onlyOfficeCjkFontProfile(
+    string $locale = 'ja',
+    string $fontDir = '/var/www/onlyoffice/Data/custom-fonts',
+): array {
+    $fontDir = rtrim($fontDir, '/');
 
-const ONLYOFFICE_FALLBACK_FONT_FAMILIES = [
-    'NanumGothic' => 'Source Han Sans JP',
-    'Droid Sans Fallback' => 'Noto Serif CJK JP',
-];
+    $profile = match ($locale) {
+        'zh_CN' => [
+            'sans' => 'Source Han Sans CN',
+            'sansLight' => 'Source Han Sans CN Light',
+            'sansFile' => 'SourceHanSansCN',
+            'serif' => 'Noto Serif CJK SC',
+            'serifFile' => 'NotoSerifCJKsc',
+            'aliases' => [
+                'sans' => ['Microsoft YaHei', 'Microsoft YaHei UI', 'SimHei', 'DengXian'],
+                'light' => ['Microsoft YaHei Light', 'Microsoft YaHei UI Light', 'DengXian Light'],
+                'serif' => ['SimSun', 'NSimSun', 'SimSun-ExtB', 'FangSong', 'KaiTi'],
+            ],
+        ],
+        'zh_TW' => [
+            'sans' => 'Source Han Sans TW',
+            'sansLight' => 'Source Han Sans TW Light',
+            'sansFile' => 'SourceHanSansTW',
+            'serif' => 'Noto Serif CJK TC',
+            'serifFile' => 'NotoSerifCJKtc',
+            'aliases' => [
+                'sans' => ['Microsoft JhengHei', 'Microsoft JhengHei UI'],
+                'light' => ['Microsoft JhengHei Light', 'Microsoft JhengHei UI Light'],
+                'serif' => ['MingLiU', 'PMingLiU', 'MingLiU-ExtB', 'PMingLiU-ExtB'],
+            ],
+        ],
+        'ko' => [
+            'sans' => 'Source Han Sans KR',
+            'sansLight' => 'Source Han Sans KR Light',
+            'sansFile' => 'SourceHanSansKR',
+            'serif' => 'Noto Serif CJK KR',
+            'serifFile' => 'NotoSerifCJKkr',
+            'aliases' => [
+                'sans' => ['Malgun Gothic', 'Gulim', 'GulimChe', 'Dotum', 'DotumChe'],
+                'light' => ['Malgun Gothic Semilight'],
+                'serif' => ['Batang', 'BatangChe', 'Gungsuh', 'GungsuhChe'],
+            ],
+        ],
+        'ja' => [
+            'sans' => 'Source Han Sans JP',
+            'sansLight' => 'Source Han Sans JP Light',
+            'sansFile' => 'SourceHanSansJP',
+            'serif' => 'Noto Serif CJK JP',
+            'serifFile' => 'NotoSerifCJKjp',
+            'aliases' => [
+                'sans' => [
+                    'Yu Gothic', 'Yu Gothic UI', 'YuGothic', 'Meiryo', 'Meiryo UI',
+                    'MS Gothic', 'MS PGothic', '游ゴシック', '游ゴシック体', 'メイリオ',
+                    'ＭＳ ゴシック', 'ＭＳ Ｐゴシック',
+                ],
+                'light' => ['Yu Gothic Light', '游ゴシック Light'],
+                'serif' => [
+                    'Yu Mincho', 'YuMincho', 'MS Mincho', 'MS PMincho',
+                    '游明朝', 'ＭＳ 明朝', 'ＭＳ Ｐ明朝',
+                ],
+            ],
+        ],
+        default => throw new InvalidArgumentException("Unsupported CJK font locale: {$locale}"),
+    };
 
-const ONLYOFFICE_FALLBACK_FONT_FILES = [
-    'NanumGothic' => [
-        'regular' => '/var/www/onlyoffice/Data/custom-fonts/SourceHanSansJP-Regular.otf',
-        'bold' => '/var/www/onlyoffice/Data/custom-fonts/SourceHanSansJP-Bold.otf',
-    ],
-    'Droid Sans Fallback' => [
-        'regular' => '/var/www/onlyoffice/Data/custom-fonts/NotoSerifCJKjp-Regular.otf',
-        'bold' => '/var/www/onlyoffice/Data/custom-fonts/NotoSerifCJKjp-Bold.otf',
-    ],
-];
+    $aliases = [
+        $profile['sans'] => $profile['aliases']['sans'],
+        $profile['sansLight'] => $profile['aliases']['light'],
+        $profile['serif'] => $profile['aliases']['serif'],
+    ];
+    $fallbackFamilies = [
+        'NanumGothic' => $profile['sans'],
+        'Droid Sans Fallback' => $profile['serif'],
+    ];
+    $fallbackFiles = [
+        'NanumGothic' => [
+            'regular' => "{$fontDir}/{$profile['sansFile']}-Regular.otf",
+            'bold' => "{$fontDir}/{$profile['sansFile']}-Bold.otf",
+        ],
+        'Droid Sans Fallback' => [
+            'regular' => "{$fontDir}/{$profile['serifFile']}-Regular.otf",
+            'bold' => "{$fontDir}/{$profile['serifFile']}-Bold.otf",
+        ],
+    ];
+
+    return compact('aliases', 'fallbackFamilies', 'fallbackFiles');
+}
 
 function readUint32Le(string $data, int &$offset): int
 {
@@ -92,8 +141,9 @@ function writeCatalogString(string $value): string
 }
 
 /** @return array{string, int} */
-function patchOnlyOfficeSelectionCatalog(string $data): array
+function patchOnlyOfficeSelectionCatalog(string $data, ?array $profile = null): array
 {
+    $profile ??= onlyOfficeCjkFontProfile();
     $offset = 0;
     $recordCount = readUint32Le($data, $offset);
     $output = writeUint32Le($recordCount);
@@ -122,16 +172,16 @@ function patchOnlyOfficeSelectionCatalog(string $data): array
         $recordTail = substr($data, $offset, $recordEnd - $offset);
         $offset = $recordEnd;
 
-        foreach (ONLYOFFICE_FONT_ALIASES[$fontName] ?? [] as $alias) {
+        foreach ($profile['aliases'][$fontName] ?? [] as $alias) {
             if (! in_array($alias, $names, true)) {
                 $names[] = $alias;
                 $aliasesAdded++;
             }
         }
 
-        if (isset(ONLYOFFICE_FALLBACK_FONT_FILES[$fontName])) {
+        if (isset($profile['fallbackFiles'][$fontName])) {
             $weight = str_contains(strtolower($fontPath), 'bold') ? 'bold' : 'regular';
-            $replacementPath = ONLYOFFICE_FALLBACK_FONT_FILES[$fontName][$weight];
+            $replacementPath = $profile['fallbackFiles'][$fontName][$weight];
             if ($fontPath !== $replacementPath) {
                 $fontPath = $replacementPath;
                 $aliasesAdded++;
@@ -155,11 +205,12 @@ function patchOnlyOfficeSelectionCatalog(string $data): array
 }
 
 /** @return array{string, int} */
-function patchOnlyOfficeAllFontsJs(string $contents): array
+function patchOnlyOfficeAllFontsJs(string $contents, ?array $profile = null): array
 {
+    $profile ??= onlyOfficeCjkFontProfile();
     $aliasesAdded = 0;
 
-    foreach (ONLYOFFICE_FONT_ALIASES as $sourceName => $aliases) {
+    foreach ($profile['aliases'] as $sourceName => $aliases) {
         $sourcePattern = '/^\["'.preg_quote($sourceName, '/').'",([^\r\n]+)\],?$/m';
         if (preg_match($sourcePattern, $contents, $sourceMatch, PREG_OFFSET_CAPTURE) !== 1) {
             throw new RuntimeException("Missing {$sourceName} in ONLYOFFICE AllFonts.js");
@@ -184,7 +235,7 @@ function patchOnlyOfficeAllFontsJs(string $contents): array
         }
     }
 
-    foreach (ONLYOFFICE_FALLBACK_FONT_FAMILIES as $fallbackName => $replacementName) {
+    foreach ($profile['fallbackFamilies'] as $fallbackName => $replacementName) {
         $replacementPattern = '/^\["'.preg_quote($replacementName, '/').'",([^\r\n]+)\],?$/m';
         if (preg_match($replacementPattern, $contents, $replacementMatch) !== 1) {
             throw new RuntimeException("Missing {$replacementName} in ONLYOFFICE AllFonts.js");
@@ -222,7 +273,7 @@ function patchCatalogFile(string $path, callable $patcher): int
 
 function runOnlyOfficeFontCatalogPatcher(array $arguments): int
 {
-    $options = getopt('', ['selection:', 'all-fonts:', 'all-fonts-web:']);
+    $options = getopt('', ['selection:', 'all-fonts:', 'all-fonts-web:', 'locale:', 'font-dir:']);
     foreach (['selection', 'all-fonts', 'all-fonts-web'] as $required) {
         if (! isset($options[$required]) || ! is_string($options[$required]) || $options[$required] === '') {
             fwrite(STDERR, "Missing --{$required}\n");
@@ -232,17 +283,24 @@ function runOnlyOfficeFontCatalogPatcher(array $arguments): int
     }
 
     try {
+        $locale = isset($options['locale']) && is_string($options['locale'])
+            ? $options['locale']
+            : 'ja';
+        $fontDir = isset($options['font-dir']) && is_string($options['font-dir'])
+            ? $options['font-dir']
+            : '/var/www/onlyoffice/Data/custom-fonts';
+        $profile = onlyOfficeCjkFontProfile($locale, $fontDir);
         $selectionAliases = patchCatalogFile(
             $options['selection'],
-            static fn (string $data): array => patchOnlyOfficeSelectionCatalog($data),
+            static fn (string $data): array => patchOnlyOfficeSelectionCatalog($data, $profile),
         );
         $serverAliases = patchCatalogFile(
             $options['all-fonts'],
-            static fn (string $data): array => patchOnlyOfficeAllFontsJs($data),
+            static fn (string $data): array => patchOnlyOfficeAllFontsJs($data, $profile),
         );
         $webAliases = patchCatalogFile(
             $options['all-fonts-web'],
-            static fn (string $data): array => patchOnlyOfficeAllFontsJs($data),
+            static fn (string $data): array => patchOnlyOfficeAllFontsJs($data, $profile),
         );
     } catch (Throwable $error) {
         fwrite(STDERR, $error->getMessage()."\n");

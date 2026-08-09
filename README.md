@@ -190,7 +190,7 @@ MACOS_APP_SERVER=herd ./setup.sh
 - macOSで`setup.sh`を実行するたび、名前付きボリュームを残してOnlyOfficeコンテナを再作成
 - `chatter-host.container.internal`を`203.0.113.150`経由でmacOSのloopbackへ接続
 - Valet/Herdではアプリのホスト名をコンテナ内だけ`203.0.113.150`へ割り当て
-- Source Han Sans JP／Noto Serif CJK JPを取得・検証し、OnlyOfficeのフォント一覧を再生成
+- 選択言語に対応するSource Han Sans／Noto Serif CJKを取得・検証し、OnlyOfficeのフォント一覧を再生成
 - `ONLYOFFICE_DOCUMENT_SERVER_URL`、`ONLYOFFICE_PUBLIC_URL`、`APP_ONLYOFFICE_INTERNAL_URL`を更新
 - DocumentServerとLaravelの`/up`をヘルスチェック
 
@@ -243,23 +243,32 @@ container volume delete \
 
 [Apple Containerの名前付きボリューム](https://github.com/apple/container/blob/main/docs/command-reference.md#volume-management)は`container run --volume <名前>:<パス>`で存在しない場合に暗黙に作成されるため、上記手順でボリューム作成を含む初期構築を確認できます。
 
-### 日本語フォント（macOS）
+### CJKフォントとPDF出力
 
-macOSホストへフォントをインストールしても、隔離されたOnlyOfficeコンテナからは使用できません。`setup.sh`は次の固定ウェイトフォントを公式リポジトリから固定バージョンでダウンロードし、SHA-256を検証してからOnlyOfficeへ登録します。
+`--language`に`ja`、`zh_CN`、`zh_TW`、`ko`を指定すると、地域ごとに異なる漢字字形を混在させないため、対応するCJKフォントを選択します。Ubuntuでは`fonts-noto-cjk`をOnlyOffice導入前にインストールし、中国語・韓国語を選んだ場合は下表の固定フォントも`/usr/share/fonts/opentype/chatterrow`へ取得してOnlyOfficeカタログを再生成します。macOSでは隔離されたOnlyOfficeコンテナのカスタムフォント領域へ同じフォントを登録します。
 
-- [Source Han Sans JP](https://github.com/adobe-fonts/source-han-sans) Light / Regular / Bold（2.005R、JP subset OTF）
-- [Noto Serif CJK JP](https://github.com/notofonts/noto-cjk) Regular / Bold（Serif2.003、Japanese OTF）
+| 言語 | ゴシック／画面向け | 明朝・宋体向け |
+|------|----------------------|----------------|
+| `ja` | Source Han Sans JP | Noto Serif CJK JP |
+| `zh_CN` | Source Han Sans CN | Noto Serif CJK SC |
+| `zh_TW` | Source Han Sans TW | Noto Serif CJK TC |
+| `ko` | Source Han Sans KR | Noto Serif CJK KR |
+
+Source Han Sansは2.005Rの地域別subset OTF（Light / Regular / Bold）、Noto Serif CJKはSerif2.003の言語別OTF（Regular / Bold）に固定しています。いずれもSIL Open Font License 1.1です。
+
+ガントチャートのPDF出力では、`zh_CN`、`zh_TW`、`ko`を選択したセットアップ時に、jsPDFで検証済みのSource Han Sans 2.005R地域別Variable TTFも`public/fonts`へダウンロードします。日本語版TTFはリポジトリに同梱済みです。PDF生成時は現在の表示言語からJP/CN/TW/KRを選択します。
 
 フォントは`chatterrow-onlyoffice-data`ボリューム内の`/var/www/onlyoffice/Data/custom-fonts`へ保存されます。セットアップを再実行した場合はコンテナ内ファイルのSHA-256を確認し、一致していれば再ダウンロードしません。
 
 固定ウェイト版の登録後、`setup.sh`は既存の`AllFonts.js`と`font_selection.bin`を削除してから`allfontsgen`を実行します。既存ファイルを残すと`allfontsgen`がカタログを再利用し、新しいフォントを登録しない場合があるためです。
 
-OnlyOffice 9.4のconverterは、Microsoft Officeの日本語テーマフォントを`NanumGothic`や`Droid Sans Fallback`へ置換する場合があります。fontconfigのaliasだけではこの変換経路に効きません。そのため[scripts/patch-onlyoffice-font-catalog.php](scripts/patch-onlyoffice-font-catalog.php)が、サーバー側`font_selection.bin`とブラウザ側2個の`AllFonts.js`へ次の補正を適用します。
+OnlyOffice 9.4のconverterは、Microsoft OfficeのCJKテーマフォントを`NanumGothic`や`Droid Sans Fallback`へ置換する場合があります。fontconfigのaliasだけではこの変換経路に効きません。そのため[scripts/patch-onlyoffice-font-catalog.php](scripts/patch-onlyoffice-font-catalog.php)が、サーバー側`font_selection.bin`とブラウザ側2個の`AllFonts.js`へ言語別の補正を適用します。
 
-- 游ゴシック、Yu Gothic、Meiryo、MS Gothic系の別名をSource Han Sans JPへ登録
-- 游明朝、Yu Mincho、MS Mincho系の別名をNoto Serif CJK JPへ登録
-- converterが選択した`NanumGothic`の実フォント参照をSource Han Sans JPへ変更
-- converterが選択した`Droid Sans Fallback`の実フォント参照をNoto Serif CJK JPへ変更
+- 日本語: Yu Gothic／Meiryo系とYu Mincho／MS Mincho系
+- 簡体字: Microsoft YaHei／SimHei系とSimSun／FangSong系
+- 繁体字: Microsoft JhengHei系とMingLiU／PMingLiU系
+- 韓国語: Malgun Gothic／Gulim系とBatang系
+- converterの`NanumGothic`と`Droid Sans Fallback`参照を、選択言語のSans／Serif実体へ変更
 
 このカタログはDOCX、XLSX、PPTXの変換とブラウザ表示で共用されます。補正後にJSキャッシュを生成し、docserviceとconverterを再起動してからDocumentServerのキャッシュを消去します。カタログ形式や必須フォント名が将来の`latest`で変わった場合は、誤ったカタログを使わずセットアップをエラー終了します。
 
@@ -269,12 +278,18 @@ OnlyOffice 9.4のconverterは、Microsoft Officeの日本語テーマフォン�
 
 既存コンテナが`Generating presentation themes`で応答しなくなっている場合も、そのまま`./setup.sh`を再実行してください。macOSでは実行のたびに`onlyoffice/documentserver:latest`をpullし、既存のOnlyOfficeコンテナを強制的に作り直します。上記4個の名前付きボリュームは削除しないため、OnlyOfficeの永続データは保持されます。
 
-Microsoftの游明朝／游ゴシックは同梱・再配布しません。OnlyOfficeコンテナ内では次の代替設定を使用します。
+MicrosoftのCJKフォントは同梱・再配布しません。OnlyOfficeコンテナ内では次の代替設定を使用します。
 
 | Office指定フォント（DOCX / XLSX / PPTX）    | 代替フォント       |
 |---------------------------------------------|--------------------|
 | 游明朝 / Yu Mincho / MS Mincho              | Noto Serif CJK JP  |
 | 游ゴシック / Yu Gothic / Meiryo / MS Gothic | Source Han Sans JP |
+| Microsoft YaHei / SimHei | Source Han Sans CN |
+| SimSun / NSimSun / FangSong | Noto Serif CJK SC |
+| Microsoft JhengHei | Source Han Sans TW |
+| MingLiU / PMingLiU | Noto Serif CJK TC |
+| Malgun Gothic / Gulim / Dotum | Source Han Sans KR |
+| Batang / BatangChe | Noto Serif CJK KR |
 
 文字欠けと不適切な欧文フォントへの置換は解消しますが、游フォントとの字幅差があるため改行位置やページ数まで完全一致する保証はありません。完全一致が必要なら、利用許諾を確認した游フォント実体をOnlyOfficeのカスタムフォント領域へ別途配置してください。
 
@@ -311,6 +326,7 @@ Ubuntuの自動化環境では`--domain`と`--database`が必須です。macOS�
 | `--domain <domain>`          | 対話入力                           | アプリの公開ドメイン                              |
 | `--email <email>`            | 空                                 | Let's Encrypt登録・期限通知メール                 |
 | `--database <driver>`        | 対話時は`sqlite`                   | `sqlite`または`postgresql`                        |
+| `--language <locale>`        | 既存`.env`または`ja`              | `en`、`ja`、`zh_CN`、`zh_TW`、`ko`など            |
 | `--db-name <name>`           | `chatterrow`                       | アプリ用PostgreSQL DB名                           |
 | `--db-user <name>`           | `chatterrow`                       | アプリ用PostgreSQLロール                          |
 | `--db-password <password>`   | 自動生成                           | アプリ用PostgreSQLパスワード                      |

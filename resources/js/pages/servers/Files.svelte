@@ -16,6 +16,7 @@
     import ServerRail from '@/components/discord/ServerRail.svelte';
     import OnlyOfficePreviewDialog from '@/components/files/OnlyOfficePreviewDialog.svelte';
     import StoredFilePreviewDialog from '@/components/files/StoredFilePreviewDialog.svelte';
+    import GlobalSearch from '@/components/GlobalSearch.svelte';
     import { Badge } from '@/components/ui/badge';
     import { formatDate } from '@/lib/dates';
     import { filesFromDrop } from '@/lib/dropped-files';
@@ -25,6 +26,7 @@
     import type {
         ServerResource,
         ChannelResource,
+        SearchSnippetSegment,
         UserResource,
     } from '@/types';
 
@@ -43,6 +45,7 @@
 
     interface SearchResult extends StoredFileResource {
         snippet: string;
+        snippet_segments: SearchSnippetSegment[];
     }
 
     const officeExtensions = new Set([
@@ -90,6 +93,8 @@
     let searchResults = $state<SearchResult[]>([]);
     let searching = $state(false);
     let searchTimer: ReturnType<typeof setTimeout> | undefined = $state();
+    let searchController: AbortController | undefined = $state();
+    let searchSequence = 0;
 
     const isImage = (f: StoredFileResource): boolean =>
         (f.mime_type ?? '').startsWith('image/');
@@ -281,38 +286,74 @@
 
     async function onSearchInput() {
         clearTimeout(searchTimer);
+        searchController?.abort();
+        searchController = undefined;
+        searchSequence += 1;
+        const sequence = searchSequence;
         const query = searchQuery.trim();
 
         if (!query) {
             searchResults = [];
+            searching = false;
 
             return;
         }
 
         searching = true;
         searchTimer = setTimeout(async () => {
+            const controller = new AbortController();
+            searchController = controller;
+
             try {
+                const channelQuery = channel
+                    ? `&channel_id=${encodeURIComponent(String(channel.id))}`
+                    : '';
                 const data = await apiJson<{ results: SearchResult[] }>(
-                    `/servers/${server.id}/files/search?q=${encodeURIComponent(query)}`,
+                    `/servers/${server.id}/files/search?q=${encodeURIComponent(query)}${channelQuery}`,
+                    { signal: controller.signal },
                 );
+
+                if (sequence !== searchSequence) {
+                    return;
+                }
+
                 searchResults = data.results;
             } catch (e) {
+                if (
+                    sequence !== searchSequence ||
+                    (e instanceof Error && e.name === 'AbortError')
+                ) {
+                    return;
+                }
+
                 error =
                     e instanceof HttpError
                         ? e.messageText()
                         : t('Failed to search files');
                 searchResults = [];
             } finally {
-                searching = false;
+                if (sequence === searchSequence) {
+                    searching = false;
+                }
+
+                if (searchController === controller) {
+                    searchController = undefined;
+                }
             }
         }, 300);
     }
 
-    function snippetParts(snippet: string): { text: string; hit: boolean }[] {
-        return snippet.split(/<mark>|<\/mark>/).map((part, index) => ({
-            text: part,
-            hit: index % 2 === 1,
-        }));
+    function snippetSegments(result: SearchResult): SearchSnippetSegment[] {
+        if (result.snippet_segments.length > 0) {
+            return result.snippet_segments;
+        }
+
+        return [
+            {
+                type: 'text',
+                text: result.snippet.replace(/<\/?mark>/g, ''),
+            },
+        ];
     }
 
     function openSearchResult(result: SearchResult) {
@@ -366,7 +407,8 @@
                     ? t('Files - #:channel', { channel: channel.name })
                     : t('File list')}
             </h1>
-            <span class="ml-auto text-xs text-[#80848e]">
+            <GlobalSearch class="ml-auto" />
+            <span class="text-xs text-[#80848e]">
                 {t('File count: :count', { count: String(files.length) })}
             </span>
         </header>
@@ -416,15 +458,12 @@
                                 <span
                                     class="mt-1 block text-xs leading-5 text-[#80848e]"
                                 >
-                                    {#each snippetParts(result.snippet) as part (part.text + part.hit)}
-                                        {#if part.hit}
-                                            <mark
-                                                class="rounded-sm bg-[#f0b232]/40 text-[#dbdee1]"
-                                                >{part.text}</mark
-                                            >
-                                        {:else}
-                                            {part.text}
-                                        {/if}
+                                    {#each snippetSegments(result) as segment, segmentIndex (segmentIndex)}
+                                        <span
+                                            class={segment.type === 'hit'
+                                                ? 'rounded-sm bg-[#f0b232]/40'
+                                                : ''}>{segment.text}</span
+                                        >
                                     {/each}
                                 </span>
                             </button>

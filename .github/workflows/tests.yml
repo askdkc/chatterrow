@@ -81,3 +81,76 @@ jobs:
 
       - name: Run CI Checks
         run: composer ci:check
+
+  pgroonga:
+    name: PostgreSQL + PGroonga integration
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: chatterrow
+      DB_USERNAME: chatterrow
+      DB_PASSWORD: chatterrow-password
+
+    services:
+      postgres:
+        image: groonga/pgroonga:4.0.8-debian-16@sha256:24bc15d68143620bf21eb292d905aa5e9bcff120fd09032f119ab316b38cd19a
+        env:
+          POSTGRES_DB: chatterrow
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chatterrow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: pgsql
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Prepare database role and extension
+        env:
+          PGPASSWORD: postgres-password
+        run: |
+          psql --host=127.0.0.1 --username=postgres --dbname=postgres --set=ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE chatterrow LOGIN PASSWORD 'chatterrow-password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          ALTER DATABASE chatterrow OWNER TO chatterrow;
+          SQL
+          psql --host=127.0.0.1 --username=postgres --dbname=chatterrow --set=ON_ERROR_STOP=1 <<'SQL'
+          CREATE EXTENSION IF NOT EXISTS pgroonga;
+          GRANT USAGE ON SCHEMA pgroonga TO chatterrow;
+          SQL
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          php artisan migrate:fresh --force
+          php artisan migrate:rollback --step=1 --force
+          php artisan migrate --force
+
+      - name: Run PGroonga integration tests
+        run: php artisan test --group=pgroonga --no-coverage

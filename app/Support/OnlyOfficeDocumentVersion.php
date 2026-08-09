@@ -6,9 +6,9 @@ use App\Models\StoredFile;
 
 class OnlyOfficeDocumentVersion
 {
-    // Invalidate DocumentServer conversions generated before the Source Han /
-    // Noto CJK catalog and Office fallback mappings were introduced.
-    private const NAMESPACE = 'chatterrow-onlyoffice-document-v3-source-han-noto-cjk';
+    // Invalidate conversions generated before the locale-specific CJK catalog
+    // and Microsoft Chinese/Korean Office aliases were introduced.
+    private const NAMESPACE = 'chatterrow-onlyoffice-document-v4-regional-cjk-fonts';
 
     public function key(StoredFile $storedFile): string
     {
