@@ -142,7 +142,7 @@ jobs:
 
             if [[ "${{ matrix.database }}" == "postgresql" ]]; then
               grep -qx "DB_CONNECTION=pgsql" /var/www/chatterrow/.env
-              extension_version="$(sudo -u postgres psql -d chatterrow -Atqc \
+              extension_version="$(runuser -u postgres -- psql -d chatterrow -Atqc \
                 "SELECT extversion FROM pg_extension WHERE extname = \$\$pgroonga\$\$")"
               [[ -n "$extension_version" ]]
             fi
