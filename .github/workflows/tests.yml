@@ -138,7 +138,6 @@ jobs:
           SQL
           psql --host=127.0.0.1 --username=postgres --dbname=chatterrow --set=ON_ERROR_STOP=1 <<'SQL'
           CREATE EXTENSION IF NOT EXISTS pgroonga;
-          GRANT USAGE ON SCHEMA pgroonga TO chatterrow;
           SQL
 
       - name: Install PHP dependencies

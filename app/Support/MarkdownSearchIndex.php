@@ -152,9 +152,9 @@ class MarkdownSearchIndex
     }
 
     /**
-     * PGroonga's v2 operator receives one bound word at a time. This keeps
-     * user input out of Groonga's query language and gives the same AND
-     * semantics as SQLite's FTS query.
+     * PGroonga's v2 query operator receives one bound query made of quoted
+     * terms. This keeps user input out of Groonga's query language while
+     * giving the same AND semantics as SQLite's FTS query.
      *
      * @return Collection<int, stdClass>
      */
@@ -174,9 +174,10 @@ class MarkdownSearchIndex
             ->orderByDesc('stored_files.id')
             ->limit($limit);
 
-        foreach ($query->terms as $term) {
-            $builder->whereRaw('markdown_doc_contents.content &@ ?', [$term]);
-        }
+        $builder->whereRaw(
+            'markdown_doc_contents.content &@~ ?',
+            [$query->postgresGroongaQuery()],
+        );
 
         return $this->finishPgroongaRows($builder->get());
     }

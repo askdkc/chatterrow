@@ -99,9 +99,7 @@ final class GlobalSearchService
         }
 
         if ($driver === 'pgsql') {
-            foreach ($query->terms as $term) {
-                $builder->whereRaw('messages.body &@ ?', [$term]);
-            }
+            $builder->whereRaw('messages.body &@~ ?', [$query->postgresGroongaQuery()]);
         } elseif ($driver === 'sqlite' && $this->canUseTrigramFts($query)) {
             $builder
                 ->join('messages_fts', 'messages_fts.rowid', '=', 'messages.id')

@@ -57,4 +57,12 @@ final readonly class SearchQuery
             $this->terms,
         )).'}';
     }
+
+    public function postgresGroongaQuery(): string
+    {
+        return implode(' ', array_map(
+            static fn (string $term): string => '"'.str_replace(['\\', '"'], ['\\\\', '\\"'], $term).'"',
+            $this->terms,
+        ));
+    }
 }

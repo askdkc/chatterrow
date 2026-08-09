@@ -135,10 +135,10 @@ class PgroongaSearchTest extends TestCase
         $message = Message::factory()->create([
             'server_id' => $this->server->id,
             'channel_id' => $this->channel->id,
-            'body' => 'literal % marker _ slash \\ hyphen - colon :',
+            'body' => 'literal % marker _ slash \\ hyphen - colon : OR AND',
         ]);
 
-        foreach (['%', '_', '\\', '-', ':'] as $term) {
+        foreach (['%', '_', '\\', '-', ':', 'OR', 'AND'] as $term) {
             $results = $this->actingAs($this->member)
                 ->getJson(route('search', ['q' => $term]))
                 ->assertOk()
@@ -158,8 +158,8 @@ class PgroongaSearchTest extends TestCase
             DB::statement('SET LOCAL enable_seqscan = off');
 
             $row = DB::selectOne(
-                'EXPLAIN (FORMAT JSON) SELECT id FROM messages WHERE body &@ ?',
-                ['roonga'],
+                'EXPLAIN (FORMAT JSON) SELECT id FROM messages WHERE body &@~ ?',
+                ['"roonga"'],
             );
 
             return json_encode($row, JSON_THROW_ON_ERROR);
