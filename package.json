@@ -39,7 +39,7 @@
         "vitest": "^4.1.11"
     },
     "dependencies": {
-        "@file-viewer/preset-office": "^2.2.4",
+        "@file-viewer/preset-office": "^2.4.0",
         "@file-viewer/web": "^2.2.4",
         "@inertiajs/svelte": "^3.0.0",
         "@inertiajs/vite": "^3.0.0",
